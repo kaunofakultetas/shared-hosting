@@ -1,0 +1,12 @@
+[Unit]
+Description=Fix default gateway at boot
+Wants=network.target
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/fix-gateway.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

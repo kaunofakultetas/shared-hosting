@@ -1,0 +1,27 @@
+# users-ssh-router/sshd_config
+
+Port 22
+Protocol 2
+
+# Let arbitrary users log in with password
+UsePAM no
+PasswordAuthentication yes
+# We'll specify a "universal" password file below
+
+# Let dynamic port forwarding (VS Code) work
+AllowTcpForwarding yes
+
+# Force all logins through our script
+ForceCommand /usr/local/bin/route_user.sh
+
+# No default shell? We'll forcibly ignore local accounts anyway
+PermitRootLogin yes  # optional, for container debugging
+ChallengeResponseAuthentication no
+X11Forwarding no
+
+# Key-based authentication OFF for simplicity:
+PubkeyAuthentication no
+AuthorizedKeysFile none
+
+# Logging: show debug if you want
+LogLevel VERBOSE
