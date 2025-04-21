@@ -1,0 +1,83 @@
+{
+    # Global options block
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 100mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+    }
+}
+
+
+
+hosting.knf.vu.lt {
+    tls admin@knf.vu.lt
+
+    ####### DBGate Endpoint #######
+    redir /dbgate /dbgate/ 301
+    handle /dbgate/* {
+        forward_auth hosting-control-backend:8000 {
+            uri /api/checkauth/admin
+        }
+        reverse_proxy hosting-control-dbgate:3000
+    }
+
+
+
+    ####### Docs Endpoint #######
+    redir /docs /docs/ 301
+
+    @docs_categories path_regexp cats ^/docs/categories/?(.*)$
+    redir @docs_categories /docs/shelves/{re.cats.1} 301
+
+    @docs_topics path_regexp tops ^/docs/topics/?(.*)$
+    redir @docs_topics /docs/books/{re.tops.1} 301
+
+    handle_path /docs* {
+        reverse_proxy hosting-control-docs-web:80
+    }
+    handle /draw/* {
+        reverse_proxy hosting-control-docs-drawio:8080
+    }
+
+
+
+
+    ####### API Endpoint #######
+    handle /api/* {
+        reverse_proxy hosting-control-backend:8000
+    }
+
+
+
+    ####### Frontend Endpoint #######
+    reverse_proxy hosting-control-frontend:443
+}
+
+
+
+hosting.knf.vu.lt:8443 {
+    tls admin@knf.vu.lt
+
+    # Check if user is authenticated
+    forward_auth hosting-control-backend:8000 {
+        uri /api/checkauth/vm/{http.request.cookie.virtual-server-id}
+    }
+
+    # Reverse proxy to user's dind
+    reverse_proxy hosting-users-dind-{http.request.cookie.virtual-server-id}:10080
+
+    handle_errors 404 {
+        respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
+    }
+
+    # Handle errors
+    handle_errors {
+        respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
+    }
+
+}
+
+
