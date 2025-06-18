@@ -29,4 +29,4 @@ Virtualization structure is as follows:
 <br>
 
 ## Installation
-Follow instructions here: [Installation Guide](https://github.com/kaunofakultetas/gateopener-server/blob/main/INSTALATION.md) 
+Follow instructions here: [Installation Guide](https://github.com/kaunofakultetas/shared-hosting/blob/main/INSTALLATION.md) 
