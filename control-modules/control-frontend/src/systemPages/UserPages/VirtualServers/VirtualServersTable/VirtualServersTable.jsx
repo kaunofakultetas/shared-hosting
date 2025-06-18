@@ -13,6 +13,8 @@ import {
   TableRow,
   Tooltip,
   Typography,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import axios from "axios";
@@ -30,18 +32,21 @@ import toast, { Toaster } from 'react-hot-toast';
 
 
 
-const VirtualServersTable = () => {
+const VirtualServersTable = ({ authdata }) => {
   const theme = useTheme();
 
   // Local states
   const [loadingData, setLoadingData] = useState(true);
   const [data, setData] = useState([]);
   const [openBackdrop, setOpenBackdrop] = useState(false);
+  const [showOtherUsers, setShowOtherUsers] = useState(false); // State for the switch
 
   // Fetch data from server
   const fetchData = async () => {
     try {
-      const response = await axios.get("/api/vm");
+      const response = await axios.get("/api/vm", {
+        params: { showOtherUsers: showOtherUsers.toString() }, // Pass the state as a query parameter
+      });
       const sortedData = response.data.sort((a, b) => a.id - b.id);
       setData(sortedData);
       setLoadingData(false);
@@ -51,23 +56,27 @@ const VirtualServersTable = () => {
     }
   };
 
+
   // Auto-update data every 3 seconds
   useEffect(() => {
     fetchData(); // Initial fetch
     const intervalId = setInterval(fetchData, 3000); // Fetch every 3 seconds
 
     return () => clearInterval(intervalId); // Cleanup on component unmount
-  }, [openBackdrop]);
+  }, [openBackdrop, showOtherUsers]);
+
 
   // 1. Row click -> open new URL
   const handleRowClick = (row) => {
     window.location.href = `/vm/${row.id}`;
   };
 
+
   // 2. Open the Backdrop for creating a new VM
   const triggerAddNewVM = () => {
     setOpenBackdrop(true);
   };
+
 
   // Start/Stop logic
   const handleStartStop = (e, row) => {
@@ -87,6 +96,7 @@ const VirtualServersTable = () => {
     }
   };
 
+
   // Delete logic
   const handleDelete = (e, row) => {
     e.stopPropagation();
@@ -98,6 +108,7 @@ const VirtualServersTable = () => {
       toast.success(<b>Deleting server: #{row.id}</b>, {duration: 10000});
     }
   };
+
 
   return (
     <Paper
@@ -122,19 +133,34 @@ const VirtualServersTable = () => {
         <Typography variant="h5" sx={{ color: theme.palette.text.secondary }}>
           Virtual Servers
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddCircleOutlinedIcon />}
-          sx={{
-            textTransform: "none",
-            fontWeight: "bold",
-            height: 36,
-          }}
-          onClick={triggerAddNewVM}
-        >
-          New Virtual Server
-        </Button>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          { authdata.admin === 1 && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showOtherUsers}
+                  onChange={(e) => setShowOtherUsers(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Show other users"
+            />
+          )}
+
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddCircleOutlinedIcon />}
+            sx={{
+              textTransform: "none",
+              fontWeight: "bold",
+              height: 36,
+            }}
+            onClick={triggerAddNewVM}
+          >
+            New Virtual Server
+          </Button>
+        </Box>
       </Box>
 
       {/* Table */}

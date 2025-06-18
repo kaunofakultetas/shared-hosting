@@ -1,0 +1,34 @@
+# Control Modules
+control-modules/control-backend/database.db
+control-modules/control-backend/database.db-shm
+control-modules/control-backend/database.db-wal
+
+control-modules/control-caddy/caddy_*
+control-modules/control-caddy/certs
+
+control-modules/control-docs
+
+
+
+# Users Modules
+users-modules/users-caddy/caddy_*
+users-modules/users-caddy/certs
+users-modules/users-caddy/Caddyfile
+
+users-modules/users-sshr
+
+
+
+# Users Virtual Servers
+SERVERS
+
+
+
+
+
+#### Common ignored files ###
+# Byte-compiled / optimized python files
+__pycache__/
+*.py[cod]
+*$py.class
+
