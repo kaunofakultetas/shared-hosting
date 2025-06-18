@@ -71,44 +71,22 @@ serhii.knf-hosting.lt {
 
 
 
-# DNS ID: 15
-wordpress.knf-hosting.lt {
-    tls admin@knf.vu.lt
+# DNS ID: 21
+http://zkp-lab.knf-hosting.lt {
 
-    reverse_proxy http://hosting-users-dind-31:80 {
+
+    reverse_proxy http://hosting-users-dind-48:80 {
         header_up X-Forwarded-For {remote_host}
     }
 }
 
 
 
-# DNS ID: 17
-joomla.knf-hosting.lt {
+# DNS ID: 23
+manim.knf-hosting.lt {
     tls admin@knf.vu.lt
 
-    reverse_proxy http://hosting-users-dind-44:80 {
-        header_up X-Forwarded-For {remote_host}
-    }
-}
-
-
-
-# DNS ID: 18
-ollama.knf-hosting.lt {
-    tls admin@knf.vu.lt
-
-    reverse_proxy http://hosting-users-dind-45:80 {
-        header_up X-Forwarded-For {remote_host}
-    }
-}
-
-
-
-# DNS ID: 19
-n8n.knf-hosting.lt {
-    tls admin@knf.vu.lt
-
-    reverse_proxy http://hosting-users-dind-46:80 {
+    reverse_proxy http://hosting-users-dind-47:80 {
         header_up X-Forwarded-For {remote_host}
     }
 }

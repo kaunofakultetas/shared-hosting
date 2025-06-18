@@ -32,16 +32,16 @@ services:
     image: hosting-control-frontend
     build:
       context: ./control-modules/control-frontend
-      dockerfile: Dockerfile.prod                 # Prod
-      # dockerfile: Dockerfile.dev                  # Dev
+      # dockerfile: Dockerfile.prod                 # Prod
+      dockerfile: Dockerfile.dev                  # Dev
     environment:
       - NEXT_PUBLIC_API_URL=http://hosting-control-backend:8000
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      # - ./control-modules/control-frontend:/app   # Dev
+      - ./control-modules/control-frontend:/app   # Dev
     networks:
       - isolated-control-panel
-      # - external                                  # Dev
+      - external                                  # Dev
     restart: unless-stopped
 
 

@@ -496,6 +496,10 @@ def homePage_HTTPGET():
 @login_required
 def vm_HTTPGET(virtualServerID=None):
 
+    showOtherUsersVMs = request.args.get('showOtherUsers', 'false').lower() == 'true'
+    if current_user.admin == 0 and showOtherUsersVMs:
+        return jsonify({'message':'Unauthorized'}), 401
+
     # Check if user is allowed to access specific virtual server
     if(virtualServerID is not None):    
         if(check_user_is_allowed_to_access_vm(current_user, virtualServerID) == False):
@@ -596,9 +600,14 @@ def vm_HTTPGET(virtualServerID=None):
 			LEFT JOIN GetVirtualServersStacks
 				ON GetVirtualServersStacks.ParentServerID = GetVirtualServers.VirtualServerID
             WHERE
-                {f"GetVirtualServers.VirtualServerID = '{virtualServerID}'" 
-                    if virtualServerID is not None else 
-                f"GetVirtualServers.OwnerID = '{current_user.id}'"}
+                1=1
+
+                -- If virtual server ID is provided, filter by virtual server ID
+                {f"AND GetVirtualServers.VirtualServerID = '{virtualServerID}'" if virtualServerID is not None else ''}
+
+                -- If user does not want to see all virtual servers, filter by user ID
+                {f"AND GetVirtualServers.OwnerID = '{current_user.id}'" if showOtherUsersVMs == False and virtualServerID is None else ''}
+
         ''', [])
         responseJson = sqlFetchData.fetchone()[0]
         responseJson = json.dumps(json.loads(responseJson), indent=4)

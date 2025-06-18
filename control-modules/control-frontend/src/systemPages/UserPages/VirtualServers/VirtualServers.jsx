@@ -11,7 +11,7 @@ const VirtualServersPage = ({ authdata }) => {
       <Toaster />
       <div style={{display: 'flex', flexDirection: 'row'}}> 
         <Sidebar authdata={authdata}/>
-        <VirtualServersTable/>
+        <VirtualServersTable authdata={authdata}/>
       </div>
       <div style={{background: 'rgb(123, 0, 63)', height: 30, display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', fontSize: "0.7em"}}> 
         Copyright © | All Rights Reserved | VUKnF
