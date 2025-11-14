@@ -1,5 +1,10 @@
 #!/bin/bash
 
+
+# Control backend database
+mkdir -p _DATA/control-backend
+
+
 # Create Docs directories
 mkdir -p control-modules/control-docs/app_data
 mkdir -p control-modules/control-docs/db_data
