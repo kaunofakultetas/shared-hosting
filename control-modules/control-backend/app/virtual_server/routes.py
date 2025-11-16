@@ -14,6 +14,8 @@ import json
 from datetime import datetime
 import random
 import re
+import requests
+import os
 
 from ..auth.user import load_user, admin_required, check_user_is_allowed_to_access_vm
 from ..database.db import get_db_connection
@@ -26,7 +28,8 @@ virtual_server_bp = Blueprint('virtual_server', __name__)
 
 
 
-
+DOCKER_CONTROLLER_HOST = os.getenv('DOCKER_CONTROLLER_HOST')
+DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT')
 
 
 

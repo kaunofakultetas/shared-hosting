@@ -11,6 +11,7 @@ import random
 import os
 import hashlib
 from datetime import datetime
+from threading import Thread
 
 
 
@@ -25,8 +26,13 @@ def create_app():
     # from .database.db_init import init_db
     # init_db()
 
+    # Initialize docker monitor
+    from .docker.monitor import docker_info_background_updater
+    daemon = Thread(target=docker_info_background_updater, daemon=True, name='DockerInfoUpdater')
+    daemon.start()
 
-    # Initialize Flask app
+
+    ###### Flask App Initialization ######
     app = Flask(__name__)
 
 
@@ -53,5 +59,8 @@ def create_app():
     from .dns_controller.routes import dns_controller_bp
     app.register_blueprint(dns_controller_bp, url_prefix='')
 
-    
+
+
+
+
     return app

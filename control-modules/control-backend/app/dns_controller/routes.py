@@ -10,6 +10,8 @@ from flask_login import login_required, current_user
 import json
 import requests
 import re
+import urllib.parse
+import os
 
 
 from ..database.db import get_db_connection
@@ -20,6 +22,9 @@ from ..auth.user import check_user_is_allowed_to_access_vm
 dns_controller_bp = Blueprint('dns_controller', __name__)
 
 
+
+DOCKER_CONTROLLER_HOST = os.getenv('DOCKER_CONTROLLER_HOST')
+DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT')
 
 
 
