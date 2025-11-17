@@ -1,7 +1,8 @@
 services:
 
 
-  # Frontend of the System Control Panel
+  ##################### INCOMMING TRAFFIC ENDPOINTS #####################
+  # Endpoint of the system control panel
   hosting-control-caddy:
     container_name: hosting-control-caddy
     image: caddy:2.9-alpine
@@ -25,21 +26,30 @@ services:
     restart: unless-stopped
 
 
-
-  control-ssl-checker:
-    container_name: control-ssl-checker
-    image: ssl-checker
-    build: ./control-modules/control-ssl-checker
-    environment:
-      - CHECK_HOSTS=hosting.knf.vu.lt
-      - ZABBIX_HOST=158.129.172.248
-      - ZABBIX_TRAPPER_HOST=KNF-HOSTING-STUD
-      - ZABBIX_TRAPPER_KEY=ssl_expiry_caddy_control
-    # volumes:                                                    # Dev
-    #   - ./control-modules/control-ssl-checker:/app              # Dev
+  # Users servers hosted apps WEB traffic endpoint
+  hosting-users-caddy:
+    container_name: hosting-users-caddy
+    image: caddy:2.9-alpine
+    user: 1000:1000
+    runtime: sysbox-runc
+    volumes:
+      - ./_DATA/users-caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_DATA/users-caddy/caddy_data:/data
+      - ./_DATA/users-caddy/caddy_config:/config
+      - ./_DATA/users-caddy/caddy_logs:/var/log/caddy
+      - ./_DATA/users-caddy/certs:/config/certs:ro
+    depends_on:
+      - hosting-users-firewall
+    ports:
+      - 10080:80
+      - 10443:443
     networks:
-      - external
+      external: {}
+      filtered-users:
+        ipv4_address: 172.19.2.3
     restart: unless-stopped
+  #######################################################################
+
 
 
 
@@ -202,31 +212,6 @@ services:
   #########################################################
 
 
-
-
-
-
-  hosting-users-caddy:
-    container_name: hosting-users-caddy
-    image: caddy:2.9-alpine
-    user: 1000:1000
-    runtime: sysbox-runc
-    volumes:
-      - ./_DATA/users-caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./_DATA/users-caddy/caddy_data:/data
-      - ./_DATA/users-caddy/caddy_config:/config
-      - ./_DATA/users-caddy/caddy_logs:/var/log/caddy
-      - ./_DATA/users-caddy/certs:/config/certs:ro
-    depends_on:
-      - hosting-users-firewall
-    ports:
-      - 10080:80
-      - 10443:443
-    networks:
-      external: {}
-      filtered-users:
-        ipv4_address: 172.19.2.3
-    restart: unless-stopped
 
 
 
