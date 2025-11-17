@@ -1,0 +1,304 @@
+services:
+
+
+  # Frontend of the System Control Panel
+  hosting-control-caddy:
+    container_name: hosting-control-caddy
+    image: caddy:2.9-alpine
+    user: 1000:1000
+    runtime: sysbox-runc
+    volumes:
+      - ./control-modules/control-caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_DATA/control-caddy/caddy_data:/data
+      - ./_DATA/control-caddy/caddy_config:/config
+      - ./_DATA/control-caddy/caddy_logs:/var/log/caddy
+      - ./_DATA/control-caddy/certs:/config/certs:ro
+    ports:
+      - 80:80
+      - 443:443
+      - 8443:8443
+    networks:
+      external: {}
+      isolated-control-panel: {}
+      filtered-users:
+        ipv4_address: 172.19.2.2
+    restart: unless-stopped
+
+
+
+  control-ssl-checker:
+    container_name: control-ssl-checker
+    image: ssl-checker
+    build: ./control-modules/control-ssl-checker
+    environment:
+      - CHECK_HOSTS=hosting.knf.vu.lt
+      - ZABBIX_HOST=158.129.172.248
+      - ZABBIX_TRAPPER_HOST=KNF-HOSTING-STUD
+      - ZABBIX_TRAPPER_KEY=ssl_expiry_caddy_control
+    # volumes:                                                    # Dev
+    #   - ./control-modules/control-ssl-checker:/app              # Dev
+    networks:
+      - external
+    restart: unless-stopped
+
+
+
+  # Control Panel Frontend
+  hosting-control-frontend:
+    container_name: hosting-control-frontend
+    image: vuknf/hosting-control-frontend:latest
+    environment:
+      - BACKEND_API_URL=http://hosting-control-backend:8000
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      # - ./control-modules/control-frontend:/app                 # Dev
+    networks:
+      - isolated-control-panel
+      # - external                                                # Dev
+    restart: unless-stopped
+
+
+
+  # Control Panel Backend
+  hosting-control-backend:
+    container_name: hosting-control-backend
+    image: vuknf/hosting-control-backend:latest
+    environment:
+      - TMPDIR=/tmp/backend
+      - APP_DEBUG=true                              # Dev
+      - DB_PATH=/data/database.db
+
+      - DOCKER_CONTROLLER_HOST=hosting-control-docker
+      - DOCKER_CONTROLLER_PORT=8000
+    
+    read_only: true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./control-modules/control-backend:/app
+      - ./_DATA/control-backend:/data
+    networks:
+      - isolated-control-panel
+      - isolated-control-docker
+      - external                                    # Dev
+    restart: unless-stopped
+
+
+  # Database Browser
+  hosting-control-dbgate:
+    container_name: hosting-control-dbgate
+    image: dbgate/dbgate@sha256:909d27d1ed5bf4141de61a0c61017e0f8e0a26f320358fd37731967b7894603b
+    environment:
+      WEB_ROOT: /dbgate
+
+      CONNECTIONS: con1
+      LABEL_con1: App Hosting Platform - SQLite
+      FILE_con1: /root/db.sqlite3
+      ENGINE_con1: sqlite@dbgate-plugin-sqlite
+    read_only: false
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./control-modules/control-backend/database.db:/root/db.sqlite3
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+
+
+
+
+
+  # System Docker Controller
+  hosting-control-docker:
+    container_name: hosting-control-docker
+    image: vuknf/hosting-control-docker:latest
+    environment:
+      - APP_DEBUG=true                  # Dev
+      - ROOT_DIR=/home/aula/apps/students
+    read_only: true
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+
+      # Users Caddy
+      - ./_DATA/users-caddy:/users-caddy
+
+      # Control Docker
+      - ./control-modules/control-docker:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # VM Images and Running Servers
+      - /home/aula/apps/students/IMAGES:/home/aula/apps/students/IMAGES
+      - /home/aula/apps/students/SERVERS:/home/aula/apps/students/SERVERS
+    networks:
+      - isolated-control-docker
+      - external                        # Dev
+    restart: unless-stopped
+
+
+
+
+
+
+
+  #########################################################
+  ###############  Bookstack Documentation ################
+  #########################################################
+  hosting-control-docs-web:
+    container_name: hosting-control-docs-web
+    image: linuxserver/bookstack:24.12.1
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - APP_KEY=base64:e1NVJQyStpl8Pc+rIVGGYq1sj6yzmJdihwkXWy9LhuU=
+      - APP_URL=https://hosting.knf.vu.lt/docs
+      - DB_HOST=hosting-control-docs-mariadb
+      - DB_PORT=3306
+      - DB_USERNAME=bookstack
+      - DB_PASSWORD=bookstack
+      - DB_DATABASE=bookstackapp
+      - APP_DEFAULT_DARK_MODE=true
+      - APP_PROXIES=*
+      - APP_TIMEZONE=Europe/Vilnius
+      - SESSION_LIFETIME=40320
+      - DRAWIO=https://hosting.knf.vu.lt/draw/?embed=1&proto=json&spin=1&configure=1
+    read_only: false
+    volumes:
+      - ./_DATA/control-docs/app_data:/config
+    depends_on:
+      - hosting-control-docs-mariadb
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+
+
+
+  hosting-control-docs-mariadb:
+    container_name: hosting-control-docs-mariadb
+    image: linuxserver/mariadb:10.11.10
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - MYSQL_ROOT_PASSWORD=bookstack
+      - TZ=Europe/Vilnius
+      - MYSQL_DATABASE=bookstackapp
+      - MYSQL_USER=bookstack
+      - MYSQL_PASSWORD=bookstack
+    read_only: false
+    volumes:
+      - ./_DATA/control-docs/db_data:/config
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+
+
+
+  hosting-control-docs-drawio:
+    container_name: hosting-control-docs-drawio
+    image: jgraph/drawio:26.0.9
+    read_only: false
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+  #########################################################
+  #########################################################
+  #########################################################
+
+
+
+
+
+
+  hosting-users-caddy:
+    container_name: hosting-users-caddy
+    image: caddy:2.9-alpine
+    user: 1000:1000
+    runtime: sysbox-runc
+    volumes:
+      - ./_DATA/users-caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_DATA/users-caddy/caddy_data:/data
+      - ./_DATA/users-caddy/caddy_config:/config
+      - ./_DATA/users-caddy/caddy_logs:/var/log/caddy
+      - ./_DATA/users-caddy/certs:/config/certs:ro
+    depends_on:
+      - hosting-users-firewall
+    ports:
+      - 10080:80
+      - 10443:443
+    networks:
+      external: {}
+      filtered-users:
+        ipv4_address: 172.19.2.3
+    restart: unless-stopped
+
+
+
+  # Outgoing users traffic firewall
+  hosting-users-firewall:
+    container_name: hosting-users-firewall
+    image: vuknf/hosting-users-firewall:latest
+    runtime: sysbox-runc
+    command: >-
+      sh -c "
+      sysctl -w net.ipv4.ip_forward=1 &&
+      iptables -F &&
+      iptables -t nat -F &&
+      iptables -t nat -X &&
+
+      echo '[*] Set default policies' &&
+      iptables -P FORWARD DROP &&
+
+      echo '[*] Restrict access to local networks' &&
+      iptables -A FORWARD -s 172.19.2.0/24 -d 172.16.0.0/12 -j DROP &&
+      iptables -A FORWARD -s 172.19.2.0/24 -d 192.168.0.0/16 -j DROP &&
+      iptables -A FORWARD -s 172.19.2.0/24 -d 10.0.0.0/8 -j DROP &&
+
+      echo '[*] Allow NATed traffic to flow' &&
+      iptables -t nat -A POSTROUTING -s 172.19.2.0/24 ! -o eth1 -j MASQUERADE &&
+
+      echo '[*] Allow traffic from isolated_net to external network' &&
+      iptables -A FORWARD -i eth1 -o eth0 -d 0.0.0.0/0 -j ACCEPT &&
+
+      echo '[*] Allow returning traffic' &&
+      iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT &&
+
+      echo '[*] Router configuration complete' &&
+      tail -f /dev/null"
+    networks:
+      external: {}
+      filtered-users:
+        ipv4_address: 172.19.2.1
+    restart: unless-stopped
+
+
+
+
+
+networks:
+  external:
+    name: external
+    external: true
+  isolated-control-panel:
+    name: isolated-control-panel
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.19.0.0/24
+          gateway: 172.19.0.1
+  isolated-control-docker:
+    name: isolated-control-docker
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.19.1.0/24
+          gateway: 172.19.1.1
+  filtered-users:
+    name: filtered-users
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: 'false'
+    ipam:
+      config:
+        - subnet: 172.19.2.0/24
+          ip_range: 172.19.2.128/25
+          gateway: 172.19.2.254

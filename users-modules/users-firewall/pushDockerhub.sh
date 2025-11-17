@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONTAINER_NAME=hosting-control-backend
+CONTAINER_NAME=hosting-users-firewall
 
 TODAY=$(date +%Y%m%d)
 sudo docker login -u admin@knf.vu.lt

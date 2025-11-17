@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir              \
     "Flask-CORS==4.0.0"                     \
     "docker==7.1.0"
 
+    
+COPY . .
+
 
 EXPOSE 8000
 CMD ["python3", "-u", "main.py", "--http"]

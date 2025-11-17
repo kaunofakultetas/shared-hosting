@@ -12,5 +12,8 @@ RUN pip install --no-cache-dir              \
     "requests==2.32.3"
 
 
+COPY . .
+
+
 EXPOSE 8000
 CMD ["python3", "-u", "main.py", "--http"]
