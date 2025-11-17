@@ -61,10 +61,8 @@ services:
       - BACKEND_API_URL=http://hosting-control-backend:8000
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      # - ./control-modules/control-frontend:/app                 # Dev
     networks:
       - isolated-control-panel
-      # - external                                                # Dev
     restart: unless-stopped
 
 
@@ -75,21 +73,17 @@ services:
     image: vuknf/hosting-control-backend:latest
     environment:
       - TMPDIR=/tmp/backend
-      - APP_DEBUG=true                              # Dev
       - DB_PATH=/data/database.db
 
       - DOCKER_CONTROLLER_HOST=hosting-control-docker
       - DOCKER_CONTROLLER_PORT=8000
-    
     read_only: true
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./control-modules/control-backend:/app
       - ./_DATA/control-backend:/data
     networks:
       - isolated-control-panel
       - isolated-control-docker
-      - external                                    # Dev
     restart: unless-stopped
 
 
@@ -121,7 +115,6 @@ services:
     container_name: hosting-control-docker
     image: vuknf/hosting-control-docker:latest
     environment:
-      - APP_DEBUG=true                  # Dev
       - ROOT_DIR=/home/aula/apps/students
     read_only: true
     volumes:
@@ -131,7 +124,6 @@ services:
       - ./_DATA/users-caddy:/users-caddy
 
       # Control Docker
-      - ./control-modules/control-docker:/app
       - /var/run/docker.sock:/var/run/docker.sock
 
       # VM Images and Running Servers
@@ -139,7 +131,6 @@ services:
       - /home/aula/apps/students/SERVERS:/home/aula/apps/students/SERVERS
     networks:
       - isolated-control-docker
-      - external                        # Dev
     restart: unless-stopped
 
 
@@ -157,7 +148,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - APP_KEY=base64:e1NVJQyStpl8Pc+rIVGGYq1sj6yzmJdihwkXWy9LhuU=
+      - APP_KEY=<Generate your own app key>
       - APP_URL=https://hosting.knf.vu.lt/docs
       - DB_HOST=hosting-control-docs-mariadb
       - DB_PORT=3306
