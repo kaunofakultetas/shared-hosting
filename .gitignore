@@ -15,6 +15,7 @@ docker-compose.yml
 
 # UNFINISHED MODULES
 users-modules/users-sshr
+users-modules/users-ssh-router
 
 
 
