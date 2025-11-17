@@ -1,7 +1,8 @@
 services:
 
-
-  ##################### INCOMMING TRAFFIC ENDPOINTS #####################
+  #########################################################
+  ##############  Incoming Traffic Endpoints ##############
+  #########################################################
   # Endpoint of the system control panel
   hosting-control-caddy:
     container_name: hosting-control-caddy
@@ -48,11 +49,16 @@ services:
       filtered-users:
         ipv4_address: 172.19.2.3
     restart: unless-stopped
-  #######################################################################
+  #########################################################
+  #########################################################
+  #########################################################
 
 
 
 
+  #########################################################
+  ############  System Control Panel Services #############
+  #########################################################
   # Control Panel Frontend
   hosting-control-frontend:
     container_name: hosting-control-frontend
@@ -64,7 +70,6 @@ services:
     networks:
       - isolated-control-panel
     restart: unless-stopped
-
 
 
   # Control Panel Backend
@@ -85,29 +90,6 @@ services:
       - isolated-control-panel
       - isolated-control-docker
     restart: unless-stopped
-
-
-  # Database Browser
-  hosting-control-dbgate:
-    container_name: hosting-control-dbgate
-    image: dbgate/dbgate@sha256:909d27d1ed5bf4141de61a0c61017e0f8e0a26f320358fd37731967b7894603b
-    environment:
-      WEB_ROOT: /dbgate
-
-      CONNECTIONS: con1
-      LABEL_con1: App Hosting Platform - SQLite
-      FILE_con1: /root/db.sqlite3
-      ENGINE_con1: sqlite@dbgate-plugin-sqlite
-    read_only: false
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ./control-modules/control-backend/database.db:/root/db.sqlite3
-    networks:
-      - isolated-control-panel
-    restart: unless-stopped
-
-
-
 
 
   # System Docker Controller
@@ -132,9 +114,29 @@ services:
     networks:
       - isolated-control-docker
     restart: unless-stopped
+  
+  
+  # Database Browser
+  hosting-control-dbgate:
+    container_name: hosting-control-dbgate
+    image: dbgate/dbgate@sha256:909d27d1ed5bf4141de61a0c61017e0f8e0a26f320358fd37731967b7894603b
+    environment:
+      WEB_ROOT: /dbgate
 
-
-
+      CONNECTIONS: con1
+      LABEL_con1: App Hosting Platform - SQLite
+      FILE_con1: /root/db.sqlite3
+      ENGINE_con1: sqlite@dbgate-plugin-sqlite
+    read_only: false
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./control-modules/control-backend/database.db:/root/db.sqlite3
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+  #########################################################
+  #########################################################
+  #########################################################
 
 
 
