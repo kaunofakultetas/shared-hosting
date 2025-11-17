@@ -148,7 +148,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - APP_KEY=<Generate your own app key>
+      - APP_KEY=${BOOKSTACK_APP_KEY}
       - APP_URL=https://hosting.knf.vu.lt/docs
       - DB_HOST=hosting-control-docs-mariadb
       - DB_PORT=3306

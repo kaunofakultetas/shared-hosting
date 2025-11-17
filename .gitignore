@@ -6,6 +6,7 @@ SERVERS/
 
 # Shared hosting system deployment configuration
 docker-compose.yml
+.env
 
 
 
