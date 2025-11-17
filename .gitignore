@@ -1,30 +1,20 @@
-# Control Modules
-control-modules/control-caddy/caddy_*
-control-modules/control-caddy/certs
-control-modules/control-docs
-
-
-
-# Users Modules
-users-modules/users-caddy/caddy_*
-users-modules/users-caddy/certs
-users-modules/users-caddy/Caddyfile
-
-users-modules/users-sshr
-
-
 
 # Shared hosting system data files
 _DATA/
 
+
 # Users Virtual Servers
 SERVERS/
+
 
 # Shared hosting system deployment configuration
 docker-compose.yml
 
 
 
+
+# UNFINISHED MODULES
+users-modules/users-sshr
 
 
 

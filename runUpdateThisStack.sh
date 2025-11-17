@@ -1,27 +1,25 @@
 #!/bin/bash
 
-
+######### HOSTING MODULES DATA DIRECTORIES AND FILES #########
 # Control backend database
 mkdir -p _DATA/control-backend
 
 
 # Create Docs directories
-mkdir -p control-modules/control-docs/app_data
-mkdir -p control-modules/control-docs/db_data
-sudo chown -R 1000:1000 control-modules/control-docs
+mkdir -p _DATA/control-docs/app_data
+mkdir -p _DATA/control-docs/db_data
+sudo chown -R 1000:1000 _DATA/control-docs
 
 
 # Create users-caddy directories
-mkdir -p users-modules/users-caddy
-touch users-modules/users-caddy/Caddyfile
+mkdir -p _DATA/users-caddy
+touch _DATA/users-caddy/Caddyfile
+##############################################################
+
 
 
 # Create SERVERS directory
 mkdir -p SERVERS
-
-
-# Create users-sshr directory
-mkdir -p users-modules/users-sshr
 
 
 # Build student environment
