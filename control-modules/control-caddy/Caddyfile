@@ -53,7 +53,7 @@ hosting.knf.vu.lt {
 
 
     ####### Frontend Endpoint #######
-    reverse_proxy hosting-control-frontend:443
+    reverse_proxy hosting-control-frontend:3000
 }
 
 
