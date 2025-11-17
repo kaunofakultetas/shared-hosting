@@ -12,8 +12,59 @@
 
 
 
+
+########################################################
+##################### NON VU BLOCKER ###################
+########################################################
+(allow_only_vu) {
+    # Local VU networks
+    remote_ip 172.16.0.1/16
+    remote_ip 192.168.0.1/16
+    remote_ip 10.0.0.1/8
+
+    # VU VPN networks
+    remote_ip 193.219.95.0/24
+    remote_ip 10.198.0.0/16
+    remote_ip 158.129.162.0/24
+
+    # VU KNF external network
+    remote_ip 158.129.172.0/24
+}
+# Traffic blocking function/subroutine
+(geo_block_non_vu) {
+    @block_non_vu {
+        not {
+            import allow_only_vu
+        }
+    }
+
+    header @block_non_vu Content-Type "text/html; charset=utf-8"
+    respond @block_non_vu `<!DOCTYPE html>
+    <html>
+        <body>
+            <p>Sistema nepasiekiama iš jūsų IP adreso. Prašome susidiegti VU VPN.</p>
+            <p>Daugiau informacijos: <a href="https://www.vu.lt/it/paslaugos/irenginiai-programos-tinklai-ir-spausdinimas/vu-vpn">VU VPN</a></p>
+            <p>Jūsų IP adresas: {remote_host}</p>
+            <hr>
+        </body>
+    </html>` 403
+}
+########################################################
+########################################################
+########################################################
+
+
+
+
+
+
+
+
+
+
 hosting.knf.vu.lt {
     tls admin@knf.vu.lt
+    import geo_block_non_vu
 
     ####### DBGate Endpoint #######
     redir /dbgate /dbgate/ 301
@@ -60,6 +111,7 @@ hosting.knf.vu.lt {
 
 hosting.knf.vu.lt:8443 {
     tls admin@knf.vu.lt
+    import geo_block_non_vu
 
     # Check if user is authenticated
     forward_auth hosting-control-backend:8000 {

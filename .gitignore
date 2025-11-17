@@ -1,21 +1,12 @@
-
 # Shared hosting system data files
 _DATA/
-
 
 # Users Virtual Servers
 SERVERS/
 
-
 # Shared hosting system deployment configuration
 docker-compose.yml
 
-
-
-
-# UNFINISHED MODULES
-users-modules/users-sshr
-users-modules/users-ssh-router
 
 
 
