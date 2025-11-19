@@ -54,11 +54,27 @@ fi
 
 # STEP 3: Run the setup script
 cd /apps/sistema || exit 1
-if [ -f "./runUpdateThisStack.sh" ]; then
-    echo "Running stack initialization..."
-    ./runUpdateThisStack.sh
+
+# Verify docker-compose.yml exists
+if [ ! -f "docker-compose.yml" ]; then
+    echo "ERROR: docker-compose.yml not found in /apps/sistema"
+    exit 1
+fi
+
+echo "Running stack initialization..."
+
+# Create network (ignore error if it already exists)
+docker network create --subnet=172.18.0.0/24 external 2>&1 || echo "Network 'external' already exists, continuing..."
+
+# Stop existing containers (ignore error on first run)
+docker compose -f /apps/sistema/docker-compose.yml down 2>&1 || echo "No existing containers to stop, continuing..."
+
+# Start the stack
+if docker compose -f /apps/sistema/docker-compose.yml up -d --build --force-recreate; then
+    echo "Stack started successfully"
 else
-    echo "WARNING: runUpdateThisStack.sh not found"
+    echo "ERROR: Failed to start stack"
+    exit 1
 fi
 
 
