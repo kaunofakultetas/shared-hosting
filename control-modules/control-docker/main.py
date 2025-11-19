@@ -175,25 +175,23 @@ def delete_HTTPGET(container_name):
 
 
 
-# unzip ./IMAGES/user.zip -d ./SERVERS/user3
+
 @app.route('/api/create/<container_name>', methods=['GET'])
 def create_HTTPGET(container_name):
 
-    # Validate the input
+    # STEP 0: Validate the input
     if not re.match(r'^[a-z0-9-]{1,25}$', container_name):
         json_obj['error'] = 'Invalid container name. Must be lowercase letters, numbers, hyphens, and up to 25 characters.'
         return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
 
-    # Create container directory
+
+
+    # STEP 1: VM ID of the new user virtual server
     vm_id = container_name.split('-')[3]
-    process = Popen(['unzip', f'{ROOT_DIR}/IMAGES/user.zip', '-d', f'{ROOT_DIR}/SERVERS/' + vm_id])
-    output, error = process.communicate()
-
-    if process.returncode != 0:
-        return Response(json.dumps({'error': f'Failed to stop {container_name}'}), mimetype='application/json')
 
 
-    # Start the container
+
+    # STEP 2: Create the container (Create user virtual server)
     process = Popen([
         'docker', 'run', '-d', 
         '--name', container_name,
@@ -202,23 +200,15 @@ def create_HTTPGET(container_name):
         '-v', f'{ROOT_DIR}/SERVERS/{vm_id}/docker:/var/lib/docker', 
         '--net', 'filtered-users', 
         '--restart', 'unless-stopped', 
-        'hosting-users-dind'])
+        'hosting-dind-ubuntu'])
     output, error = process.communicate()
 
     if process.returncode != 0:
-        return Response(json.dumps({'error': f'Failed to stop {container_name}'}), mimetype='application/json')
-
-       
-    # Run system containers stack
-    time.sleep(3) 
-    process = Popen(['docker', 'exec', container_name, 'bash', '-c', 'cd /apps/sistema && ./runUpdateThisStack.sh'])
-    output, error = process.communicate()
-
-    if process.returncode != 0:
-        return Response(json.dumps({'error': f'Failed to run {container_name}'}), mimetype='application/json')
+        return Response(json.dumps({'error': f'Failed to create {container_name}'}), mimetype='application/json')
 
 
-    return Response(json.dumps({'message': f'{container_name} stopped'}), mimetype='application/json')
+
+    return Response(json.dumps({'message': f'{container_name} created'}), mimetype='application/json')
 
 
 

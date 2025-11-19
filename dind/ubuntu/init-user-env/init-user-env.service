@@ -1,0 +1,15 @@
+[Unit]
+Description=Initialize user environment on first boot
+Wants=docker.service
+After=docker.service
+ConditionPathExists=!/var/lib/docker-user-init-done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/init-user-env.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -33,7 +33,7 @@ mkdir -p SERVERS
 
 
 # Build student environment
-sudo docker build -t hosting-users-dind -f ./dind/Dockerfile ./dind
+sudo docker build -t hosting-dind-ubuntu -f ./dind/ubuntu/Dockerfile ./dind/ubuntu
 
 
 
