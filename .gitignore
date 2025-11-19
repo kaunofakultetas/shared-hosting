@@ -5,7 +5,7 @@ _DATA/
 SERVERS/
 
 # Shared hosting system deployment configuration
-docker-compose.yml
+/docker-compose.yml
 .env
 
 
