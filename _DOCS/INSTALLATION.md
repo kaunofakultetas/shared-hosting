@@ -11,7 +11,7 @@ Run the commands in the terminal:
 sudo apt update
 sudo apt upgrade -y
 sudo apt install -y docker.io
-sudo curl -L https://github.com/docker/compose/releases/download/v2.37.1/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+sudo curl -L https://github.com/docker/compose/releases/download/v2.40.3/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 ```
 
@@ -20,9 +20,9 @@ sudo chmod +x /usr/local/bin/docker-compose
 ### 3. Install Sysbox Runtime
 Run the commands in the terminal:
 ```bash
-wget https://downloads.nestybox.com/sysbox/releases/v0.6.7/sysbox-ce_0.6.7-0.linux_amd64.deb
-sudo dpkg -i sysbox-ce_0.6.7-0.linux_amd64.deb
-rm sysbox-ce_0.6.7-0.linux_amd64.deb
+wget https://github.com/nestybox/sysbox/releases/download/v0.6.7/sysbox-ce_0.6.7.linux_amd64.deb
+sudo dpkg -i sysbox-ce_0.6.7.linux_amd64.deb
+rm sysbox-ce_0.6.7.linux_amd64.deb
 ```
 
 <br>
@@ -95,7 +95,7 @@ Using your domain name provider configure your domain name to point to your cont
 
 ### 8. Start Shared Hosting System
 ```bash
-sudo docker-compose up -d
+./runUpdateThisStack.sh
 ```
 
 <br>
