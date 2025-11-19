@@ -130,7 +130,7 @@ services:
     read_only: false
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./control-modules/control-backend/database.db:/root/db.sqlite3
+      - ./_DATA/control-backend/database.db:/root/db.sqlite3
     networks:
       - isolated-control-panel
     restart: unless-stopped
