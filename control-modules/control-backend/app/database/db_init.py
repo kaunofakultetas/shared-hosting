@@ -24,7 +24,7 @@ def init_db_tables():
 
         ############################ Users tables ###########################
         conn.execute('''
-            CREATE TABLE "System_Users" (
+            CREATE TABLE IF NOT EXISTS "System_Users" (
                 "ID"	INTEGER NOT NULL UNIQUE,
                 "Email"	TEXT NOT NULL UNIQUE,
                 "Password"	TEXT NOT NULL,
@@ -53,7 +53,7 @@ def init_db_tables():
             );
         ''')
         conn.execute('''
-            CREATE TABLE "Hosting_DockerContainers" (
+            CREATE TABLE IF NOT EXISTS "Hosting_DockerContainers" (
                 "DockerID"	TEXT NOT NULL,
                 "ParentServerID"	INTEGER NOT NULL,
                 "Command"	TEXT NOT NULL,
@@ -99,6 +99,6 @@ def init_default_admin_user():
         if(conn.execute(' SELECT COUNT(*) FROM System_Users ').fetchone()[0] == 0):
             # Default Email:       admin@admin.com
             # Default Password:    admin
-            conn.execute(''' INSERT INTO System_Users (Email, Password, Admin, Enabled, '') VALUES (?,?,?,?) ''', 
-                ['admin@admin.com', '$2a$12$4a3b6u7a1oBdtvuTkvw9TevgCwH36raEE2oe1BI9Wtt7.L4Pfb4YW', 1, 1])
+            conn.execute(''' INSERT INTO System_Users (Email, Password, Admin, Enabled, LastLogin) VALUES (?,?,?,?,?) ''', 
+                ['admin@admin.com', '$2a$12$4a3b6u7a1oBdtvuTkvw9TevgCwH36raEE2oe1BI9Wtt7.L4Pfb4YW', 1, 1, ''])
             conn.commit()

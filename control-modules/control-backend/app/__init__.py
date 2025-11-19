@@ -22,9 +22,9 @@ APP_DEBUG = os.getenv('APP_DEBUG', 'false').lower() == "true"
 
 def create_app():
 
-    # # Initialize database
-    # from .database.db_init import init_db
-    # init_db()
+    # Initialize database
+    from .database.db_init import init_db
+    init_db()
 
     # Initialize docker monitor
     from .docker.monitor import docker_info_background_updater
