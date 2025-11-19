@@ -62,8 +62,8 @@
 
 
 
-hosting.knf.vu.lt {
-    tls admin@knf.vu.lt
+{$HOSTING_DOMAIN} {
+    tls {$TLS_LETSENCRYPT_EMAIL:internal}
     import geo_block_non_vu
 
     ####### DBGate Endpoint #######
@@ -109,8 +109,8 @@ hosting.knf.vu.lt {
 
 
 
-hosting.knf.vu.lt:8443 {
-    tls admin@knf.vu.lt
+{$HOSTING_DOMAIN}:8443 {
+    tls {$TLS_LETSENCRYPT_EMAIL:internal}
     import geo_block_non_vu
 
     # Check if user is authenticated
