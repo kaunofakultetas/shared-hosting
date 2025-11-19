@@ -11,8 +11,18 @@ mkdir -p _DATA/control-docs/db_data
 sudo chown -R 1000:1000 _DATA/control-docs
 
 
+# Create control-caddy directories
+mkdir -p _DATA/control-caddy/caddy_config
+mkdir -p _DATA/control-caddy/caddy_data
+mkdir -p _DATA/control-caddy/caddy_logs
+mkdir -p _DATA/control-caddy/certs
+
+
 # Create users-caddy directories
-mkdir -p _DATA/users-caddy
+mkdir -p _DATA/users-caddy/caddy_config
+mkdir -p _DATA/users-caddy/caddy_data
+mkdir -p _DATA/users-caddy/caddy_logs
+mkdir -p _DATA/users-caddy/certs
 touch _DATA/users-caddy/Caddyfile
 ########################################################################################
 
@@ -29,7 +39,22 @@ sudo docker build -t hosting-users-dind -f ./dind/Dockerfile ./dind
 
 
 
-######################### GENERATE AND STORE BOOKSTACK_APP_KEY #########################
+
+################################ CONTROL-DOCKER AUTOSETUP ###############################
+# Only generate if ROOT_DIR doesn't exist in .env
+if [ ! -f .env ] || ! grep -q "^ROOT_DIR=" .env; then
+    echo "Generating ROOT_DIR..."
+    ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    
+    echo "ROOT_DIR=$ROOT_DIR" >> .env
+    echo "ROOT_DIR added to .env"
+    echo "ROOT_DIR: $ROOT_DIR"
+fi
+#########################################################################################
+
+
+
+################################## BOOKSTACK AUTOSETUP ##################################
 # Only generate if BOOKSTACK_APP_KEY doesn't exist in .env
 if [ ! -f .env ] || ! grep -q "^BOOKSTACK_APP_KEY=" .env; then
     echo "Generating BOOKSTACK_APP_KEY..."

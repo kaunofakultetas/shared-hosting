@@ -97,7 +97,7 @@ services:
     container_name: hosting-control-docker
     image: vuknf/hosting-control-docker:latest
     environment:
-      - ROOT_DIR=/home/aula/apps/students
+      - ROOT_DIR=${ROOT_DIR}
     read_only: true
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -109,8 +109,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
       # VM Images and Running Servers
-      - /home/aula/apps/students/IMAGES:/home/aula/apps/students/IMAGES
-      - /home/aula/apps/students/SERVERS:/home/aula/apps/students/SERVERS
+      - ${ROOT_DIR}/IMAGES:${ROOT_DIR}/IMAGES
+      - ${ROOT_DIR}/SERVERS:${ROOT_DIR}/SERVERS
     networks:
       - isolated-control-docker
     restart: unless-stopped
