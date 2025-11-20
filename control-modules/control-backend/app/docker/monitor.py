@@ -10,10 +10,14 @@ from ..database.db import get_db_connection
 
 
 
-
+# Environment variables
 DOCKER_CONTROLLER_API_KEY = os.getenv('DOCKER_CONTROLLER_API_KEY')
 DOCKER_CONTROLLER_HOST = os.getenv('DOCKER_CONTROLLER_HOST', 'hosting-control-docker')
 DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT', '8000')
+
+
+
+
 
 
 def push_docker_info_to_db(json_obj, parentServerID=0):

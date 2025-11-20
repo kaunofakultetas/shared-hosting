@@ -22,12 +22,12 @@ from ..database.db import get_db_connection
 
 
 
-
+# Flask Blueprint
 virtual_server_bp = Blueprint('virtual_server', __name__)
 
 
 
-
+# Environment variables
 DOCKER_CONTROLLER_HOST = os.getenv('DOCKER_CONTROLLER_HOST')
 DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT')
 
@@ -179,50 +179,96 @@ def vmControl_HTTPPOST():
 
     with get_db_connection() as conn:
 
-        if(action != 'create'):
-            # Check if user is owner of this virtual server
-            if(getattr(current_user, 'admin', 0) == 0):
-                ownerID = conn.execute('SELECT OwnerID FROM Hosting_VirtualServers WHERE ID = ?', [virtualServerID]).fetchone()[0]
-                if(ownerID != current_user.id):
-                    return jsonify({'message':'Unauthorized'}), 401
 
-
-   
-            if(action == 'start'):
-                conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
-                conn.commit()
-                requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/start/{containerName}')
-                return jsonify({'message':'OK'}), 200
-
-            elif(action == 'stop'):
-                conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 0 WHERE ID = ?', [virtualServerID])
-                conn.commit()
-                requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/stop/{containerName}')
-                return jsonify({'message':'OK'}), 200
-            
-            elif(action == 'delete'):
-                conn.execute('UPDATE Hosting_VirtualServers SET Deleted = 1 WHERE ID = ?', [virtualServerID])
-                conn.execute('DELETE FROM Hosting_DockerContainers WHERE ParentServerID = ?', [virtualServerID])
-                conn.execute('DELETE FROM Hosting_DomainNames WHERE VirtualServerID = ?', [virtualServerID])
-                conn.commit()
-                requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/delete/{containerName}')
-                return jsonify({'message':'OK'}), 200
-
-
-        else:
+        # --- CREATE ---
+        if(action == 'create'):
+            # Create virtual server in the database
             timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             serverName = postData.get('name')
             sqlfetchdata = conn.execute('INSERT INTO Hosting_VirtualServers (OwnerID, Name, Enabled, Deleted, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?)', [current_user.id, serverName, 1, 0, timeNow, timeNow])
             virtualServerID = sqlfetchdata.lastrowid
             conn.commit()
 
-            containerName = 'hosting-users-dind-' + str(virtualServerID)
-            
-            with requests.Session() as session:
-                try:
-                    session.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/create/{containerName}', timeout=1)
-                except requests.exceptions.ReadTimeout:
-                    pass
 
+            # Create virtual server physically using the docker controller
+            containerName = 'hosting-users-dind-' + str(virtualServerID)
+            resp = requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/create/{containerName}', timeout=1)
+            if(resp.status_code != 200):
+                # Rollback database on failure
+                conn.execute('DELETE FROM Hosting_VirtualServers WHERE ID = ?', [virtualServerID])
+                conn.commit()
+                return jsonify({'message':'Failed to create virtual server'}), 500
+
+
+            # Update database
+            conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
+            conn.commit()
+
+            # Return success
             return jsonify({'message':'OK'}), 200
+
+
+
+        # ------ OTHER ACTIONS REQUIRE OWNERSHIP CHECK ------
+        # Check if user is owner of this virtual server
+        if(getattr(current_user, 'admin', 0) == 0):
+            ownerID = conn.execute('SELECT OwnerID FROM Hosting_VirtualServers WHERE ID = ?', [virtualServerID]).fetchone()[0]
+            if(ownerID != current_user.id):
+                return jsonify({'message':'Unauthorized'}), 401
+
+
+
+        # --- START ---
+        if(action == 'start'):
+            resp = requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/start/{containerName}')
+            if(resp.status_code != 200):
+                return jsonify({'message':'Failed to start virtual server'}), 500
+            
+            # Update database
+            conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
+            conn.commit()
+
+            # Return success
+            return jsonify({'message':'OK'}), 200
+
+
+
+        # --- STOP ---
+        elif(action == 'stop'):
+            resp = requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/stop/{containerName}')
+            if(resp.status_code != 200):
+                return jsonify({'message':'Failed to stop virtual server'}), 500
+
+            # Update database
+            conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 0 WHERE ID = ?', [virtualServerID])
+            conn.commit()
+
+            # Return success
+            return jsonify({'message':'OK'}), 200
+
+
+
+        # --- DELETE ---
+        elif(action == 'delete'):
+            resp = requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/delete/{containerName}')
+            if(resp.status_code != 200):
+                return jsonify({'message':'Failed to delete virtual server'}), 500
+            
+            # Update database
+            conn.execute('UPDATE Hosting_VirtualServers SET Deleted = 1 WHERE ID = ?', [virtualServerID])
+            conn.execute('DELETE FROM Hosting_DockerContainers WHERE ParentServerID = ?', [virtualServerID])
+            conn.execute('DELETE FROM Hosting_DomainNames WHERE VirtualServerID = ?', [virtualServerID])
+            conn.commit()
+
+            # Return success
+            return jsonify({'message':'OK'}), 200
+        
+
+
+        # --- INVALID ---
+        else:
+            return jsonify({'message':'Invalid action'}), 400
+
+
+
 
