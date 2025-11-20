@@ -233,14 +233,15 @@ services:
       iptables -A FORWARD -s 172.19.2.0/24 -d 192.168.0.0/16 -j DROP &&
       iptables -A FORWARD -s 172.19.2.0/24 -d 10.0.0.0/8 -j DROP &&
 
-      echo '[*] Allow NATed traffic to flow' &&
-      iptables -t nat -A POSTROUTING -s 172.19.2.0/24 ! -o eth1 -j MASQUERADE &&
-
-      echo '[*] Allow traffic from isolated_net to external network' &&
-      iptables -A FORWARD -i eth1 -o eth0 -d 0.0.0.0/0 -j ACCEPT &&
+      echo '[*] Allow VM traffic to internet' &&
+      iptables -A FORWARD -s 172.19.2.0/24 -j ACCEPT &&
 
       echo '[*] Allow returning traffic' &&
       iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT &&
+
+      echo '[*] NAT outgoing traffic' &&
+      iptables -t nat -A POSTROUTING -s 172.19.2.0/24 -o eth1 -j MASQUERADE &&
+      iptables -t nat -A POSTROUTING -s 172.19.2.0/24 -o eth0 -j MASQUERADE &&
 
       echo '[*] Router configuration complete' &&
       tail -f /dev/null"
