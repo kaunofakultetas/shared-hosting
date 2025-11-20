@@ -6,7 +6,7 @@ services:
   # Endpoint of the system control panel
   hosting-control-caddy:
     container_name: hosting-control-caddy
-    image: caddy:2.9-alpine
+    image: caddy:2.10-alpine
     user: 1000:1000
     runtime: sysbox-runc
     environment:
@@ -33,7 +33,7 @@ services:
   # Users servers hosted apps WEB traffic endpoint
   hosting-users-caddy:
     container_name: hosting-users-caddy
-    image: caddy:2.9-alpine
+    image: caddy:2.10-alpine
     user: 1000:1000
     runtime: sysbox-runc
     volumes:
@@ -101,6 +101,8 @@ services:
     image: vuknf/hosting-control-docker:latest
     environment:
       - ROOT_DIR=${ROOT_DIR}
+      - USERS_VM_DIR=SERVERS
+      - APP_DEBUG=false
     read_only: true
     volumes:
       - /etc/localtime:/etc/localtime:ro
