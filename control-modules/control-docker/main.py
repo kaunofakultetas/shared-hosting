@@ -22,7 +22,8 @@ from modules.caddyfile_updater import CaddyfileUpdater
 
 # Environment variables
 APP_DEBUG = os.getenv('APP_DEBUG', 'false').lower() == "true"
-ROOT_DIR = os.getenv('ROOT_DIR', '/home/stud/students')
+ROOT_DIR = os.getenv('ROOT_DIR', '/home/stud/students').rstrip('/')
+USERS_VM_DIR = os.getenv('USERS_VM_DIR', 'SERVERS').lstrip('/').rstrip('/')
 
 
 
@@ -162,6 +163,11 @@ def delete_HTTPGET(container_name):
 
     # Delete the docker directory
     process = Popen(['rm', '-rf', f'{ROOT_DIR}/SERVERS/{vm_id}/docker'])
+    output, error = process.communicate()
+
+    # Rename the VM directory to {vm_id}-deleted-YYYYMMDDHHMMSS
+    timeNow = datetime.now().strftime("%Y%m%d%H%M%S")
+    process = Popen(['mv', f'{ROOT_DIR}/SERVERS/{vm_id}', f'{ROOT_DIR}/SERVERS/{vm_id}-deleted-{timeNow}'])
     output, error = process.communicate()
 
     # Return the status of the container
