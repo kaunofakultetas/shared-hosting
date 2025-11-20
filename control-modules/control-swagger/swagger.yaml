@@ -1,0 +1,479 @@
+openapi: 3.0.3
+info:
+  title: App Hosting Platform API Documentation
+  description: |
+    API for managing app hosting platform.
+    This API allows frontend to manage app hosting platform, including user authentication,
+    virtual server management, and DNS configuration.
+  version: 1.0.0
+  contact:
+    name: VU KnF
+
+servers:
+  - url: https://hosting.knf.vu.lt
+    description: Production server
+  - url: https://hostingdev.knf.vu.lt
+    description: Development server
+
+
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Users
+    description: User management endpoints (Admin only)
+  - name: Virtual Servers
+    description: Virtual server management and control endpoints
+  - name: DNS
+    description: Domain name and DNS management endpoints
+
+
+
+
+paths:
+  /api/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+        '400':
+          description: Invalid credentials or missing fields
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: El. Paštas ir/arba Slaptažodis neteisingas.
+
+  /api/checkauth:
+    get:
+      tags:
+        - Authentication
+      summary: Check authentication status
+      description: Verify if user is authenticated and return user information
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User is authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          description: Unauthorized - User is not authenticated or disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/checkauth/vm/{virtualServerID}:
+    get:
+      tags:
+        - Authentication
+      summary: Check authentication for specific virtual server
+      description: Verify if user is authenticated and authorized to access specific virtual server
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: virtualServerID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+      responses:
+        '200':
+          description: User is authenticated and authorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/checkauth/admin:
+    get:
+      tags:
+        - Authentication
+      summary: Check admin authentication
+      description: Verify if user is authenticated as admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User is authenticated as admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          description: Unauthorized - User is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/users:
+    get:
+      tags:
+        - Users
+      summary: Get all users (Admin only)
+      description: Retrieve list of all users with their server counts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserListItem'
+        '401':
+          description: Unauthorized - Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      tags:
+        - Users
+      summary: Create or update user (Admin only)
+      description: Create new user or update existing user. Can also delete users.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/UserCreateUpdate'
+                - $ref: '#/components/schemas/UserDelete'
+      responses:
+        '200':
+          description: Operation successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: ok
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    example: error
+                  reason:
+                    type: string
+                    example: Password must be at least 8 characters long
+        '401':
+          description: Unauthorized - Admin access required
+
+  /api/vm:
+    get:
+      tags:
+        - Virtual Servers
+      summary: Get virtual servers
+      description: Retrieve list of virtual servers. Regular users see only their servers, admins can see all.
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: showOtherUsers
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Show virtual servers from other users (Admin only)
+      responses:
+        '200':
+          description: List of virtual servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VirtualServer'
+        '401':
+          description: Unauthorized
+
+  /api/vm/{virtualServerID}:
+    get:
+      tags:
+        - Virtual Servers
+      summary: Get specific virtual server
+      description: Retrieve details of a specific virtual server
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: virtualServerID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+      responses:
+        '200':
+          description: Virtual server details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VirtualServer'
+        '401':
+          description: Unauthorized - Not allowed to access this virtual server
+
+  /api/vm/control:
+    post:
+      tags:
+        - Virtual Servers
+      summary: Control virtual server
+      description: Perform actions on virtual servers (create, start, stop, delete)
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/VirtualServerCreate'
+                - $ref: '#/components/schemas/VirtualServerControl'
+      responses:
+        '200':
+          description: Action completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OK
+        '401':
+          description: Unauthorized
+
+  /api/vm/dns/isvalid:
+    get:
+      tags:
+        - DNS
+      summary: Validate domain name
+      description: Check if a domain name is valid and available
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: domainname
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Domain name to validate (URL encoded)
+        - name: virtualserverid
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isvalid:
+                    type: boolean
+                    example: true
+                  error_message:
+                    type: string
+                    example: Domain name is valid
+
+  /api/vm/dns/{virtualServerID}:
+    get:
+      tags:
+        - DNS
+      summary: Get domain names for virtual server
+      description: Retrieve all domain names configured for a virtual server
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: virtualServerID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+      responses:
+        '200':
+          description: List of domain names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DomainName'
+        '401':
+          description: Unauthorized
+
+    post:
+      tags:
+        - DNS
+      summary: Add new domain name
+      description: Create a new domain name for a virtual server
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: virtualServerID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainNameCreate'
+      responses:
+        '200':
+          description: Domain name created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OK
+        '400':
+          description: Invalid domain name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Error
+                  reason:
+                    type: string
+                    example: Domain name is already taken
+        '401':
+          description: Unauthorized
+
+    put:
+      tags:
+        - DNS
+      summary: Update domain name
+      description: Update an existing domain name configuration
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: virtualServerID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainNameUpdate'
+      responses:
+        '200':
+          description: Domain name updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OK
+        '400':
+          description: Invalid domain name
+        '401':
+          description: Unauthorized
+
+  /api/vm/dns/{virtualServerID}/{domainID}:
+    delete:
+      tags:
+        - DNS
+      summary: Delete domain name
+      description: Remove a domain name from a virtual server
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: virtualServerID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Virtual server ID
+        - name: domainID
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Domain ID to delete
+      responses:
+        '200':
+          description: Domain name deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OK
+        '401':
+          description: Unauthorized
+
+
+

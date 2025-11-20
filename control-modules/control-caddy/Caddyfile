@@ -92,7 +92,9 @@
     handle /draw/* {
         reverse_proxy hosting-control-docs-drawio:8080
     }
-
+    handle /swagger* {
+        reverse_proxy hosting-control-swagger:8080
+    }
 
 
 
