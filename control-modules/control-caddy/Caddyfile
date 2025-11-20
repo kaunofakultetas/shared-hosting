@@ -118,6 +118,9 @@
     # Check if user is authenticated
     forward_auth hosting-control-backend:8000 {
         uri /api/checkauth/vm/{http.request.cookie.virtual-server-id}
+        # Strip WebSocket headers from the auth request to prevent backend confusion
+        header_up -Connection
+        header_up -Upgrade
     }
 
     # Reverse proxy to user's dind

@@ -1,0 +1,19 @@
+:80 {
+
+    # Filebrowser
+    handle /filebrowser* {
+        reverse_proxy sistema-filebrowser:80
+    }
+
+    # WebSSH2
+    handle /ssh/* {
+        reverse_proxy sistema-webssh2:2222 {
+            header_up Authorization "Basic YWRtaW46YWRtaW4="
+        }
+    }
+
+    # Dockge (default)
+    handle {
+        reverse_proxy sistema-dockge:5001
+    }
+}

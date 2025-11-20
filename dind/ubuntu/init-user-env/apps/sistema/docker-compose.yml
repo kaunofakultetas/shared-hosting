@@ -2,10 +2,10 @@ services:
 
   sistema-endpoint:
     container_name: sistema-endpoint
-    image: nginx:alpine-slim
-    read_only: false
+    image: caddy:2.10-alpine
+    read_only: true
     volumes:
-      - ./endpoint/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./endpoint/Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
       - 10080:80
     networks:
@@ -16,7 +16,7 @@ services:
 
   sistema-dockge:
     container_name: sistema-dockge
-    image: louislam/dockge:1
+    image: louislam/dockge:1.5.0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dockge/data:/app/data
@@ -44,7 +44,7 @@ services:
 
   sistema-webssh2:
     container_name: sistema-webssh2
-    image: billchurch/webssh2:0.4.6
+    image: billchurch/webssh2:2.3.5
     networks:
       - external
     restart: unless-stopped
