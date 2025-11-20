@@ -113,8 +113,7 @@ services:
       # Control Docker
       - /var/run/docker.sock:/var/run/docker.sock
 
-      # VM Images and Running Servers
-      - ${ROOT_DIR}/IMAGES:${ROOT_DIR}/IMAGES
+      # Users virtual servers persistent directories
       - ${ROOT_DIR}/SERVERS:${ROOT_DIR}/SERVERS
     networks:
       - isolated-control-docker
