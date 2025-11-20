@@ -147,7 +147,7 @@ services:
 
 
   #########################################################
-  ###############  Bookstack Documentation ################
+  ####################  Documentation #####################
   #########################################################
   hosting-control-docs-web:
     container_name: hosting-control-docs-web
@@ -202,6 +202,20 @@ services:
     container_name: hosting-control-docs-drawio
     image: jgraph/drawio:29.0.3
     read_only: false
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+
+
+  hosting-control-swagger:
+    container_name: hosting-control-swagger
+    image: swaggerapi/swagger-ui:v5.29.5
+    read_only: false
+    volumes:
+      - ./control-modules/control-swagger/swagger.yaml:/swagger.yaml:ro
+    environment:
+      - SWAGGER_JSON=/swagger.yaml
+      - BASE_URL=/swagger
     networks:
       - isolated-control-panel
     restart: unless-stopped
