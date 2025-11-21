@@ -1,5 +1,36 @@
-:80 {
+########################################################
+################### NON SYSTEM BLOCKER #################
+########################################################
+(system_components_ip_addresses) {
+    remote_ip 172.19.2.1/32 # hosting-control-caddy
+}
 
+(block_non_system) {
+    @block_non_system {
+        not {
+            import system_components_ip_addresses
+        }
+    }
+
+    header @block_non_system Content-Type "text/html; charset=utf-8"
+    respond @block_non_system `<!DOCTYPE html>
+    <html>
+        <body>
+            <p>Virtual server management endpoint is not accessible from your IP address.</p>
+            <p>Your IP address: {remote_host}</p>
+            <hr>
+        </body>
+    </html>` 403
+}
+########################################################
+########################################################
+########################################################
+
+
+
+:80 {
+    import block_non_system
+    
     # Filebrowser
     handle /filebrowser* {
         reverse_proxy sistema-filebrowser:80
