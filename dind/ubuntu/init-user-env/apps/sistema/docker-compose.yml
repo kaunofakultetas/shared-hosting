@@ -24,6 +24,7 @@ services:
       - /apps/aplikacijos:/apps/aplikacijos
     environment:
       - DOCKGE_STACKS_DIR=/apps/aplikacijos
+      - DOCKGE_ENABLE_CONSOLE=true
     networks:
       - isolated
     restart: unless-stopped
