@@ -9,6 +9,7 @@ services:
     image: caddy:2.10-alpine
     user: 1000:1000
     runtime: sysbox-runc
+    read_only: true
     environment:
       - HOSTING_DOMAIN=hosting.knf.vu.lt
       - TLS_LETSENCRYPT_EMAIL=internal # Self-Signed
@@ -36,6 +37,7 @@ services:
     image: caddy:2.10-alpine
     user: 1000:1000
     runtime: sysbox-runc
+    read_only: true
     volumes:
       - ./_DATA/users-caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./_DATA/users-caddy/caddy_data:/data
