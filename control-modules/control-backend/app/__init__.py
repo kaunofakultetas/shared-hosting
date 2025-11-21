@@ -27,9 +27,10 @@ def create_app():
     init_db()
 
     # Initialize docker monitor
-    from .docker.monitor import docker_info_background_updater
-    daemon = Thread(target=docker_info_background_updater, daemon=True, name='DockerInfoUpdater')
-    daemon.start()
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not APP_DEBUG:
+        from .docker.monitor import docker_info_background_updater
+        daemon = Thread(target=docker_info_background_updater, daemon=True, name='DockerInfoUpdater')
+        daemon.start()
 
 
     ###### Flask App Initialization ######

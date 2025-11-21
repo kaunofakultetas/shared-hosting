@@ -1,3 +1,12 @@
+############################################################
+# Author:           Tomas Vanagas
+# Updated:          2025-11-21
+# Version:          1.0
+# Description:      Monitor docker containers and update 
+#                   database
+############################################################
+
+
 import json
 import requests
 import time
@@ -100,7 +109,3 @@ def docker_info_background_updater():
         except Exception as e:
             print(f'Docker Info Updater Error: {e}')
 
-
-if __name__ == '__main__':
-    daemon = Thread(target=docker_info_background_updater, daemon=True, name='DockerInfoUpdater')
-    daemon.start()
