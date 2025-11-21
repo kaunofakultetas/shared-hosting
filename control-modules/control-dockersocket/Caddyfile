@@ -2,8 +2,7 @@
 ################### NON SYSTEM BLOCKER #################
 ########################################################
 (system_components_ip_addresses) {
-    remote_ip 172.19.2.2/32   # hosting-control-caddy
-    remote_ip 172.19.2.11/32  # hosting-control-dockersocket
+    remote_ip 172.19.1.0/24 # hosting-control-docker
 }
 
 (block_non_system) {
@@ -29,6 +28,8 @@
 
 
 
+
+
 :80 {
     import block_non_system
 
@@ -38,25 +39,18 @@
         Pragma "no-cache"
     }
 
-    # Docker Socket API
-    handle_path /dockersocket/* {
-        reverse_proxy unix//var/run/docker.sock
-    }
-    
-    # Filebrowser
-    handle /filebrowser* {
-        reverse_proxy sistema-filebrowser:80
+    # Reverse proxy to user's dind
+    reverse_proxy hosting-users-dind-{http.request.cookie.virtual-server-id}:10080
+
+    handle_errors 404 {
+        respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
     }
 
-    # WebSSH2
-    handle /ssh/* {
-        reverse_proxy sistema-webssh2:2222 {
-            header_up Authorization "Basic YWRtaW46YWRtaW4="
-        }
+    # Handle errors
+    handle_errors {
+        respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
     }
 
-    # Dockge (default)
-    handle {
-        reverse_proxy sistema-dockge:5001
-    }
 }
+
+

@@ -5,6 +5,7 @@ services:
     image: caddy:2.10-alpine
     read_only: true
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./endpoint/Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
       - 10080:80
