@@ -115,6 +115,12 @@
     tls {$TLS_LETSENCRYPT_EMAIL:internal}
     import geo_block_non_vu
 
+    # Disable caching
+    header {
+        Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Pragma "no-cache"
+    }
+
     # Check if user is authenticated
     forward_auth hosting-control-backend:8000 {
         uri /api/checkauth/vm/{http.request.cookie.virtual-server-id}

@@ -2,7 +2,7 @@
 ################### NON SYSTEM BLOCKER #################
 ########################################################
 (system_components_ip_addresses) {
-    remote_ip 172.19.2.1/32 # hosting-control-caddy
+    remote_ip 172.19.2.2/32 # hosting-control-caddy
 }
 
 (block_non_system) {
@@ -30,6 +30,12 @@
 
 :80 {
     import block_non_system
+
+    # Disable caching
+    header {
+        Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Pragma "no-cache"
+    }
     
     # Filebrowser
     handle /filebrowser* {
