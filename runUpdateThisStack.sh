@@ -24,6 +24,9 @@ mkdir -p _DATA/users-caddy/caddy_data
 mkdir -p _DATA/users-caddy/caddy_logs
 mkdir -p _DATA/users-caddy/certs
 touch _DATA/users-caddy/Caddyfile
+
+# Create users-dockerhub-cache directory
+mkdir -p _DATA/users-dockerhub-cache
 ########################################################################################
 
 

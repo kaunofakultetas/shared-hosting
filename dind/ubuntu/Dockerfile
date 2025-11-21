@@ -31,6 +31,10 @@ COPY init-user-env/init-user-env.sh /usr/local/bin/init-user-env.sh
 RUN chmod +x /usr/local/bin/init-user-env.sh
 COPY init-user-env/init-user-env.service /etc/systemd/system/init-user-env.service
 RUN systemctl enable init-user-env.service
+
+# Setup docker registry pass-through cache
+COPY docker-config/daemon.json /etc/docker/daemon.json
+RUN chmod 644 /etc/docker/daemon.json
 ########################################################################
 
 

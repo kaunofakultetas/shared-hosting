@@ -226,6 +226,9 @@ services:
 
 
 
+  #########################################################
+  ############## Outgoing Traffic Management ##############
+  #########################################################
   # Outgoing users traffic firewall
   hosting-users-firewall:
     container_name: hosting-users-firewall
@@ -263,6 +266,26 @@ services:
       filtered-users:
         ipv4_address: 172.19.2.1
     restart: unless-stopped
+
+
+  # Docker Hub cache proxy for users
+  hosting-users-dockerhub-cache:
+    container_name: hosting-users-dockerhub-cache
+    image: registry:3.0.0
+    user: 1000:1000
+    runtime: sysbox-runc
+    environment:
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+    volumes:
+      - ./_DATA/users-dockerhub-cache:/var/lib/registry
+    networks:
+      external: {}
+      filtered-users:
+        ipv4_address: 172.19.2.4
+    restart: unless-stopped
+  #########################################################
+  #########################################################
+  #########################################################
 
 
 
