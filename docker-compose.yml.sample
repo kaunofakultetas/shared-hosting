@@ -121,6 +121,21 @@ services:
       - isolated-control-docker
     restart: unless-stopped
   
+
+  hosting-control-dockersocket:
+    container_name: hosting-control-dockersocket
+    image: caddy:2.10-alpine
+    user: 1000:1000
+    runtime: sysbox-runc
+    read_only: true
+    volumes:
+      - ./control-modules/control-dockersocket/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      isolated-control-docker: {}
+      filtered-users:
+        ipv4_address: 172.19.2.11
+    restart: unless-stopped 
+  
   
   # Database Browser
   hosting-control-dbgate:
