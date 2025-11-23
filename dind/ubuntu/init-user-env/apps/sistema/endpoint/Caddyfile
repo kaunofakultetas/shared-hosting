@@ -1,20 +1,20 @@
 ########################################################
 ################### NON SYSTEM BLOCKER #################
 ########################################################
-(system_components_ip_addresses) {
+(system_ips) {
     remote_ip 172.19.2.2/32   # hosting-control-caddy
     remote_ip 172.19.2.11/32  # hosting-control-dockersocket
 }
 
 (block_non_system) {
-    @block_non_system {
+    @non_system_ips {
         not {
-            import system_components_ip_addresses
+            import system_ips
         }
     }
 
-    header @block_non_system Content-Type "text/html; charset=utf-8"
-    respond @block_non_system `<!DOCTYPE html>
+    header @non_system_ips Content-Type "text/html; charset=utf-8"
+    respond @non_system_ips `<!DOCTYPE html>
     <html>
         <body>
             <p>Virtual server management endpoint is not accessible from your IP address.</p>
@@ -30,7 +30,13 @@
 
 
 :80 {
-    import block_non_system
+    # Block non system IPs
+    handle {
+        import block_non_system
+    }
+
+
+
 
     # Disable caching
     header {
