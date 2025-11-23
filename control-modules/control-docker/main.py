@@ -353,6 +353,7 @@ def create_HTTPGET(container_name):
     process = Popen([
         'docker', 'run', '-d', 
         '--name', container_name,
+        '--hostname', f'server{vm_id}',
         '--runtime=sysbox-runc', 
         '-v', f'{ROOT_DIR}/SERVERS/{vm_id}/apps:/apps',
         '-v', f'{ROOT_DIR}/SERVERS/{vm_id}/docker:/var/lib/docker', 
