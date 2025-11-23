@@ -15,25 +15,38 @@ echo "Initializing user environment..."
 
 
 
-# STEP 1: Copy default apps from image to mounted volume
-if [ -d "/opt/default-apps" ]; then
-    echo "Copying default apps to /apps..."
+# STEP 1: Copy /apps/sistema apps from image to mounted volume
+if [ -d "/opt/default-apps/sistema" ]; then
+    echo "Copying system apps to /apps/sistema ..."
     
-    # Check if /apps is empty or doesn't exist
-    if [ ! -d "/apps" ] || [ -z "$(ls -A /apps)" ]; then
-        cp -r /opt/default-apps/* /apps/
-        echo "Default apps copied successfully"
+    # Check if /apps/sistema is empty or doesn't exist
+    if [ ! -d "/apps/sistema" ] || [ -z "$(ls -A /apps/sistema)" ]; then
+        cp -r /opt/default-apps/sistema /apps
+        echo "System apps copied successfully"
     else
-        echo "WARNING: /apps is not empty, skipping copy to preserve existing data"
+        echo "WARNING: /apps/sistema is not empty, skipping copy to preserve existing data"
     fi
 else
-    echo "ERROR: /opt/default-apps not found in image"
+    echo "ERROR: /opt/default-apps/sistema not found in image"
+    exit 1
+fi
+
+
+# STEP 2: Copy /apps/aplikacijos home directory files from image to mounted volume
+if [ -d "/opt/default-apps/aplikacijos" ]; then
+    echo "Copying home directory files to /apps/aplikacijos ..."
+    
+    mkdir -p /apps/aplikacijos
+    cp -r /opt/default-apps/aplikacijos/.* /apps/aplikacijos/ || true
+    cp -r /opt/default-apps/aplikacijos/* /apps/aplikacijos/ || true
+else
+    echo "ERROR: /opt/default-apps/aplikacijos not found in image"
     exit 1
 fi
 
 
 
-# STEP 2: Wait for Docker daemon to be ready
+# STEP 3: Wait for Docker daemon to be ready
 timeout=30
 while [ $timeout -gt 0 ]; do
     if docker info >/dev/null 2>&1; then
@@ -52,7 +65,7 @@ fi
 
 
 
-# STEP 3: Run the setup script
+# STEP 4: Run the setup script
 cd /apps/sistema || exit 1
 
 if [ -f "./runUpdateThisStack.sh" ]; then
@@ -64,6 +77,6 @@ fi
 
 
 
-# STEP 4: Mark initialization as complete
+# STEP 5: Mark initialization as complete
 touch "$INIT_MARKER"
 echo "User environment initialization complete"

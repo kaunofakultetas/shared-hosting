@@ -51,7 +51,7 @@
     # WebSSH2
     handle /ssh/* {
         reverse_proxy sistema-webssh2:2222 {
-            header_up Authorization "Basic YWRtaW46YWRtaW4="
+            header_up Authorization "Basic cm9vdDpyb290"
         }
     }
 

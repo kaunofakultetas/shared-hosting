@@ -40,11 +40,14 @@ RUN chmod 644 /etc/docker/daemon.json
 
 
 
-# Add admin user to sudo group and grant sudo privileges
-RUN usermod -aG sudo admin && echo '%sudo ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers
+##################### CONFIGURE USER IN A CONTAINER ####################
+# Remove ubuntu/admin users if they exist
+RUN userdel -r ubuntu || true
+RUN userdel -r admin || true
 
+# Set root password to "root"
+RUN echo 'root:root' | chpasswd
 
-# Set it as default login directory for root and admin bash shells
-RUN echo 'cd /apps/aplikacijos' >> /root/.bashrc && \
-    echo 'cd /apps/aplikacijos' >> /home/admin/.bashrc && \
-    echo 'sudo -i' >> /home/admin/.bashrc
+# Set root home directory
+RUN sed -i 's|root:/root|root:/apps/aplikacijos|' /etc/passwd
+########################################################################
