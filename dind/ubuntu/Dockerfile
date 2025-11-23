@@ -4,7 +4,7 @@ FROM nestybox/ubuntu-noble-systemd-docker
 #################### BASIC TOOLS INSTALLATION ##########################
 # Install cli tools
 RUN apt update && apt install -y \
-    iputils-ping traceroute net-tools nmap htop nano psmisc
+    iputils-ping traceroute net-tools nmap htop nano psmisc bash-completion
 
 # Install docker-compose
 RUN curl -L https://github.com/docker/compose/releases/download/v2.40.3/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
