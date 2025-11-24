@@ -54,6 +54,23 @@ services:
       filtered-users:
         ipv4_address: 172.19.2.3
     restart: unless-stopped
+
+
+  # SSH Router for Users
+  hosting-users-ssh-router:
+    container_name: hosting-users-ssh-router
+    image: vuknf/hosting-users-ssh-router:latest
+    environment:
+      - BACKEND_SSH_API_URL=http://hosting-control-backend:8000/api/sshrouter
+      - BACKEND_SSH_API_KEY=${BACKEND_SSH_API_KEY}
+    ports:
+      - "10022:2222"
+    networks:
+      external: {}
+      isolated-control-panel: {}
+      filtered-users:
+        ipv4_address: 172.19.2.5
+    restart: unless-stopped
   #########################################################
   #########################################################
   #########################################################
@@ -87,6 +104,8 @@ services:
 
       - DOCKER_CONTROLLER_HOST=hosting-control-docker
       - DOCKER_CONTROLLER_PORT=8000
+
+      - BACKEND_SSH_API_KEY=${BACKEND_SSH_API_KEY}
     read_only: true
     volumes:
       - /etc/localtime:/etc/localtime:ro

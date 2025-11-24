@@ -1,6 +1,6 @@
 #!/bin/bash
 
-################## HOSTING MODULES DATA DIRECTORIES AND FILES ##########################
+################## HOSTING MODULES DATA DIRECTORIES AND FILES ###########################
 # Control backend database
 mkdir -p _DATA/control-backend
 
@@ -27,7 +27,7 @@ touch _DATA/users-caddy/Caddyfile
 
 # Create users-dockerhub-cache directory
 mkdir -p _DATA/users-dockerhub-cache
-########################################################################################
+#########################################################################################
 
 
 
@@ -69,6 +69,19 @@ if [ ! -f .env ] || ! grep -q "^BOOKSTACK_APP_KEY=" .env; then
 fi
 #########################################################################################
 
+
+
+################################## SSH ROUTER AUTOSETUP #################################
+# Only generate if BACKEND_SSH_API_KEY doesn't exist in .env
+if [ ! -f .env ] || ! grep -q "^BACKEND_SSH_API_KEY=" .env; then
+    echo "Generating BACKEND_SSH_API_KEY..."
+    BACKEND_SSH_API_KEY="$(openssl rand -hex 32)"
+    
+    echo "BACKEND_SSH_API_KEY=$BACKEND_SSH_API_KEY" >> .env
+    echo "BACKEND_SSH_API_KEY added to .env"
+    echo "BACKEND_SSH_API_KEY: $BACKEND_SSH_API_KEY"
+fi
+#########################################################################################
 
 
 
