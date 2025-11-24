@@ -24,7 +24,6 @@ ssh_router_bp = Blueprint('ssh_router', __name__)
 
 
 # Environment variables
-BACKEND_SSH_API_URL = os.getenv('BACKEND_SSH_API_URL')
 BACKEND_SSH_API_KEY = os.getenv('BACKEND_SSH_API_KEY')
 
 
