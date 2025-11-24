@@ -60,6 +60,9 @@ def create_app():
     from .dns_controller.routes import dns_controller_bp
     app.register_blueprint(dns_controller_bp, url_prefix='')
 
+    from .ssh_router.routes import ssh_router_bp
+    app.register_blueprint(ssh_router_bp, url_prefix='')
+
 
 
 
