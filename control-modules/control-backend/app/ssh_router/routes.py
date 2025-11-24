@@ -78,5 +78,5 @@ def sshrouter_HTTPPOST():
 
 
     # STEP 5: Return server data
-    print(json.dumps(serverData, indent=4))
+    # print(json.dumps(serverData, indent=4)) # DEBUG
     return Response(json.dumps(serverData, indent=4), mimetype='application/json')
