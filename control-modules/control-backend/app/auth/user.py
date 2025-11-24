@@ -6,7 +6,7 @@
 ############################################################
 
 
-from flask_login import UserMixin, LoginManager, current_user
+from flask_login import UserMixin, LoginManager, current_user, jsonify
 from functools import wraps
 from ..database.db import get_db_connection
 
