@@ -4,6 +4,7 @@ import os
 import re
 import time
 import requests
+import requests_unixsocket
 from datetime import datetime, date, timedelta
 from subprocess import Popen, PIPE
 
@@ -41,24 +42,6 @@ app.secret_key = b'22ac33b7ee75b031e9cac6fa37a86229443c977d277307f25d8c0a0219d47
 
 
 
-# docker run --rm -it -v /:/mounted ubuntu bash
-
-'''
-docker run -d \
-    --name hosting-user2-dind \
-    --runtime=sysbox-runc \
-    -v /home/stud/students/environments/user2/apps:/apps \
-    -v /home/stud/students/environments/user2/dockge:/dockge \
-    -v /home/stud/students/environments/user2/docker:/var/lib/docker \
-    -v /home/stud/students/users-sshr/keys/ssh_host_ed25519_key.pub:/home/admin/.ssh/authorized_keys:ro \
-    --net filtered-users \
-    --restart unless-stopped \
-    hosting-user1-dind
-'''
-
-
-
-
 @app.route('/api/test', methods=['GET'])
 def test_HTTPGET():
     json_obj = {}
@@ -73,179 +56,148 @@ def test_HTTPGET():
 
 
 
-
-# @app.route('/api/status/<container_name>', methods=['GET'])
-# def status_HTTPGET(container_name):
-#     json_obj = {}
-    
-#     # Validate the input
-#     if not re.match(r'^[a-z0-9-]{1,25}$', container_name):
-#         json_obj['error'] = 'Invalid container name. Must be lowercase letters, numbers, hyphens, and up to 25 characters.'
-#         return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
-
-#     # Get the status of the container
-#     process = None
-#     if(container_name == 'host'):
-#         process = Popen(['docker', 'ps', '-a', '--format', '{{json .}}'], stdout=PIPE, stderr=PIPE)
-#     else:
-#         process = Popen(['docker', 'exec', container_name, 'docker', 'ps', '-a', '--format', '{{json .}}'], stdout=PIPE, stderr=PIPE)
-#     output, error = process.communicate()
-
-#     # Return the status of the container
-#     if process.returncode != 0:
-#         json_obj['error'] = error.decode('utf-8')
-#     else:
-#         json_obj['containers'] = [json.loads(line) for line in output.decode('utf-8').strip().split('\n') if line]
-
-
-#     # print(f'------ DEBUG: Container: {container_name} ------>')
-#     # print(json.dumps(json_obj, indent=4))
-#     # print('--------------------------------')
-
-#     return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
-
-
-
-
-
-
-
-
 @app.route('/api/status/<container_name>', methods=['GET'])
 def newstatus_HTTPGET(container_name):
     json_obj = {}
     
-    # Validate the input
+    # STEP 0: Validate "container name" input
     if not re.match(r'^[a-z0-9-]{1,25}$', container_name):
         json_obj['error'] = 'Invalid container name. Must be lowercase letters, numbers, hyphens, and up to 25 characters.'
         return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
 
+
+
+
+    # STEP 1: Fetch data from the appropriate API endpoint
+    response = None
     if(container_name == 'host'):
-        process = Popen(['docker', 'ps', '-a', '--format', '{{json .}}'], stdout=PIPE, stderr=PIPE)
-        output, error = process.communicate()
-
-        # Return the status of the container
-        if process.returncode != 0:
-            json_obj['error'] = error.decode('utf-8')
-        else:
-            json_obj['containers'] = [json.loads(line) for line in output.decode('utf-8').strip().split('\n') if line]
-        return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
+        # STEP 1.1: Fetch data from the host API endpoint
+        session = requests_unixsocket.Session()
+        response = session.get('http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json', timeout=2)
     else:
-        # Get the status of the container
+        # STEP 1.1: Fetch data from the VM API endpoint
         vm_id = container_name.split('-')[3]
-        response = requests.get(
-            f'http://hosting-control-dockersocket:80/dockersocket/containers/json',
-            cookies={'virtual-server-id': vm_id}
-        )
+        api_url = f'http://hosting-control-dockersocket:80/dockersocket/containers/json'
+        response = requests.get(api_url, cookies={'virtual-server-id': vm_id}, timeout=2)
 
-        if response.status_code != 200:
-            return Response(json.dumps({'error': f'Error from VM: {response.status_code}'}), mimetype='application/json')
 
-        response_json = json.loads(response.text)
+
+
+    # STEP 2: Validate the response and parse it to the JSON object
+    if response.status_code != 200:
+        return Response(json.dumps({'error': f'Error from {container_name}: {response.status_code}'}), mimetype='application/json')
+    response = response.text
+    response_json = json.loads(response)
+
+
+
+
+    # STEP 3: Map Docker API response to legacy format (Docker CLI json format)
+    containers = []
+    for container in response_json:
+        # Calculate running status
+        status = container.get('Status', '')
+        state = container.get('State', '')
         
-        # Map Docker API response to legacy format
-        containers = []
-        for container in response_json:
-            # Calculate running status
-            status = container.get('Status', '')
-            state = container.get('State', '')
+        # Format networks string
+        networks = ",".join(container.get('NetworkSettings', {}).get('Networks', {}).keys())
+        
+        # Format ports string
+        ports = []
+        for p in container.get('Ports', []):
+            private_port = p.get('PrivatePort')
+            public_port = p.get('PublicPort')
+            type_ = p.get('Type')
+            ip = p.get('IP')
             
-            # Format networks string
-            networks = ",".join(container.get('NetworkSettings', {}).get('Networks', {}).keys())
-            
-            # Format ports string
-            ports = []
-            for p in container.get('Ports', []):
-                private_port = p.get('PrivatePort')
-                public_port = p.get('PublicPort')
-                type_ = p.get('Type')
-                ip = p.get('IP')
-                
-                # Match old format style roughly
-                if public_port:
-                    if ip == '0.0.0.0':
-                        ports.append(f"{ip}:{public_port}->{private_port}/{type_}")
-                    elif ip == '::':
-                        ports.append(f"[{ip}]:{public_port}->{private_port}/{type_}") # Match [::] format
-                    else:
-                        ports.append(f"{public_port}->{private_port}/{type_}")
+            # Match old format style roughly
+            if public_port:
+                if ip == '0.0.0.0':
+                    ports.append(f"{ip}:{public_port}->{private_port}/{type_}")
+                elif ip == '::':
+                    ports.append(f"[{ip}]:{public_port}->{private_port}/{type_}") # Match [::] format
                 else:
-                    ports.append(f"{private_port}/{type_}")
-            ports_str = ", ".join(ports)
-
-            # Format mounts string (Legacy: comma separated sources)
-            # Also count LocalVolumes (Type == 'volume')
-            mounts = []
-            local_volumes = 0
-            for m in container.get('Mounts', []):
-                src = m.get('Source', '')
-                mount_type = m.get('Type', '')
-                
-                if mount_type == 'volume':
-                    local_volumes += 1
-                    # Legacy often showed volume name or path. 
-                    # If Name exists and is long hash, maybe show Name, otherwise Source.
-                    # For now, Source is safe.
-                    # mounts.append(src) # Don't append volume sources to match legacy "LocalVolumes: 1" hiding details
-                    pass
-                else:
-                    mounts.append(src)
-            mounts_str = ",".join(mounts)
-
-            # Format labels string
-            labels = []
-            for k, v in container.get('Labels', {}).items():
-                labels.append(f"{k}={v}")
-            labels_str = ",".join(labels)
-
-            # Format command
-            cmd = container.get('Command', '')
-            if not cmd.startswith('"'):
-                cmd = f'"{cmd}"'
-
-            # Format created date
-            created_ts = container.get('Created')
-            created_str = datetime.fromtimestamp(created_ts).strftime('%Y-%m-%d %H:%M:%S +0000 UTC')
-
-            # Calculate "RunningFor" (e.g., "3 hours ago")
-            # Docker API returns "Status": "Up 3 hours". 
-            # "RunningFor" in docker ps usually means "Created X ago" or "Started X ago".
-            # The old output had "RunningFor": "3 hours ago".
-            # We can approximate this from Created time.
-            now = datetime.now()
-            created_dt = datetime.fromtimestamp(created_ts)
-            diff = now - created_dt
-            
-            if diff.days > 0:
-                running_for = f"{diff.days} days ago"
-            elif diff.seconds >= 3600:
-                running_for = f"{diff.seconds // 3600} hours ago"
-            elif diff.seconds >= 60:
-                running_for = f"{diff.seconds // 60} minutes ago"
+                    ports.append(f"{public_port}->{private_port}/{type_}")
             else:
-                running_for = "Less than a minute ago"
+                ports.append(f"{private_port}/{type_}")
+        ports_str = ", ".join(ports)
 
-            legacy_container = {
-                "Command": cmd,
-                "CreatedAt": created_str,
-                "ID": container.get('Id')[:12],
-                "Image": container.get('Image'),
-                "Labels": labels_str,
-                "LocalVolumes": str(local_volumes),
-                "Mounts": mounts_str,
-                "Names": (container.get('Names', [''])[0]).lstrip('/'),
-                "Networks": networks,
-                "Ports": ports_str,
-                "RunningFor": running_for,
-                "Size": "N/A", 
-                "State": state,
-                "Status": status
-            }
-            containers.append(legacy_container)
+        # Format mounts string (Legacy: comma separated sources)
+        # Also count LocalVolumes (Type == 'volume')
+        mounts = []
+        local_volumes = 0
+        for m in container.get('Mounts', []):
+            src = m.get('Source', '')
+            mount_type = m.get('Type', '')
+            
+            if mount_type == 'volume':
+                local_volumes += 1
+                # Legacy often showed volume name or path. 
+                # If Name exists and is long hash, maybe show Name, otherwise Source.
+                # For now, Source is safe.
+                # mounts.append(src) # Don't append volume sources to match legacy "LocalVolumes: 1" hiding details
+                pass
+            else:
+                mounts.append(src)
+        mounts_str = ",".join(mounts)
 
-        json_obj['containers'] = containers
+        # Format labels string
+        labels = []
+        for k, v in container.get('Labels', {}).items():
+            labels.append(f"{k}={v}")
+        labels_str = ",".join(labels)
 
-        return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
+        # Format command
+        cmd = container.get('Command', '')
+        if not cmd.startswith('"'):
+            cmd = f'"{cmd}"'
+
+        # Format created date
+        created_ts = container.get('Created')
+        created_str = datetime.fromtimestamp(created_ts).strftime('%Y-%m-%d %H:%M:%S +0000 UTC')
+
+        # Calculate "RunningFor" (e.g., "3 hours ago")
+        # Docker API returns "Status": "Up 3 hours". 
+        # "RunningFor" in docker ps usually means "Created X ago" or "Started X ago".
+        # The old output had "RunningFor": "3 hours ago".
+        # We can approximate this from Created time.
+        now = datetime.now()
+        created_dt = datetime.fromtimestamp(created_ts)
+        diff = now - created_dt
+        
+        if diff.days > 0:
+            running_for = f"{diff.days} days ago"
+        elif diff.seconds >= 3600:
+            running_for = f"{diff.seconds // 3600} hours ago"
+        elif diff.seconds >= 60:
+            running_for = f"{diff.seconds // 60} minutes ago"
+        else:
+            running_for = "Less than a minute ago"
+
+        legacy_container = {
+            "Command": cmd,
+            "CreatedAt": created_str,
+            "ID": container.get('Id')[:12],
+            "Image": container.get('Image'),
+            "Labels": labels_str,
+            "LocalVolumes": str(local_volumes),
+            "Mounts": mounts_str,
+            "Names": (container.get('Names', [''])[0]).lstrip('/'),
+            "Networks": networks,
+            "Ports": ports_str,
+            "RunningFor": running_for,
+            "Size": "N/A", 
+            "State": state,
+            "Status": status
+        }
+        containers.append(legacy_container)
+
+
+
+
+    # STEP 4: Return the response
+    json_obj['containers'] = containers
+    return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
 
 
 
@@ -270,6 +222,9 @@ def start_HTTPGET(container_name):
         return Response(json.dumps({'error': f'Failed to start {container_name}'}), mimetype='application/json')
     
     return Response(json.dumps({'message': f'{container_name} started'}), mimetype='application/json')
+
+
+
 
 
 
@@ -343,10 +298,8 @@ def create_HTTPGET(container_name):
         return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
 
 
-
     # STEP 1: VM ID of the new user virtual server
     vm_id = container_name.split('-')[3]
-
 
 
     # STEP 2: Create the container (Create user virtual server)

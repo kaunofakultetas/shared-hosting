@@ -8,7 +8,8 @@ RUN apk add --update docker openrc zip
 RUN pip install --no-cache-dir              \
     "Flask==3.0.0"                          \
     "Flask-CORS==4.0.0"                     \
-    "docker==7.1.0"
+    "docker==7.1.0"                         \
+    "requests-unixsocket==0.4.1"
 
     
 COPY . .
