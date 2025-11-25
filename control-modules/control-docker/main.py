@@ -73,11 +73,11 @@ def newstatus_HTTPGET(container_name):
     if(container_name == 'host'):
         # STEP 1.1: Fetch data from the host API endpoint
         session = requests_unixsocket.Session()
-        response = session.get('http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json', timeout=2)
+        response = session.get('http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/json?all=1', timeout=2)
     else:
         # STEP 1.1: Fetch data from the VM API endpoint
         vm_id = container_name.split('-')[3]
-        api_url = f'http://hosting-control-dockersocket:80/dockersocket/containers/json'
+        api_url = f'http://hosting-control-dockersocket:80/dockersocket/containers/json?all=1'
         response = requests.get(api_url, cookies={'virtual-server-id': vm_id}, timeout=2)
 
 
