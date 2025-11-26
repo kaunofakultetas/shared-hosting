@@ -177,7 +177,7 @@ def newstatus_HTTPGET(container_name):
         legacy_container = {
             "Command": cmd,
             "CreatedAt": created_str,
-            "ID": container.get('Id')[:12],
+            "ID": container.get('Id'),
             "Image": container.get('Image'),
             "Labels": labels_str,
             "LocalVolumes": str(local_volumes),

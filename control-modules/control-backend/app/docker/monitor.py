@@ -10,7 +10,7 @@
 import json
 import requests
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from threading import Thread
 import os
 from ..database.db import get_db_connection
@@ -44,7 +44,6 @@ def push_docker_info_to_db(json_obj, parentServerID=0):
                 [container['ID'], parentServerID, container['Command'], container['CreatedAt'], container['Image'], 
                 container['Labels'], container['Mounts'], container['Names'], container['Networks'], container['Ports'], container['RunningFor'], 
                 container['Size'], container['State'], container['Status'], timeNow])
-
 
             conn.execute('''
                 UPDATE Hosting_DockerContainers SET 
@@ -109,3 +108,9 @@ def docker_info_background_updater():
         except Exception as e:
             print(f'Docker Info Updater Error: {e}')
 
+
+        # Clean up old docker containers
+        with get_db_connection() as conn:
+            timeBefore5mins = (datetime.now() - timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute(' DELETE FROM Hosting_DockerContainers WHERE UpdatedAt < ? ', [timeBefore5mins])
+            conn.commit()
