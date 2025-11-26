@@ -168,6 +168,7 @@ def vm_HTTPGET(virtualServerID=None):
 @login_required
 def vmControl_HTTPPOST():
     postData = request.get_json()
+    timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
     virtualServerID = postData.get('virtualServerID')
@@ -187,21 +188,24 @@ def vmControl_HTTPPOST():
             serverName = postData.get('name')
             sqlfetchdata = conn.execute('INSERT INTO Hosting_VirtualServers (OwnerID, Name, Enabled, Deleted, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?)', [current_user.id, serverName, 1, 0, timeNow, timeNow])
             virtualServerID = sqlfetchdata.lastrowid
-            conn.commit()
 
 
             # Create virtual server physically using the docker controller
             containerName = 'hosting-users-dind-' + str(virtualServerID)
             resp = requests.get(f'http://{DOCKER_CONTROLLER_HOST}:{DOCKER_CONTROLLER_PORT}/api/create/{containerName}', timeout=1)
             if(resp.status_code != 200):
-                # Rollback database on failure
-                conn.execute('DELETE FROM Hosting_VirtualServers WHERE ID = ?', [virtualServerID])
-                conn.commit()
                 return jsonify({'message':'Failed to create virtual server'}), 500
 
 
             # Update database
             conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Virtual server #{virtualServerID} created', 
+                    timeNow 
+                ]
+            )
             conn.commit()
 
             # Return success
@@ -226,6 +230,13 @@ def vmControl_HTTPPOST():
             
             # Update database
             conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Virtual server #{virtualServerID} started', 
+                    timeNow 
+                ]
+            )
             conn.commit()
 
             # Return success
@@ -241,6 +252,13 @@ def vmControl_HTTPPOST():
 
             # Update database
             conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 0 WHERE ID = ?', [virtualServerID])
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Virtual server #{virtualServerID} stopped', 
+                    timeNow 
+                ]
+            )
             conn.commit()
 
             # Return success
@@ -258,6 +276,13 @@ def vmControl_HTTPPOST():
             conn.execute('UPDATE Hosting_VirtualServers SET Deleted = 1 WHERE ID = ?', [virtualServerID])
             conn.execute('DELETE FROM Hosting_DockerContainers WHERE ParentServerID = ?', [virtualServerID])
             conn.execute('DELETE FROM Hosting_DomainNames WHERE VirtualServerID = ?', [virtualServerID])
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Virtual server #{virtualServerID} deleted', 
+                    timeNow 
+                ]
+            )
             conn.commit()
 
             # Return success

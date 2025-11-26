@@ -30,6 +30,7 @@ auth_bp = Blueprint('auth', __name__)
 @auth_bp.route('/api/login', methods=['POST'])
 def login_HTTPPOST():
     postData = request.get_json()
+    timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Preauth Checks
     if( not postData or (not postData.get('email') and not postData.get('password')) ):
@@ -54,6 +55,15 @@ def login_HTTPPOST():
         # Login Check
         if( bcrypt.checkpw( str.encode(postData.get('password')), str.encode(thisUserObject.password) )):
             login_user(thisUserObject)
+            with get_db_connection() as conn:
+                conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                    [ 
+                        thisUserObject.id, 
+                        f'User {thisUserObject.email} logged in (IP: {request.headers.get("X-Forwarded-For")})', 
+                        timeNow 
+                    ]
+                )
+                conn.commit()
             return 'OK'
         else:
             # Dummy check
@@ -66,88 +76,6 @@ def login_HTTPPOST():
         bcrypt.checkpw( str.encode("This Only Used to prevent time based user enumeration attack, so doing nothing there."), 
                         str.encode('$2b$12$37rvWwtdP/sb.pZwBklPFeUxoH.KWOXIDjTxiiC9awCYpXIB8EbmS') )
         return "El. Paštas ir/arba Slaptažodis neteisingas."
-
-
-
-
-
-
-
-# @auth_bp.route('/api/checkauth', methods=['GET'])
-# @login_required
-# def checkauth_HTTPGET():
-#     timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-#     with get_db_connection() as conn:
-
-#         # All Users
-#         user_info = {
-#             "id": current_user.id,
-#             "userid": current_user.userid,
-#             "admin": getattr(current_user, 'admin', False)
-#         }
-
-    
-
-        
-#         # Admin
-#         if(getattr(current_user, 'admin', False)):
-#             adminID = current_user.userid
-
-#             # Update LastLogin
-#             conn.execute('UPDATE System_Users SET LastLogin = ? WHERE ID = ?', [timeNow, adminID])
-
-
-
-#         # Student
-#         else:
-#             studentID = current_user.userid
-
-#             user_info['passcode'] = current_user.password
-
-#             # Update LastLogin
-#             conn.execute('UPDATE Users_Students SET LastLogin = ? WHERE StudentID = ?', [timeNow, studentID])
-
-#             # Checking if student finished test
-#             user_info["phishingtestfinished"] = conn.execute(' SELECT IsFinished FROM Users_Students WHERE StudentID = ? ', [studentID]).fetchone()[0]
-    
-    
-#     return Response(json.dumps(user_info, indent=4), mimetype='application/json')
-
-
-
-
-
-
-
-
-# @auth_bp.route('/api/checkauth/admin', methods=['GET'])
-# @login_required
-# def checkauth_admin_HTTPGET():
-#     timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-#     with get_db_connection() as conn:
-
-#         # All Users
-#         user_info = {
-#             "id": current_user.id,
-#             "userid": current_user.userid,
-#             "admin": getattr(current_user, 'admin', False)
-#         }
-
-
-#         # Admin
-#         if(getattr(current_user, 'admin', False)):
-#             adminID = current_user.userid
-
-#             # Update LastLogin
-#             conn.execute('UPDATE System_Users SET LastLogin = ? WHERE ID = ?', [timeNow, adminID])
-
-#             return Response(json.dumps(user_info, indent=4), mimetype='application/json')
-
-#     return jsonify({'message':'Unauthorized'}), 401
-
-
-
-
 
 
 
@@ -277,136 +205,3 @@ def checkauth_admin_HTTPGET():
 
 
 
-
-
-
-
-
-# @auth_bp.route('/api/admin/students', methods=['GET'])
-# @auth_bp.route('/api/admin/students/<int:studentID>', methods=['GET'])
-# @login_required
-# def studentsList_HTTPGET(studentID=None):
-#     if(not current_user.admin):
-#         if(studentID == current_user.userid):
-#             # Finished the test
-#             pass
-#         else:
-#             return 'Error: Not Admin'
-    
-
-#     with get_db_connection() as conn:
-#         sqlFetchData = conn.execute(f'''
-#             WITH GetStudentsProgress AS (
-#                 SELECT 
-#                     PhishingTest_Answers.StudentID,
-#                     Users_Students.Username,
-#                     COUNT(*) AS QuestionCount,
-#                     IFNULL(     SUM(    IIF(PhishingTest_Answers.AnswerStatus IS NOT NULL, 1, 0)    )   , 0) AS AnsweredQuestionCount,
-#                     Users_Students.IsFinished,
-#                     Users_Students.LastLogin
-#                 FROM 
-#                     PhishingTest_Answers
-#                 LEFT JOIN Users_Students
-#                     ON Users_Students.StudentID = PhishingTest_Answers.StudentID
-#                 GROUP BY PhishingTest_Answers.StudentID
-#             ),
-#             GetTable AS (
-#                 SELECT 
-#                     Users_Students.StudentID                                        AS ID,
-#                     Users_StudentGroups.Name                                        AS GroupName,
-#                     Users_Students.Username                                         AS Username,
-#                     Users_Students.Passcode                                         AS Passcode,
-
-#                     IFNULL(_VIEW_GetUsersTestResults.FullyCorrectCount, '')         AS FullyCorrectCount,
-#                     IFNULL(_VIEW_GetUsersTestResults.FullyCorrectPercentage, '')    AS FullyCorrectPercentage,
-
-
-#                     IFNULL(_VIEW_GetUsersTestResults.QuestionCount, '')             AS QuestionCount,
-#                     IFNULL(_VIEW_GetUsersTestResults.TotalIdentifiedCorrectly, '')  AS TotalIdentifiedCorrectly,
-
-
-#                     IFNULL(_VIEW_GetUsersTestResults.TotalOptionsCount, '')         AS TotalOptionsCount,
-#                     IFNULL(_VIEW_GetUsersTestResults.TotalCorrectOptionsCount, '')  AS TotalCorrectOptionsCount,
-
-
-#                     IFNULL(_VIEW_GetUsersTestResults.TestGrade, '')                 AS TestGrade,
-
-
-#                     Users_Students.IsFinished                                       AS IsFinished,
-#                     Users_Students.LastLogin                                        AS LastLogin,
-#                     Users_Students.Status                                           AS Status,
-#                     GetStudentsProgress.AnsweredQuestionCount                       AS AnsweredQuestionCount
-#                 FROM 
-#                     Users_Students
-#                 LEFT JOIN Users_StudentGroups
-#                     ON Users_Students.GroupID = Users_StudentGroups.GroupID
-#                 LEFT JOIN _VIEW_GetUsersTestResults
-#                     ON Users_Students.StudentID = _VIEW_GetUsersTestResults.StudentID
-#                 LEFT JOIN GetStudentsProgress
-#                     ON Users_Students.StudentID = GetStudentsProgress.StudentID
-#                 { 
-#                     "WHERE Users_Students.StudentID = " + str(studentID) if studentID != None else ""
-#                 }
-#                 ORDER BY Users_Students.StudentID DESC
-#             )
-
-#             SELECT
-#                 {"json_group_array(" if studentID == None else ""}
-#                     json_object(
-#                         'id',                       ID,
-#                         'username',                 Username,
-#                         'passcode',                 Passcode,
-#                         'groupname',                GroupName,
-                        
-#                         'questioncount',            QuestionCount,
-#                         'answeredquestioncount',    AnsweredQuestionCount,
-#                         'totalidentifiedcorrectly', TotalIdentifiedCorrectly,
-
-#                         'fullycorrectcount',        FullyCorrectCount,
-#                         'fullycorrectpercentage',   FullyCorrectPercentage,
-
-#                         'totaloptionscount',        TotalOptionsCount,
-#                         'totalcorrectoptionscount', TotalCorrectOptionsCount,
-
-#                         'testgrade',                TestGrade,
-
-#                         'isfinished',               IsFinished,
-#                         'lastseen',                 LastLogin,
-#                         'status',                   Status
-#                     )
-#                 {")" if studentID == None else ""}
-#             FROM 
-#                 GetTable
-#         ''', [])
-#         return Response(json.dumps(json.loads(sqlFetchData.fetchone()[0]), indent=4), mimetype='application/json')
-    
-
-
-
-
-
-
-# @auth_bp.route('/api/student/register', methods=['POST'])
-# def studentRegister_HTTPPOST():
-#     postData = request.get_json()
-#     username = re.sub(r'[^A-Z0-9_]', '', postData['username'].upper())
-    
-
-#     with get_db_connection() as conn:
-#         if(conn.execute(' SELECT COUNT(*) FROM Users_Students WHERE Username = ? ', [username]).fetchone()[0] == 0):
-#             accessCode = str(random.randint(10**7, 10**8 - 1))
-#             returnJson = {
-#                 "status": "OK",
-#                 "username": username,
-#                 "accessCode": accessCode
-#             }
-#             conn.execute(''' INSERT OR IGNORE INTO Users_Students 
-#                          (GroupID, Username, Passcode, IsFinished, LastLogin, Status) VALUES (?,?,?,?,?,?) ''', 
-#                          [0, username, accessCode, 0, '', 1])
-#             return Response(json.dumps(returnJson, indent=4), mimetype='application/json')
-#         else:
-#             returnJson = {
-#                 "status": "error",
-#                 "error": "Vartotojas tokiu vardu jau registruotas"
-#             }
-#             return Response(json.dumps(returnJson, indent=4), mimetype='application/json')

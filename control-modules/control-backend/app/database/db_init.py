@@ -92,6 +92,23 @@ def init_db_tables():
 
 
 
+        ######################## Recent activity tables #####################
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS "Hosting_RecentActivity" (
+                "ID"	INTEGER NOT NULL UNIQUE,
+                "UserID"	INTEGER NOT NULL,
+                "Message"	TEXT NOT NULL,
+                "Time"	TEXT NOT NULL,
+                PRIMARY KEY("ID" AUTOINCREMENT)
+            );
+        ''')
+        #####################################################################
+
+
+
+
+
+
 
 def init_default_admin_user():
     with get_db_connection() as conn:

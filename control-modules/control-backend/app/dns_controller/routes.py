@@ -7,6 +7,7 @@
 
 from flask import Blueprint, request, Response, jsonify
 from flask_login import login_required, current_user
+from datetime import datetime
 import json
 import requests
 import re
@@ -122,6 +123,7 @@ def vm_dns_isvalid_HTTPGET():
 @login_required
 def vm_dns_HTTPGET(virtualServerID, domainID=None):
     with get_db_connection() as conn:
+        timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
         # Check if user is allowed to access specific virtual server
@@ -165,8 +167,15 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             # Update the domain name
             conn.execute('UPDATE Hosting_DomainNames SET DomainName = ?, IsCloudflare = ?, SSL = ? WHERE ID = ?', 
                 [ postData['domainname'].lower(), postData['iscloudflare'], postData['ssl'], postData['domainid'] ])
-            conn.commit()
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Domain name "{postData["domainname"]}" updated for virtual server #{virtualServerID}', 
+                    timeNow 
+                ]
+            )
             dockerBackendResponse = update_caddy_config()
+            conn.commit()
             return jsonify({'message':'OK'}), 200
 
 
@@ -182,16 +191,31 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             # Insert the domain name
             conn.execute('INSERT INTO Hosting_DomainNames (VirtualServerID, DomainName, IsCloudflare, SSL) VALUES (?, ?, ?, ?)', 
                 [ virtualServerID, postData['domainname'].lower(), postData['iscloudflare'], postData['ssl'] ])
-            conn.commit()
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Domain name "{postData["domainname"]}" added for virtual server #{virtualServerID}', 
+                    timeNow 
+                ]
+            )
             dockerBackendResponse = update_caddy_config()
+            conn.commit()
             return jsonify({'message':'OK'}), 200
         
 
 
         elif request.method == "DELETE":
+            domainName = conn.execute('SELECT DomainName FROM Hosting_DomainNames WHERE ID = ?', [domainID]).fetchone()[0]
             conn.execute('DELETE FROM Hosting_DomainNames WHERE ID = ?', [domainID])
-            conn.commit()
+            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Domain name "{domainName}" deleted for virtual server #{virtualServerID}', 
+                    timeNow 
+                ]
+            )
             dockerBackendResponse = update_caddy_config()
+            conn.commit()
             return jsonify({'message':'OK'}), 200
         
 
