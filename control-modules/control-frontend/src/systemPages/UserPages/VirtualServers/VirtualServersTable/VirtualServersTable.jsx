@@ -113,7 +113,7 @@ const VirtualServersTable = ({ authdata }) => {
   return (
     <Paper
       sx={{
-        height: "calc(100vh - 135px)",
+        height: "calc(100vh - 105px)",
         width: "100%",
         borderRadius: 0,
         overflowY: "auto",
