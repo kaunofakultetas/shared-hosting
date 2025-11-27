@@ -1,9 +1,9 @@
 {
-  "name": "hosting-nextjs",
+  "name": "hosting-control-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "rm -rf .next && next build && rm -rf build_output && cp -r .next build_output",
     "start": "next start",
     "lint": "next lint"
@@ -21,6 +21,8 @@
     "react-hot-toast": "^2.5.1",
     "react-tsparticles": "^2.12.2",
     "sass": "^1.83.0",
+    "@tailwindcss/postcss": "^4.1.17",
+    "tailwindcss": "^4.1.17",
     "tsparticles-slim": "^2.12.0"
   }
 }
