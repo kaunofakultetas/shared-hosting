@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Button, Modal, ModalDialog, Stack, Typography } from "@mui/joy";
 import { TextField, Box, FormControl, Grid, MenuItem } from "@mui/material";
@@ -10,12 +10,24 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
   // vmData: optional prop if you decide to allow editing in the future.
   // Currently, if vmData is undefined, we assume "Add New VM".
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [data, setData] = useState({
     // Basic structure for a new VM
     id: '',
     name: '',
     os: '',
   });
+  const nameInputRef = useRef(null);
+
+  // Focus the name input when modal opens
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (nameInputRef.current) {
+        nameInputRef.current.focus();
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // If you do NOT plan to edit existing VMs, you can omit these effect checks.
   useEffect(() => {
@@ -38,14 +50,23 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
 
   // Example API call to insert or update VM
   async function sendData(postData) {
-    // Adjust the endpoint to your real API
-    const response = await axios.post("/api/vm/control", postData, { withCredentials: true });
-    toast.success(<b>Server is being created. Please wait 1 minute...</b>, { duration: 30000 });
+    // Prevent double submission
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    // Refresh data in parent
-    getData();
-    // Close modal
-    setOpen(false);
+    try {
+      // Adjust the endpoint to your real API
+      const response = await axios.post("/api/vm/control", postData, { withCredentials: true });
+      toast.success(<b>Server is being created. Please wait 1 minute...</b>, { duration: 30000 });
+
+      // Refresh data in parent
+      getData();
+      // Close modal
+      setOpen(false);
+    } catch (error) {
+      toast.error(<b>Failed to create server. Please try again.</b>);
+      setIsSubmitting(false);
+    }
   }
 
   // Handle Save
@@ -72,8 +93,16 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
     sendData(postData);
   }
 
-  // ** Disable "Save" if name is empty (example logic) **
-  const disableSave = data.name.trim() === '';
+  // ** Disable "Save" if name is empty or submitting **
+  const disableSave = data.name.trim() === '' || isSubmitting;
+
+  // Handle Enter key to submit the form
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !disableSave) {
+      e.preventDefault();
+      handleSaveButton();
+    }
+  }
 
   // If data not yet loaded for edit (rare case), or you can remove this entirely
   if (!data) {
@@ -119,9 +148,11 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
           <FormControl size="lg" color="primary">
             <TextField
               required
+              inputRef={nameInputRef}
               label="Virtual Server Name"
               value={data.name}
               onChange={(e) => setData(prev => ({ ...prev, name: e.target.value }))}
+              onKeyDown={handleKeyDown}
             />
           </FormControl>
 
@@ -132,6 +163,7 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
               label="Virtual Server Image"
               value={data.os}
               onChange={(e) => setData(prev => ({ ...prev, os: e.target.value }))}
+              onKeyDown={handleKeyDown}
             >
               <MenuItem value="linux">Ubuntu Server 24.04</MenuItem>
             </TextField>
@@ -154,7 +186,7 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
                   onClick={handleSaveButton}
                   disabled={disableSave}
                 >
-                  {vmData ? 'Save' : 'Create'}
+                  {isSubmitting ? 'Creating...' : (vmData ? 'Save' : 'Create')}
                 </Button>
               </Grid>
 
