@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar/Navbar";
 import Widget from "@/components/Admin/Widget/Widget";
 import React, { useState, useEffect } from "react";
 import { Modal, ModalDialog, Button } from "@mui/joy";
+import axios from "axios";
 
 // Icons
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
@@ -22,12 +23,51 @@ const Home = ({ authdata }) => {
   const [remainingTime, setRemainingTime] = useState('');
   const [showCodeModal, setShowCodeModal] = useState(false);
 
-  // System stats (mock data - replace with API call)
+  // System stats from API
   const [systemStats, setSystemStats] = useState({
-    cpu: 45,
-    ram: 62,
-    disk: 38
+    cpu_percent: 0,
+    memory_percent: 0,
+    disk_percent: 0,
+    cpu_cores: 0,
+    memory_total_gb: 0,
+    memory_used_gb: 0,
+    disk_total_gb: 0,
+    disk_used_gb: 0,
   });
+
+  // Hosting system stats from API
+  const [hostingStats, setHostingStats] = useState({
+    users: 0,
+    virtualservers: 0,
+    domains: 0,
+  });
+
+  // Recent activity from API
+  const [recentActivity, setRecentActivity] = useState([]);
+
+  // Fetch all dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      const [systemRes, hostingRes, activityRes] = await Promise.all([
+        axios.get('/api/dashboard/system', { withCredentials: true }),
+        axios.get('/api/dashboard/hostingsystem', { withCredentials: true }),
+        axios.get('/api/dashboard/recentactivity', { withCredentials: true }),
+      ]);
+
+      if (systemRes.status === 200) setSystemStats(systemRes.data);
+      if (hostingRes.status === 200) setHostingStats(hostingRes.data);
+      if (activityRes.status === 200) setRecentActivity(activityRes.data);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    }
+  };
+
+  // Fetch data on mount and every 3 seconds
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Generate random 8-char uppercase code
   const generateCode = () => {
@@ -42,12 +82,11 @@ const Home = ({ authdata }) => {
   // Handle Turn ON quick registration
   const handleTurnOn = () => {
     const code = generateCode();
-    const expiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
+    const expiry = new Date(Date.now() + 30 * 60 * 1000);
     setQuickRegCode(code);
     setQuickRegExpiry(expiry);
     setQuickRegEnabled(true);
     toast.success('Quick Registration enabled!');
-    // TODO: Send to backend
   };
 
   // Handle Turn OFF quick registration
@@ -57,7 +96,6 @@ const Home = ({ authdata }) => {
     setQuickRegExpiry(null);
     setRemainingTime('');
     toast.success('Quick Registration disabled');
-    // TODO: Send to backend
   };
 
   // Countdown timer effect
@@ -105,22 +143,36 @@ const Home = ({ authdata }) => {
     return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
   };
 
+  // Format time ago
+  const formatTimeAgo = (timestamp) => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
+
   return (
     <div>
       <Navbar />
       <div className="flex">
         <Sidebar authdata={authdata} />
         
-        <div className="grow-[6] bg-gray-100 p-5" style={{ height: "calc(100vh - 105px)" }}>
+        <div className="grow-[6] bg-gray-100 p-5" style={{ height: "calc(100vh - 105px)", overflowY: "auto" }}>
 
-          {/* Top Widgets - 3 items */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
+          {/* Top Widgets - 4 items */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
             
             <Widget 
               type="user" 
               text="Users" 
-              count={12} 
-              percentage={5} 
+              count={hostingStats.users} 
               icon={getIcon(PeopleOutlinedIcon, "crimson", "rgba(255, 0, 0, 0.2)")} 
               link="/admin/users" 
             />
@@ -128,13 +180,20 @@ const Home = ({ authdata }) => {
             <Widget 
               type="order" 
               text="Virtual Servers" 
-              count={25} 
-              percentage={10}
+              count={hostingStats.virtualservers}
               icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")} 
               link="/admin/servers"
             />
             
-            {/* Quick Registration Widget - matching Widget component style */}
+            <Widget 
+              type="order" 
+              text="Domains" 
+              count={hostingStats.domains}
+              icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")} 
+              link="/admin/domains"
+            />
+            
+            {/* Quick Registration Widget */}
             <div 
               className="flex justify-between bg-white"
               style={{
@@ -144,7 +203,6 @@ const Home = ({ authdata }) => {
                 height: '100px',
               }}
             >
-              {/* Left side */}
               <div className="flex flex-col justify-between">
                 <span className="font-bold text-sm text-gray-400">Quick Registration</span>
                 {quickRegEnabled ? (
@@ -159,7 +217,6 @@ const Home = ({ authdata }) => {
                 )}
               </div>
               
-              {/* Right side */}
               <div className="flex flex-col justify-between items-end mr-2">
                 {quickRegEnabled ? (
                   <>
@@ -191,13 +248,13 @@ const Home = ({ authdata }) => {
           <div className="flex gap-5 flex-wrap">
             
             {/* System Overview - CPU, RAM, Disk */}
-            <div className="grow-[2] basis-0 shadow-md p-5 rounded-xl bg-white min-h-128">
+            <div className="grow-[2] basis-0 shadow-md p-5 rounded-xl bg-white min-h-64">
               <h3 className="text-gray-500 mb-6 text-base font-medium">System Overview</h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* CPU Usage */}
                 {(() => {
-                  const colors = getUsageColor(systemStats.cpu);
+                  const colors = getUsageColor(systemStats.cpu_percent);
                   return (
                     <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.bg }}>
                       <div className="flex justify-center mb-3">
@@ -206,13 +263,13 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {systemStats.cpu}%
+                        {systemStats.cpu_percent}%
                       </div>
-                      <div className="text-gray-500 text-sm font-medium">CPU Usage</div>
+                      <div className="text-gray-500 text-sm font-medium">CPU ({systemStats.cpu_cores} cores)</div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${systemStats.cpu}%`, backgroundColor: colors.color }}
+                          style={{ width: `${systemStats.cpu_percent}%`, backgroundColor: colors.color }}
                         />
                       </div>
                     </div>
@@ -221,7 +278,7 @@ const Home = ({ authdata }) => {
 
                 {/* RAM Usage */}
                 {(() => {
-                  const colors = getUsageColor(systemStats.ram);
+                  const colors = getUsageColor(systemStats.memory_percent);
                   return (
                     <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.bg }}>
                       <div className="flex justify-center mb-3">
@@ -230,13 +287,15 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {systemStats.ram}%
+                        {systemStats.memory_percent}%
                       </div>
-                      <div className="text-gray-500 text-sm font-medium">RAM Usage</div>
+                      <div className="text-gray-500 text-sm font-medium">
+                        RAM ({systemStats.memory_used_gb}/{systemStats.memory_total_gb} GB)
+                      </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${systemStats.ram}%`, backgroundColor: colors.color }}
+                          style={{ width: `${systemStats.memory_percent}%`, backgroundColor: colors.color }}
                         />
                       </div>
                     </div>
@@ -245,7 +304,7 @@ const Home = ({ authdata }) => {
 
                 {/* Disk Usage */}
                 {(() => {
-                  const colors = getUsageColor(systemStats.disk);
+                  const colors = getUsageColor(systemStats.disk_percent);
                   return (
                     <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.bg }}>
                       <div className="flex justify-center mb-3">
@@ -254,13 +313,15 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {systemStats.disk}%
+                        {systemStats.disk_percent}%
                       </div>
-                      <div className="text-gray-500 text-sm font-medium">Disk Usage</div>
+                      <div className="text-gray-500 text-sm font-medium">
+                        Disk ({systemStats.disk_used_gb}/{systemStats.disk_total_gb} GB)
+                      </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${systemStats.disk}%`, backgroundColor: colors.color }}
+                          style={{ width: `${systemStats.disk_percent}%`, backgroundColor: colors.color }}
                         />
                       </div>
                     </div>
@@ -273,14 +334,16 @@ const Home = ({ authdata }) => {
             <div className="grow basis-0 shadow-md p-5 rounded-xl bg-white min-h-64">
               <h3 className="text-gray-500 mb-4 text-base font-medium">Recent Activity</h3>
               <ul className="list-none p-0 text-gray-600 text-sm">
-                <li className="mb-2 pb-2 border-b border-gray-100">
-                  <span className="font-bold text-gray-700">User1</span> created a new server <br/>
-                  <span className="text-gray-400 text-xs">2 mins ago</span>
-                </li>
-                <li className="mb-2 pb-2 border-b border-gray-100">
-                  <span className="font-bold text-gray-700">User2</span> logged in <br/>
-                  <span className="text-gray-400 text-xs">1 hour ago</span>
-                </li>
+                {recentActivity.length > 0 ? (
+                  recentActivity.map((activity) => (
+                    <li key={activity.log_id} className="mb-2 pb-2 border-b border-gray-100">
+                      <span className="font-bold text-gray-700">{activity.email || 'System'}</span> {activity.message} <br/>
+                      <span className="text-gray-400 text-xs">{formatTimeAgo(activity.time)}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-gray-400 italic">No recent activity</li>
+                )}
               </ul>
             </div>
           </div>

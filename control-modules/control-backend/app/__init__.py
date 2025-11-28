@@ -63,6 +63,8 @@ def create_app():
     from .ssh_router.routes import ssh_router_bp
     app.register_blueprint(ssh_router_bp, url_prefix='')
 
+    from .dashboard.routes import dashboard_bp
+    app.register_blueprint(dashboard_bp, url_prefix='')
 
 
 

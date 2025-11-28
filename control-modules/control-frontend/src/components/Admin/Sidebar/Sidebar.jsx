@@ -52,6 +52,12 @@ const AdminSidebar = ({ authdata }) => {
 
           {/* ---- */}
           {open? <p className={styles.title}>CONTROL</p>:<p className={styles.title}>-----</p>}
+          <Link href="/admin" style={{ textDecoration: "none" }}>
+            <li>
+              <DashboardIcon className={styles.icon} />
+              {open? <span>Dashboard</span>:<></>}
+            </li>
+          </Link>
           <Link href="/vm" style={{ textDecoration: "none" }}>
             <li>
               <ViewInArIcon className={styles.icon} />
