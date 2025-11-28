@@ -367,7 +367,7 @@ const Home = ({ authdata }) => {
                 {recentActivity.length > 0 ? (
                   recentActivity.map((activity) => (
                     <li key={activity.log_id} className="mb-2 pb-2 border-b border-gray-100">
-                      <span className="font-bold text-gray-700">{activity.email || 'System'}</span> {activity.message} <br/>
+                      <span className="font-bold text-gray-700">{activity.email || 'System'}:</span> <br/> {activity.message} <br/>
                       <span className="text-gray-400 text-xs">{formatTimeAgo(activity.time)}</span>
                     </li>
                   ))
