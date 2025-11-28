@@ -3,6 +3,7 @@
 ################## HOSTING MODULES DATA DIRECTORIES AND FILES ###########################
 # Control backend database
 mkdir -p _DATA/control-backend
+touch _DATA/control-backend/database.db
 
 
 # Create Docs directories
