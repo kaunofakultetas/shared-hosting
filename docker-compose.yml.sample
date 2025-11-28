@@ -110,9 +110,30 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./_DATA/control-backend:/data
+    extra_hosts:
+      - "auth.docker.io:172.19.0.30"
+      - "registry-1.docker.io:172.19.0.30"
     networks:
       - isolated-control-panel
       - isolated-control-docker
+    restart: unless-stopped
+  
+
+  # Exit container for Docker Hub API access (L4 SNI proxy)
+  hosting-control-backend-exit:
+    container_name: hosting-control-backend-exit
+    image: hosting-control-backend-exit
+    build:
+      context: ./control-modules/control-backend-exit
+      dockerfile: Dockerfile
+    user: 1000:1000
+    read_only: true
+    volumes:
+      - ./control-modules/control-backend-exit/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      isolated-control-panel:
+        ipv4_address: 172.19.0.30
+      external: {}
     restart: unless-stopped
 
 

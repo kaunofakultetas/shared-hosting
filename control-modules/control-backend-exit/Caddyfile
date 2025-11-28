@@ -1,0 +1,15 @@
+{
+	layer4 {
+		:443 {
+			@docker_auth tls sni auth.docker.io
+			route @docker_auth {
+				proxy auth.docker.io:443
+			}
+
+			@docker_registry tls sni registry-1.docker.io
+			route @docker_registry {
+				proxy registry-1.docker.io:443
+			}
+		}
+	}
+}

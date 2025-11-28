@@ -21,7 +21,7 @@ def get_rate_limit():
     }
     
     try:
-        token_response = requests.get(token_url, params=token_params)
+        token_response = requests.get(token_url, params=token_params, timeout=2)
         token_response.raise_for_status()
         token = token_response.json()["token"]
     except Exception as e:
@@ -34,7 +34,7 @@ def get_rate_limit():
     headers = {"Authorization": f"Bearer {token}"}
     
     try:
-        response = requests.head(registry_url, headers=headers)
+        response = requests.head(registry_url, headers=headers, timeout=2)
         response.raise_for_status()
         
         # Extract rate limit headers
