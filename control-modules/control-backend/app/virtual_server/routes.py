@@ -199,7 +199,7 @@ def vmControl_HTTPPOST():
 
             # Update database
             conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Virtual server #{virtualServerID} created', 
@@ -230,7 +230,7 @@ def vmControl_HTTPPOST():
             
             # Update database
             conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 1 WHERE ID = ?', [virtualServerID])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Virtual server #{virtualServerID} started', 
@@ -252,7 +252,7 @@ def vmControl_HTTPPOST():
 
             # Update database
             conn.execute('UPDATE Hosting_VirtualServers SET Enabled = 0 WHERE ID = ?', [virtualServerID])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Virtual server #{virtualServerID} stopped', 
@@ -276,7 +276,7 @@ def vmControl_HTTPPOST():
             conn.execute('UPDATE Hosting_VirtualServers SET Deleted = 1 WHERE ID = ?', [virtualServerID])
             conn.execute('DELETE FROM Hosting_DockerContainers WHERE ParentServerID = ?', [virtualServerID])
             conn.execute('DELETE FROM Hosting_DomainNames WHERE VirtualServerID = ?', [virtualServerID])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Virtual server #{virtualServerID} deleted', 

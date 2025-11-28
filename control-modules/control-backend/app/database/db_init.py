@@ -94,7 +94,7 @@ def init_db_tables():
 
         ######################## Recent activity tables #####################
         conn.execute('''
-            CREATE TABLE IF NOT EXISTS "Hosting_RecentActivity" (
+            CREATE TABLE IF NOT EXISTS "System_RecentActivity" (
                 "ID"	INTEGER NOT NULL UNIQUE,
                 "UserID"	INTEGER NOT NULL,
                 "Message"	TEXT NOT NULL,

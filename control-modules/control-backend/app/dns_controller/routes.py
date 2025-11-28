@@ -167,7 +167,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             # Update the domain name
             conn.execute('UPDATE Hosting_DomainNames SET DomainName = ?, IsCloudflare = ?, SSL = ? WHERE ID = ?', 
                 [ postData['domainname'].lower(), postData['iscloudflare'], postData['ssl'], postData['domainid'] ])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Domain name "{postData["domainname"]}" updated for virtual server #{virtualServerID}', 
@@ -191,7 +191,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             # Insert the domain name
             conn.execute('INSERT INTO Hosting_DomainNames (VirtualServerID, DomainName, IsCloudflare, SSL) VALUES (?, ?, ?, ?)', 
                 [ virtualServerID, postData['domainname'].lower(), postData['iscloudflare'], postData['ssl'] ])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Domain name "{postData["domainname"]}" added for virtual server #{virtualServerID}', 
@@ -207,7 +207,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
         elif request.method == "DELETE":
             domainName = conn.execute('SELECT DomainName FROM Hosting_DomainNames WHERE ID = ?', [domainID]).fetchone()[0]
             conn.execute('DELETE FROM Hosting_DomainNames WHERE ID = ?', [domainID])
-            conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                 [ 
                     current_user.id, 
                     f'Domain name "{domainName}" deleted for virtual server #{virtualServerID}', 

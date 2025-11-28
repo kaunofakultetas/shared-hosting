@@ -56,7 +56,7 @@ def login_HTTPPOST():
         if( bcrypt.checkpw( str.encode(postData.get('password')), str.encode(thisUserObject.password) )):
             login_user(thisUserObject)
             with get_db_connection() as conn:
-                conn.execute('INSERT INTO Hosting_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
                     [ 
                         thisUserObject.id, 
                         f'User {thisUserObject.email} logged in (IP: {request.headers.get("X-Forwarded-For")})', 
