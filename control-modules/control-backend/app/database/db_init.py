@@ -52,6 +52,8 @@ def init_db_tables():
                 PRIMARY KEY("ID")
             );
         ''')
+        conn.execute(''' INSERT OR IGNORE INTO Hosting_VirtualServers VALUES (0, 0, 'HOST', 1, 0, '', '') ''')
+        
         conn.execute('''
             CREATE TABLE IF NOT EXISTS "Hosting_DockerContainers" (
                 "DockerID"	TEXT NOT NULL,
