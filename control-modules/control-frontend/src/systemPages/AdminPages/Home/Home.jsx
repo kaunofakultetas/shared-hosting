@@ -1,7 +1,7 @@
 'use client';
 import Sidebar from "@/components/Admin/Sidebar/Sidebar";
 import Navbar from "@/components/Navbar/Navbar";
-import Widget from "@/components/Admin/Widget/Widget";
+import Widget from "./components/Widget/Widget";
 import React, { useState, useEffect } from "react";
 import { Modal, ModalDialog, Button } from "@mui/joy";
 import axios from "axios";
@@ -40,7 +40,8 @@ const Home = ({ authdata }) => {
   // Hosting system stats from API
   const [hostingStats, setHostingStats] = useState({
     users: 0,
-    virtualservers: 0,
+    virtualservers_running: 0,
+    virtualservers_total: 0,
     domains: 0,
   });
 
@@ -182,17 +183,17 @@ const Home = ({ authdata }) => {
             <Widget 
               type="order" 
               text="Virtual Servers" 
-              count={hostingStats.virtualservers}
+              count={hostingStats.virtualservers_running}
+              countSecondary={hostingStats.virtualservers_total}
               icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")} 
-              link="/admin/servers"
+              link="/vm"
             />
             
             <Widget 
               type="order" 
-              text="Domains" 
+              text="Domain Names" 
               count={hostingStats.domains}
               icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")} 
-              link="/admin/domains"
             />
             
             {/* Quick Registration Widget */}

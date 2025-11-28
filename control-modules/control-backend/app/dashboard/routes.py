@@ -175,7 +175,8 @@ def dashboard_hostingsystem_HTTPGET():
             sqlFetchData = conn.execute('''
                 SELECT json_object(
                     'users', (SELECT COUNT(*) FROM System_Users),
-                    'virtualservers', (SELECT COUNT(*) FROM Hosting_VirtualServers WHERE Deleted = 0),
+                    'virtualservers_running', (SELECT COUNT(*) FROM Hosting_VirtualServers WHERE Deleted = 0 AND ID <> 0 AND Enabled = 1),
+                    'virtualservers_total', (SELECT COUNT(*) FROM Hosting_VirtualServers WHERE Deleted = 0 AND ID <> 0),
                     'domains', (SELECT COUNT(*) FROM Hosting_DomainNames)
                 ) AS HostingSystemJSON
             ''')
