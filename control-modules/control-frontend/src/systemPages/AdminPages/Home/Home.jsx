@@ -12,6 +12,7 @@ import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import MemoryIcon from '@mui/icons-material/Memory';
 import StorageIcon from '@mui/icons-material/Storage';
 import SdStorageIcon from '@mui/icons-material/SdStorage';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import toast from 'react-hot-toast';
 
@@ -33,6 +34,7 @@ const Home = ({ authdata }) => {
     memory_used_gb: 0,
     disk_total_gb: 0,
     disk_used_gb: 0,
+    dockerhub_pull_limits: null,
   });
 
   // Hosting system stats from API
@@ -251,7 +253,7 @@ const Home = ({ authdata }) => {
             <div className="grow-[2] basis-0 shadow-md p-5 rounded-xl bg-white min-h-64">
               <h3 className="text-gray-500 mb-6 text-base font-medium">System Overview</h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* CPU Usage */}
                 {(() => {
                   const colors = getUsageColor(systemStats.cpu_percent);
@@ -322,6 +324,34 @@ const Home = ({ authdata }) => {
                         <div 
                           className="h-full rounded-full transition-all duration-500"
                           style={{ width: `${systemStats.disk_percent}%`, backgroundColor: colors.color }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Docker Hub Rate Limit */}
+                {(() => {
+                  const dockerhub = systemStats.dockerhub_pull_limits;
+                  const percent = dockerhub ? dockerhub.percent : 100;
+                  const colors = getUsageColor(100 - percent); // Invert: low remaining = bad
+                  return (
+                    <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.bg }}>
+                      <div className="flex justify-center mb-3">
+                        <div className="p-3 rounded-full" style={{ backgroundColor: colors.ring }}>
+                          <CloudDownloadIcon style={{ color: colors.color, fontSize: '28px' }} />
+                        </div>
+                      </div>
+                      <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
+                        {dockerhub ? `${dockerhub.remaining}` : '—'}
+                      </div>
+                      <div className="text-gray-500 text-sm font-medium">
+                        Docker Hub ({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : 'N/A'})
+                      </div>
+                      <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${percent}%`, backgroundColor: colors.color }}
                         />
                       </div>
                     </div>

@@ -13,6 +13,7 @@ import json
 
 from ..database.db import get_db_connection
 from ..auth.user import admin_required
+from .registry_monitor import get_rate_limit
 
 
 
@@ -85,6 +86,21 @@ def dashboard_system_HTTPGET():
         
         disk_percent = (disk_used / disk_total) * 100.0 if disk_total > 0 else 0
 
+
+
+        # DockerHub pull limits
+        dockerhub_pull_limits = get_rate_limit()
+        if dockerhub_pull_limits:
+            dockerhub_pull_limits = {
+                'limit': dockerhub_pull_limits['limit'],
+                'remaining': dockerhub_pull_limits['remaining'],
+                'used': dockerhub_pull_limits['used'],
+                'percent': dockerhub_pull_limits['percent']
+            }
+
+
+
+
         # Convert to GB
         GB = 1024 ** 3
         
@@ -97,6 +113,7 @@ def dashboard_system_HTTPGET():
             'memory_used_gb': round(memory_used / GB, 2),
             'disk_total_gb': round(disk_total / GB, 2),
             'disk_used_gb': round(disk_used / GB, 2),
+            'dockerhub_pull_limits': dockerhub_pull_limits,
         }), 200
     
     except requests.exceptions.Timeout:
