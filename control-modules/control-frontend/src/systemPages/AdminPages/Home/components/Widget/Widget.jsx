@@ -4,7 +4,7 @@ import ArrowDownwardSharpIcon from '@mui/icons-material/ArrowDownwardSharp';
 
 const Widget = ({ text, bottomtext, count, countSecondary, icon, link, difference }) => {
   // If countSecondary is provided, show as "count / countSecondary" format
-  const hasSecondaryCount = countSecondary !== undefined && countSecondary !== null;
+  const hasSecondaryCount = countSecondary !== undefined && countSecondary !== null && countSecondary !== '—';
 
   return (
     <div className="flex justify-between flex-1 p-2.5 shadow-[2px_4px_10px_1px_rgba(201,201,201,0.47)] rounded-[15px] h-[100px] w-full bg-white">
@@ -20,7 +20,7 @@ const Widget = ({ text, bottomtext, count, countSecondary, icon, link, differenc
             <span className="text-xl font-light text-gray-500">{countSecondary}</span>
           </div>
         ) : (
-          <span className="text-3xl font-light">{count}</span>
+          <span className="text-3xl font-light text-gray-600">{count}</span>
         )}
         
         {bottomtext && (

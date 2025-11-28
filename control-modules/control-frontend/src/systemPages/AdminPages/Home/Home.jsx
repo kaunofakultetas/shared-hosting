@@ -17,6 +17,9 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import toast from 'react-hot-toast';
 
 const Home = ({ authdata }) => {
+  // Loading state for API data
+  const [isLoading, setIsLoading] = useState(true);
+  
   // Quick Registration state
   const [quickRegEnabled, setQuickRegEnabled] = useState(false);
   const [quickRegCode, setQuickRegCode] = useState('');
@@ -60,8 +63,11 @@ const Home = ({ authdata }) => {
       if (systemRes.status === 200) setSystemStats(systemRes.data);
       if (hostingRes.status === 200) setHostingStats(hostingRes.data);
       if (activityRes.status === 200) setRecentActivity(activityRes.data);
+      
+      setIsLoading(false); // Data loaded successfully
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
+      setIsLoading(false); // Stop showing loading even on error
     }
   };
 
@@ -146,6 +152,12 @@ const Home = ({ authdata }) => {
     return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
   };
 
+  // Format value: show "-" while loading and value is 0, otherwise show actual value
+  const formatValue = (value) => {
+    if (isLoading && (value === 0 || value === null || value === undefined)) return '—';
+    return value;
+  };
+
   // Format time ago
   const formatTimeAgo = (timestamp) => {
     const now = new Date();
@@ -175,7 +187,7 @@ const Home = ({ authdata }) => {
             <Widget 
               type="user" 
               text="Users" 
-              count={hostingStats.users} 
+              count={formatValue(hostingStats.users)} 
               icon={getIcon(PeopleOutlinedIcon, "crimson", "rgba(255, 0, 0, 0.2)")} 
               link="/admin/users" 
             />
@@ -183,8 +195,8 @@ const Home = ({ authdata }) => {
             <Widget 
               type="order" 
               text="Virtual Servers" 
-              count={hostingStats.virtualservers_running}
-              countSecondary={hostingStats.virtualservers_total}
+              count={formatValue(hostingStats.virtualservers_running)}
+              countSecondary={formatValue(hostingStats.virtualservers_total)}
               icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")} 
               link="/vm"
             />
@@ -192,7 +204,7 @@ const Home = ({ authdata }) => {
             <Widget 
               type="order" 
               text="Domain Names" 
-              count={hostingStats.domains}
+              count={formatValue(hostingStats.domains)}
               icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")} 
             />
             
@@ -266,9 +278,9 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {systemStats.cpu_percent}%
+                        {formatValue(systemStats.cpu_percent)}%
                       </div>
-                      <div className="text-gray-500 text-sm font-medium">CPU ({systemStats.cpu_cores} cores)</div>
+                      <div className="text-gray-500 text-sm font-medium">CPU ({formatValue(systemStats.cpu_cores)} cores)</div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all duration-500"
@@ -290,10 +302,10 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {systemStats.memory_percent}%
+                        {formatValue(systemStats.memory_percent)}%
                       </div>
                       <div className="text-gray-500 text-sm font-medium">
-                        RAM ({systemStats.memory_used_gb}/{systemStats.memory_total_gb} GB)
+                        RAM ({formatValue(systemStats.memory_used_gb)}/{formatValue(systemStats.memory_total_gb)} GB)
                       </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
@@ -316,10 +328,10 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {systemStats.disk_percent}%
+                        {formatValue(systemStats.disk_percent)}%
                       </div>
                       <div className="text-gray-500 text-sm font-medium">
-                        Disk ({systemStats.disk_used_gb}/{systemStats.disk_total_gb} GB)
+                        Disk ({formatValue(systemStats.disk_used_gb)}/{formatValue(systemStats.disk_total_gb)} GB)
                       </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
@@ -344,10 +356,10 @@ const Home = ({ authdata }) => {
                         </div>
                       </div>
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
-                        {dockerhub ? `${dockerhub.remaining}` : '—'}
+                        {dockerhub ? dockerhub.remaining : (isLoading ? '—' : 'N/A')}
                       </div>
                       <div className="text-gray-500 text-sm font-medium">
-                        Docker Hub ({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : 'N/A'})
+                        Docker Hub ({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isLoading ? '—' : 'N/A')})
                       </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
@@ -362,7 +374,7 @@ const Home = ({ authdata }) => {
             </div>
 
             {/* Recent Activity */}
-            <div className="grow basis-0 shadow-md p-5 rounded-xl bg-white min-h-64">
+            <div className="grow basis-0 shadow-md p-5 rounded-xl bg-white h-128">
               <h3 className="text-gray-500 mb-4 text-base font-medium">Recent Activity</h3>
               <ul className="list-none p-0 text-gray-600 text-sm">
                 {recentActivity.length > 0 ? (
@@ -373,7 +385,7 @@ const Home = ({ authdata }) => {
                     </li>
                   ))
                 ) : (
-                  <li className="text-gray-400 italic">No recent activity</li>
+                  <li className="text-gray-400 italic">Loading...</li>
                 )}
               </ul>
             </div>
