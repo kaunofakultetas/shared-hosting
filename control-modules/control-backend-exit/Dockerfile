@@ -1,7 +1,6 @@
 FROM caddy:2.10-builder AS builder
 
-RUN xcaddy build \
-    --with github.com/mholt/caddy-l4
+RUN xcaddy build --with github.com/mholt/caddy-l4
 
 FROM caddy:2.10-alpine
 

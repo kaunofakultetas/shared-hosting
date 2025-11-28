@@ -280,7 +280,9 @@ const Home = ({ authdata }) => {
                       <div className="text-3xl font-bold mb-1" style={{ color: colors.color }}>
                         {formatValue(systemStats.cpu_percent)}%
                       </div>
-                      <div className="text-gray-500 text-sm font-medium">CPU ({formatValue(systemStats.cpu_cores)} cores)</div>
+                      <div className="text-gray-500 text-sm font-medium">
+                        CPU<br/>({formatValue(systemStats.cpu_cores)} cores)
+                      </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all duration-500"
@@ -305,7 +307,7 @@ const Home = ({ authdata }) => {
                         {formatValue(systemStats.memory_percent)}%
                       </div>
                       <div className="text-gray-500 text-sm font-medium">
-                        RAM ({formatValue(systemStats.memory_used_gb)}/{formatValue(systemStats.memory_total_gb)} GB)
+                        RAM<br/>({formatValue(systemStats.memory_used_gb)}/{formatValue(systemStats.memory_total_gb)} GB)
                       </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
@@ -331,7 +333,7 @@ const Home = ({ authdata }) => {
                         {formatValue(systemStats.disk_percent)}%
                       </div>
                       <div className="text-gray-500 text-sm font-medium">
-                        Disk ({formatValue(systemStats.disk_used_gb)}/{formatValue(systemStats.disk_total_gb)} GB)
+                        Disk<br/>({formatValue(systemStats.disk_used_gb)}/{formatValue(systemStats.disk_total_gb)} GB)
                       </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
@@ -359,7 +361,7 @@ const Home = ({ authdata }) => {
                         {dockerhub ? dockerhub.remaining : (isLoading ? '—' : 'N/A')}
                       </div>
                       <div className="text-gray-500 text-sm font-medium">
-                        Docker Hub ({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isLoading ? '—' : 'N/A')})
+                        Docker Hub<br/>({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isLoading ? '—' : 'N/A')})
                       </div>
                       <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div 
