@@ -79,6 +79,8 @@ def get_user_by_email(email):
 def admin_required(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
+        if 'admin' not in current_user.__dict__:
+            return jsonify({'message': 'Unauthorized: Admin required'}), 401
         if not current_user.admin:
             return jsonify({'message': 'Unauthorized: Admin required'}), 401
         return func(*args, **kwargs)
