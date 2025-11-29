@@ -30,25 +30,24 @@ DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT')
 
 
 
-def update_caddy_config():
+def update_caddy_config(conn):
     # Get the domains from the database
-    with get_db_connection() as conn:
-        sqlFetchData = conn.execute('''
-            SELECT
-                json_object(
-                    'domains', json_group_array(
-                        json_object(
-                            'id', ID,
-                            'virtualserverid', VirtualServerID,
-                            'domainname', DomainName,
-                            'iscloudflare', IsCloudflare,
-                            'ssl', SSL
-                        )
+    sqlFetchData = conn.execute('''
+        SELECT
+            json_object(
+                'domains', json_group_array(
+                    json_object(
+                        'id', ID,
+                        'virtualserverid', VirtualServerID,
+                        'domainname', DomainName,
+                        'iscloudflare', IsCloudflare,
+                        'ssl', SSL
                     )
                 )
-            FROM Hosting_DomainNames
-        ''', [])
-        domains = sqlFetchData.fetchone()[0]
+            )
+        FROM Hosting_DomainNames
+    ''', [])
+    domains = sqlFetchData.fetchone()[0]
 
 
     # Send the domains to the Docker controller
@@ -174,7 +173,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
                     timeNow 
                 ]
             )
-            dockerBackendResponse = update_caddy_config()
+            dockerBackendResponse = update_caddy_config(conn)
             conn.commit()
             return jsonify({'message':'OK'}), 200
 
@@ -198,7 +197,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
                     timeNow 
                 ]
             )
-            dockerBackendResponse = update_caddy_config()
+            dockerBackendResponse = update_caddy_config(conn)
             conn.commit()
             return jsonify({'message':'OK'}), 200
         
@@ -214,7 +213,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
                     timeNow 
                 ]
             )
-            dockerBackendResponse = update_caddy_config()
+            dockerBackendResponse = update_caddy_config(conn)
             conn.commit()
             return jsonify({'message':'OK'}), 200
         
