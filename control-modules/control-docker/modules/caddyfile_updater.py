@@ -72,6 +72,16 @@ class CaddyfileUpdater:
 
 
 
+    # Resolve any other domain names
+    resolve_any_other_domain_names = '''
+    :80 {
+        respond "Hosting platform does not host any applications at this domain name." 200
+    }
+    '''
+    resolve_any_other_domain_names = re.sub(r'^ {4}', '', resolve_any_other_domain_names, flags=re.MULTILINE)
+
+
+
     def generate_caddyfile(self, dns_entries):
         '''
         Function to generate a Caddyfile content from a list of DNS entries.
@@ -126,16 +136,25 @@ class CaddyfileUpdater:
                 server_block += f"    reverse_proxy http://hosting-users-dind-{virtual_server_id}:80 {{\n"
                 server_block += "        header_up X-Forwarded-For {http.request.header.X-Forwarded-For}\n"
                 server_block += "    }\n"
-                server_block += "}"
             else:
                 server_block += f"    reverse_proxy http://hosting-users-dind-{virtual_server_id}:80 {{\n"
                 server_block += "        header_up X-Forwarded-For {remote_host}\n"
                 server_block += "    }\n"
-                server_block += "}"
+
+            # Add default response if upstream server could not be connected
+            server_block += f"    handle_errors 502 {{\n"
+            server_block += "        respond \"Virtual server does not host any app on port 80 or the app cannot be accessed externally.\" 502\n"
+            server_block += "    }\n"
+            server_block += "}"
+
+            # Add a newline to separate the server blocks.
             server_block += "\n\n\n\n"
 
             # Add the server block to the caddyfile content.
             caddyfile_content += server_block
+
+        # Add the resolve any other domain names block.
+        caddyfile_content += self.resolve_any_other_domain_names + "\n\n"
 
         return caddyfile_content
 
