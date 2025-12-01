@@ -50,7 +50,8 @@ if [ ! -f .env ] || ! grep -q "^ROOT_DIR=" .env; then
     echo "Generating ROOT_DIR..."
     ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
     
-    echo "" >> .env
+    # Only add newline if file doesn't end with one
+    [ -f .env ] && [ -n "$(tail -c1 .env 2>/dev/null)" ] && echo "" >> .env
     echo "ROOT_DIR=$ROOT_DIR" >> .env
     echo "ROOT_DIR added to .env"
     echo "ROOT_DIR: $ROOT_DIR"
@@ -65,7 +66,8 @@ if [ ! -f .env ] || ! grep -q "^BOOKSTACK_APP_KEY=" .env; then
     echo "Generating BOOKSTACK_APP_KEY..."
     BOOKSTACK_APP_KEY="base64:$(openssl rand -base64 32)"
     
-    echo "" >> .env
+    # Only add newline if file doesn't end with one
+    [ -f .env ] && [ -n "$(tail -c1 .env 2>/dev/null)" ] && echo "" >> .env
     echo "BOOKSTACK_APP_KEY=$BOOKSTACK_APP_KEY" >> .env
     echo "BOOKSTACK_APP_KEY added to .env"
     echo "BOOKSTACK_APP_KEY: $BOOKSTACK_APP_KEY"
@@ -80,7 +82,8 @@ if [ ! -f .env ] || ! grep -q "^BACKEND_SSH_API_KEY=" .env; then
     echo "Generating BACKEND_SSH_API_KEY..."
     BACKEND_SSH_API_KEY="$(openssl rand -hex 32)"
     
-    echo "" >> .env
+    # Only add newline if file doesn't end with one
+    [ -f .env ] && [ -n "$(tail -c1 .env 2>/dev/null)" ] && echo "" >> .env
     echo "BACKEND_SSH_API_KEY=$BACKEND_SSH_API_KEY" >> .env
     echo "BACKEND_SSH_API_KEY added to .env"
     echo "BACKEND_SSH_API_KEY: $BACKEND_SSH_API_KEY"
