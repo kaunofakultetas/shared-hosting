@@ -194,7 +194,7 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
                 }}
               />
             </div>
-            <h3 className="text-lg font-semibold text-gray-800 truncate">
+            <h3 className="text-2xl font-semibold text-gray-800 truncate mt-6">
               {vm.name || "Unnamed Server"}
             </h3>
           </div>
