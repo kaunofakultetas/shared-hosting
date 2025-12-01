@@ -371,6 +371,13 @@ const VirtualServersTable = ({ authdata }) => {
     // Search by VM ID
     if (vm.id?.toString().includes(query)) return true;
     
+    // Search by domain names
+    if (vm.domains) {
+      for (const domain of vm.domains) {
+        if (domain.domainname?.toLowerCase().includes(query)) return true;
+      }
+    }
+    
     // Search by container names
     if (vm.stacks) {
       for (const stack of vm.stacks) {
