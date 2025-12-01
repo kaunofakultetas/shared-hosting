@@ -23,6 +23,7 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import StorageIcon from "@mui/icons-material/Storage";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
+import DomainIcon from "@mui/icons-material/Domain";
 
 import AddNewVM from "./AddNewVM/AddNewVM";
 import toast from "react-hot-toast";
@@ -229,6 +230,7 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
           </div>
         </div>
 
+
         {/* Info Section */}
         <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
           {/* Owner */}
@@ -243,6 +245,55 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
             <span>{vm.status || "N/A"}</span>
           </div>
         </div>
+
+
+        {/* Domains */}
+        {vm.domains && vm.domains.length > 0 && (
+          <div className="border-t border-gray-100 pt-3 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <DomainIcon sx={{ fontSize: 16, color: "gray" }} />
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                Domain Names
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {vm.domains.map((domain, didx) => (
+                <div key={didx} className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-gray-700 font-medium">
+                    {domain.domainname || "Unknown"}
+                  </span>
+                  {domain.iscloudflare === 1 && (
+                    <Chip
+                      label="Cloudflare"
+                      size="small"
+                      sx={{
+                        fontSize: "0.6rem",
+                        height: 18,
+                        bgcolor: "green",
+                        color: "white",
+                        fontWeight: 600,
+                        "& .MuiChip-label": { px: 0.75 },
+                      }}
+                    />
+                  )}
+                  <Chip
+                    label={domain.ssl === 1 ? "HTTPS" : "No HTTPS"}
+                    size="small"
+                    sx={{
+                      fontSize: "0.6rem",
+                      height: 18,
+                      bgcolor: domain.ssl === 1 ? "green" : "red",
+                      color: "white",
+                      fontWeight: 600,
+                      "& .MuiChip-label": { px: 0.75 },
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         {/* Docker Containers */}
         <div className="border-t border-gray-100 pt-3">

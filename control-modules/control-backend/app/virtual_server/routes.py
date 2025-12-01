@@ -124,25 +124,43 @@ def vm_HTTPGET(virtualServerID=None):
 				FROM
 					GetAllStacks
 				GROUP BY ParentServerID
-			)
+			),
+            GetVirtualServersDomains AS (
+                SELECT
+                    VirtualServerID,
+                    json_group_array(
+                        json_object(
+                            'id', ID,
+                            'domainname', DomainName,
+                            'iscloudflare', IsCloudflare,
+                            'ssl', SSL
+                        )
+                    ) AS DomainsJSON
+                FROM
+                    Hosting_DomainNames
+                GROUP BY VirtualServerID
+            )
 
 
 
             SELECT
 				json_group_array(
 					json_object(
-						'id', 						VirtualServerID,
+						'id', 						GetVirtualServers.VirtualServerID,
 						'name',						Name,
 						'status',					Status,
 						'state',					State,
 						'enabled',					Enabled,
                         'owneremail',				OwnerEmail,
-						'stacks',					JSON(GetVirtualServersStacks.StacksJSON)
+						'stacks',					JSON(GetVirtualServersStacks.StacksJSON),
+                        'domains',					JSON(GetVirtualServersDomains.DomainsJSON)
 					)
 				)
             FROM GetVirtualServers
 			LEFT JOIN GetVirtualServersStacks
 				ON GetVirtualServersStacks.ParentServerID = GetVirtualServers.VirtualServerID
+            LEFT JOIN GetVirtualServersDomains
+                ON GetVirtualServersDomains.VirtualServerID = GetVirtualServers.VirtualServerID
             WHERE
                 1=1
 
