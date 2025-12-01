@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   Tooltip,
-  Switch,
   FormControlLabel,
   CircularProgress,
   IconButton,
@@ -116,6 +115,7 @@ const LongPressDeleteButton = ({ row, onDelete, disabled }) => {
       className="select-none"
       sx={{
         color: disabled ? "grey.400" : "error.main",
+        backgroundColor: "lightgray",
         "&:hover": { backgroundColor: "error.light", color: "white" },
         transition: "all 0.2s",
       }}
@@ -167,7 +167,7 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
       {/* Status Indicator Bar */}
       <div
         className={`absolute top-0 left-0 right-0 h-1 ${
-          isRunning ? "bg-emerald-500" : "bg-red-500"
+          isRunning ? "bg-green-500" : "bg-red-500"
         }`}
       />
 
@@ -177,7 +177,7 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+              <span className="text-xs font-mono bg-gray-300 px-2 py-0.5 rounded-full">
                 #{vm.id}
               </span>
               <Chip
@@ -187,8 +187,8 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
                   fontWeight: 600,
                   fontSize: "0.7rem",
                   height: 22,
-                  backgroundColor: isRunning ? "#dcfce7" : "#fee2e2",
-                  color: isRunning ? "#166534" : "#991b1b",
+                  backgroundColor: isRunning ? "green" : "red",
+                  color: "white",
                 }}
               />
             </div>
@@ -199,16 +199,17 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
 
           {/* Quick Actions */}
           <div
-            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
             <Tooltip title={isRunning ? "Stop Server" : "Start Server"}>
               <IconButton
                 onClick={(e) => onStartStop(e, vm)}
                 sx={{
-                  color: isRunning ? "error.main" : "success.main",
+                  color: isRunning ? "red" : "green",
+                  backgroundColor: "lightgray",
                   "&:hover": {
-                    backgroundColor: isRunning ? "error.light" : "success.light",
+                    backgroundColor: isRunning ? "red" : "green",
                     color: "white",
                   },
                 }}
@@ -271,13 +272,10 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
                             fontSize: "0.65rem",
                             height: 20,
                             backgroundColor:
-                              container.state === "running"
-                                ? "#dcfce7"
-                                : "#fee2e2",
-                            color:
-                              container.state === "running"
-                                ? "#166534"
-                                : "#991b1b",
+                              container.state === "running" && isRunning === true
+                                ? "green"
+                                : "red",
+                            color: "white",
                             "& .MuiChip-label": { px: 1 },
                           }}
                         />
