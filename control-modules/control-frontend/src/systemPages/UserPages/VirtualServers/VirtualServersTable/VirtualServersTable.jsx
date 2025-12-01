@@ -1,51 +1,46 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Box,
   Button,
   Chip,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Tooltip,
-  Typography,
   Switch,
   FormControlLabel,
   CircularProgress,
+  IconButton,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
+import IOSSwitch from "@/components/Other/IOSSwitch/IOSSwitch";
 import { useTheme } from "@mui/material/styles";
 import axios from "axios";
 
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import StopCircleIcon from "@mui/icons-material/StopCircle";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import DeleteIcon from "@mui/icons-material/Delete";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import StorageIcon from "@mui/icons-material/Storage";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
 
 import AddNewVM from "./AddNewVM/AddNewVM";
-import toast, { Toaster } from 'react-hot-toast';
-
-
-
-
-
+import toast from "react-hot-toast";
 
 const LONG_PRESS_DURATION = 3000;
 
-const LongPressDeleteButton = ({ row, onDelete, theme }) => {
+
+
+
+// Long Press Delete Button Component
+const LongPressDeleteButton = ({ row, onDelete, disabled }) => {
   const [progress, setProgress] = useState(0);
   const [isPressed, setIsPressed] = useState(false);
   const animationRef = useRef(null);
   const startTimeRef = useRef(null);
   const isPressedRef = useRef(false);
   const eventRef = useRef(null);
-
-  const isDisabled = row.state === "running";
 
   const animate = useCallback(() => {
     if (!isPressedRef.current || !startTimeRef.current) return;
@@ -65,25 +60,30 @@ const LongPressDeleteButton = ({ row, onDelete, theme }) => {
     animationRef.current = requestAnimationFrame(animate);
   }, [onDelete, row]);
 
-  const startLongPress = useCallback((e) => {
-    if (isDisabled) return;
-    e.stopPropagation();
-    e.preventDefault();
-    
-    eventRef.current = e;
-    startTimeRef.current = Date.now();
-    isPressedRef.current = true;
-    setIsPressed(true);
-    setProgress(0);
-    animationRef.current = requestAnimationFrame(animate);
-  }, [isDisabled, animate]);
+  const startLongPress = useCallback(
+    (e) => {
+      if (disabled) return;
+      e.stopPropagation();
+      e.preventDefault();
+
+      eventRef.current = e;
+      startTimeRef.current = Date.now();
+      isPressedRef.current = true;
+      setIsPressed(true);
+      setProgress(0);
+      animationRef.current = requestAnimationFrame(animate);
+    },
+    [disabled, animate]
+  );
 
   const cancelLongPress = useCallback((e) => {
     if (!isPressedRef.current) return;
     e.stopPropagation();
-    
-    const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
-    
+
+    const elapsed = startTimeRef.current
+      ? Date.now() - startTimeRef.current
+      : 0;
+
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -100,40 +100,13 @@ const LongPressDeleteButton = ({ row, onDelete, theme }) => {
   }, []);
 
   useEffect(() => {
-    return () => animationRef.current && cancelAnimationFrame(animationRef.current);
+    return () =>
+      animationRef.current && cancelAnimationFrame(animationRef.current);
   }, []);
 
-  const ProgressIcon = () => (
-    <div className="relative flex items-center justify-center w-6 h-6">
-      <CircularProgress
-        variant="determinate"
-        value={100}
-        size={24}
-        thickness={4}
-        className="absolute text-white/30"
-      />
-      <CircularProgress
-        variant="determinate"
-        value={progress}
-        size={24}
-        thickness={4}
-        sx={{
-          color: "white",
-          position: "absolute",
-          transform: "rotate(-90deg)",
-          "& .MuiCircularProgress-circle": {
-            strokeLinecap: "round",
-            transition: "none",
-          },
-        }}
-      />
-    </div>
-  );
-
   return (
-    <Button
-      variant="contained"
-      disabled={isDisabled}
+    <IconButton
+      disabled={disabled}
       onMouseDown={startLongPress}
       onMouseUp={cancelLongPress}
       onMouseLeave={cancelLongPress}
@@ -142,39 +115,232 @@ const LongPressDeleteButton = ({ row, onDelete, theme }) => {
       onContextMenu={(e) => e.preventDefault()}
       className="select-none"
       sx={{
-        textTransform: "none",
-        fontWeight: "bold",
-        backgroundColor: isPressed ? theme.palette.error.dark : theme.palette.error.main,
-        "&:hover": { backgroundColor: theme.palette.error.dark },
-        "&.Mui-disabled": {
-          backgroundColor: theme.palette.grey[500],
-          color: theme.palette.grey[300],
-        },
+        color: disabled ? "grey.400" : "error.main",
+        "&:hover": { backgroundColor: "error.light", color: "white" },
+        transition: "all 0.2s",
       }}
-      startIcon={isPressed ? <ProgressIcon /> : <DeleteIcon />}
     >
-      Delete
-    </Button>
+      {isPressed ? (
+        <div className="relative flex items-center justify-center w-6 h-6">
+          <CircularProgress
+            variant="determinate"
+            value={100}
+            size={24}
+            thickness={4}
+            sx={{ color: "error.light", position: "absolute" }}
+          />
+          <CircularProgress
+            variant="determinate"
+            value={progress}
+            size={24}
+            thickness={4}
+            sx={{
+              color: "error.main",
+              position: "absolute",
+              transform: "rotate(-90deg)",
+              "& .MuiCircularProgress-circle": {
+                strokeLinecap: "round",
+                transition: "none",
+              },
+            }}
+          />
+        </div>
+      ) : (
+        <DeleteIcon />
+      )}
+    </IconButton>
   );
 };
 
 
 
 
+// VM Card Component
+const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
+  const isRunning = vm.state === "running";
+
+  return (
+    <div
+      onClick={() => onNavigate(vm)}
+      className="group relative bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-300 cursor-pointer overflow-hidden"
+    >
+      {/* Status Indicator Bar */}
+      <div
+        className={`absolute top-0 left-0 right-0 h-1 ${
+          isRunning ? "bg-emerald-500" : "bg-red-500"
+        }`}
+      />
+
+      {/* Card Content */}
+      <div className="p-5">
+        {/* Header: VM Name + Status + Actions */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                #{vm.id}
+              </span>
+              <Chip
+                label={isRunning ? "Running" : "Stopped"}
+                size="small"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "0.7rem",
+                  height: 22,
+                  backgroundColor: isRunning ? "#dcfce7" : "#fee2e2",
+                  color: isRunning ? "#166534" : "#991b1b",
+                }}
+              />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 truncate">
+              {vm.name || "Unnamed Server"}
+            </h3>
+          </div>
+
+          {/* Quick Actions */}
+          <div
+            className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Tooltip title={isRunning ? "Stop Server" : "Start Server"}>
+              <IconButton
+                onClick={(e) => onStartStop(e, vm)}
+                sx={{
+                  color: isRunning ? "error.main" : "success.main",
+                  "&:hover": {
+                    backgroundColor: isRunning ? "error.light" : "success.light",
+                    color: "white",
+                  },
+                }}
+              >
+                {isRunning ? <StopIcon /> : <PlayArrowIcon />}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={isRunning ? "Stop server first" : "Hold to delete"}>
+              <span>
+                <LongPressDeleteButton
+                  row={vm}
+                  onDelete={onDelete}
+                  disabled={isRunning}
+                />
+              </span>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* Info Section */}
+        <div className="flex items-center justify-between mb-4 text-sm text-gray-600">
+          {/* Owner */}
+          <div className="flex items-center gap-2">
+            <PersonOutlineIcon sx={{ fontSize: 18, color: "gray" }} />
+            <span>{vm.owneremail || "N/A"}</span>
+          </div>
+
+          {/* Uptime */}
+          <div className="flex items-center gap-2">
+            <AccessTimeIcon sx={{ fontSize: 18, color: "gray" }} />
+            <span>{vm.status || "N/A"}</span>
+          </div>
+        </div>
+
+        {/* Docker Containers */}
+        <div className="border-t border-gray-100 pt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <StorageIcon sx={{ fontSize: 16, color: "gray" }} />
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Containers
+            </span>
+          </div>
+          {vm.stacks && vm.stacks.length > 0 && (
+            <div className="space-y-2">
+              {vm.stacks.map((stack, sidx) => (
+                <div key={sidx}>
+                  <span className="text-xs font-semibold text-gray-700">
+                    {stack.stackname || "Stack"}:
+                  </span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {stack.containers?.map((container, cidx) => (
+                      <Tooltip
+                        key={`${container.image}-${cidx}`}
+                        title={container.status || "N/A"}
+                      >
+                        <Chip
+                          label={container.names}
+                          size="small"
+                          sx={{
+                            fontSize: "0.65rem",
+                            height: 20,
+                            backgroundColor:
+                              container.state === "running"
+                                ? "#dcfce7"
+                                : "#fee2e2",
+                            color:
+                              container.state === "running"
+                                ? "#166534"
+                                : "#991b1b",
+                            "& .MuiChip-label": { px: 1 },
+                          }}
+                        />
+                      </Tooltip>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+
+
+// Main Component
 const VirtualServersTable = ({ authdata }) => {
   const theme = useTheme();
 
-  // Local states
   const [loadingData, setLoadingData] = useState(true);
   const [data, setData] = useState([]);
   const [openBackdrop, setOpenBackdrop] = useState(false);
-  const [showOtherUsers, setShowOtherUsers] = useState(false); // State for the switch
+  const [showOtherUsers, setShowOtherUsers] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch data from server
+  // Filter VMs based on search query
+  const filteredData = data.filter((vm) => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    
+    // Search by VM name
+    if (vm.name?.toLowerCase().includes(query)) return true;
+    
+    // Search by owner email
+    if (vm.owneremail?.toLowerCase().includes(query)) return true;
+    
+    // Search by VM ID
+    if (vm.id?.toString().includes(query)) return true;
+    
+    // Search by container names
+    if (vm.stacks) {
+      for (const stack of vm.stacks) {
+        if (stack.stackname?.toLowerCase().includes(query)) return true;
+        if (stack.containers) {
+          for (const container of stack.containers) {
+            if (container.names?.toLowerCase().includes(query)) return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  });
+
   const fetchData = async () => {
     try {
       const response = await axios.get("/api/vm", {
-        params: { showOtherUsers: showOtherUsers.toString() }, // Pass the state as a query parameter
+        params: { showOtherUsers: showOtherUsers.toString() },
       });
       const sortedData = response.data.sort((a, b) => a.id - b.id);
       setData(sortedData);
@@ -185,246 +351,173 @@ const VirtualServersTable = ({ authdata }) => {
     }
   };
 
-
-  // Auto-update data every 3 seconds
   useEffect(() => {
-    fetchData(); // Initial fetch
-    const intervalId = setInterval(fetchData, 3000); // Fetch every 3 seconds
-
-    return () => clearInterval(intervalId); // Cleanup on component unmount
+    fetchData();
+    const intervalId = setInterval(fetchData, 3000);
+    return () => clearInterval(intervalId);
   }, [openBackdrop, showOtherUsers]);
 
-
-  // 1. Row click -> open new URL
-  const handleRowClick = (row) => {
-    window.location.href = `/vm/${row.id}`;
+  const handleNavigate = (vm) => {
+    window.location.href = `/vm/${vm.id}`;
   };
 
-
-  // 2. Open the Backdrop for creating a new VM
-  const triggerAddNewVM = () => {
-    setOpenBackdrop(true);
-  };
-
-
-  // Start/Stop logic
-  const handleStartStop = (e, row) => {
+  const handleStartStop = (e, vm) => {
     e.stopPropagation();
-    if (row.state === "running") {
-      axios.post('/api/vm/control', {
-        virtualServerID: row.id,
-        action: 'stop'
-      })
-      toast.success(<b>Stopping server: #{row.id}</b>, {duration: 10000});
-    } else {
-      axios.post('/api/vm/control', {
-        virtualServerID: row.id,
-        action: 'start'
-      })
-      toast.success(<b>Starting server: #{row.id}</b>, {duration: 10000});
+    const action = vm.state === "running" ? "stop" : "start";
+    axios.post("/api/vm/control", { virtualServerID: vm.id, action });
+    toast.success(
+      <b>
+        {action === "stop" ? "Stopping" : "Starting"} server: #{vm.id}
+      </b>,
+      { duration: 10000 }
+    );
+  };
+
+  const handleDelete = (e, vm) => {
+    e.stopPropagation();
+    if (vm.state !== "running") {
+      axios.post("/api/vm/control", { virtualServerID: vm.id, action: "delete" });
+      toast.success(<b>Deleting server: #{vm.id}</b>, { duration: 10000 });
     }
   };
-
-
-  // Delete logic
-  const handleDelete = (e, row) => {
-    e.stopPropagation();
-    if (row.state !== "running") {
-      axios.post('/api/vm/control', {
-        virtualServerID: row.id,
-        action: 'delete'
-      })
-      toast.success(<b>Deleting server: #{row.id}</b>, {duration: 10000});
-    }
-  };
-
 
   return (
-    <Paper
-      sx={{
-        height: "calc(100vh - 105px)",
-        width: "100%",
-        borderRadius: 0,
-        overflowY: "auto",
-        padding: 2,
-      }}
-    >
+    <div className="h-[calc(100vh-105px)] w-full overflow-y-auto bg-gray-50 p-6">
       {/* Header */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          p: theme.spacing(2),
-          backgroundColor: theme.palette.background.paper,
-        }}
-      >
-        <Typography variant="h5" sx={{ color: theme.palette.text.secondary }}>
-          Virtual Servers
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          { authdata.admin === 1 && (
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Virtual Servers</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {searchQuery ? (
+              <>{filteredData.length} of {data.length} server{data.length !== 1 ? "s" : ""}</>
+            ) : (
+              <>{data.length} server{data.length !== 1 ? "s" : ""} total</>
+            )}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+
+          {/* Show other users switch */}
+          {authdata.admin === 1 && (
             <FormControlLabel
               control={
-                <Switch
+                <IOSSwitch
                   checked={showOtherUsers}
                   onChange={(e) => setShowOtherUsers(e.target.checked)}
-                  color="primary"
+                  sx={{ marginRight: '10px' }}
                 />
               }
-              label="Show other users"
+              label={
+                <span className="text-sm text-gray-600">Show other users</span>
+              }
             />
           )}
 
+
+          {/* Search Box */}
+          <TextField
+            size="small"
+            placeholder="Search VMs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{
+              width: 280,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+                backgroundColor: "white",
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgb(123, 0, 63)",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgb(123, 0, 63)",
+                },
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "gray" }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery("")}
+                    sx={{ p: 0.5 }}
+                  >
+                    <ClearIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+
           <Button
             variant="contained"
-            color="primary"
             startIcon={<AddCircleOutlinedIcon />}
+            onClick={() => setOpenBackdrop(true)}
             sx={{
               textTransform: "none",
-              fontWeight: "bold",
-              height: 36,
+              fontWeight: 600,
+              borderRadius: 2,
+              boxShadow: "none",
+              backgroundColor: "rgb(123, 0, 63)",
+              "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "#E64164" },
             }}
-            onClick={triggerAddNewVM}
           >
-            New Virtual Server
+            New Server
           </Button>
-        </Box>
-      </Box>
+        </div>
+      </div>
 
-      {/* Table */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: theme.palette.grey[200] }}>
-              <TableCell>
-                <strong>ID</strong>
-              </TableCell>
-              <TableCell>
-                <strong>VM Name</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Status</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Uptime</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Docker Containers</strong>
-              </TableCell>
-              <TableCell>
-                <strong>Actions</strong>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {!loadingData &&
-              data.map((row) => (
-                <TableRow
-                  key={row.id}
-                  hover
-                  sx={{ cursor: "pointer" }}
-                  onClick={() => handleRowClick(row)}
-                >
-                  <TableCell>{row.id}</TableCell>
-                  <TableCell>{row.name || "Not set"}</TableCell>
-                  <TableCell>
-                    {row.state === "running" ? (
-                      <Chip
-                        label="Running"
-                        color="success"
-                        icon={<CheckCircleOutlineIcon />}
-                        sx={{ fontWeight: "bold" }}
-                      />
-                    ) : (
-                      <Chip
-                        label="Stopped"
-                        color="error"
-                        icon={<StopCircleIcon />}
-                        sx={{ fontWeight: "bold" }}
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: "bold", color: "text.secondary" }}
-                    >
-                      {row.status || "N.D."}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {/* Updated logic for stacks/containers */}
-                    {row.stacks && row.stacks.map((stack, sidx) => (
-                      <Box key={sidx} sx={{ mb: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                          {stack.stackname || "Not set"}:
-                        </Typography>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 1,
-                            mt: 0.5,
-                          }}
-                        >
-                          {stack.containers?.map((container, cidx) => {
-                            const isRunning = container.state === "running";
-                            return (
-                              <Tooltip
-                                key={`${container.image}-${cidx}`}
-                                title={`${container.status || "N.D."}`}
-                              >
-                                <Chip
-                                  label={container.names}
-                                  color={isRunning ? "success" : "error"}
-                                  variant="filled"
-                                  size="small"
-                                  sx={{
-                                    fontSize: "0.75rem",
-                                    borderRadius: 2,
-                                  }}
-                                />
-                              </Tooltip>
-                            );
-                          })}
-                        </Box>
-                      </Box>
-                    ))}
-                  </TableCell>
-
-                  <TableCell>
-                    <div
-                      className="flex flex-col gap-2 cursor-default"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        variant="contained"
-                        onClick={(e) => handleStartStop(e, row)}
-                        color={row.state === "running" ? "error" : "success"}
-                        sx={{ textTransform: "none", fontWeight: "bold" }}
-                        startIcon={row.state === "running" ? <StopIcon /> : <PlayArrowIcon />}
-                      >
-                        {row.state === "running" ? "Stop" : "Start"}
-                      </Button>
-                      <LongPressDeleteButton row={row} onDelete={handleDelete} theme={theme} />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Add/Edit Dialog or Backdrop */}
-      {openBackdrop && (
-        <AddNewVM
-          setOpen={setOpenBackdrop}
-          // In real world, you might re-fetch from server or pass updated data
-          getData={fetchData}
-        />
+      {/* Loading State */}
+      {loadingData && (
+        <div className="flex items-center justify-center h-64">
+          <CircularProgress />
+        </div>
       )}
-    </Paper>
+
+      {/* Empty State */}
+      {!loadingData && data.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+          <StorageIcon sx={{ fontSize: 64, color: "gray", opacity: 0.3 }} />
+          <p className="mt-4 text-lg">No virtual servers found</p>
+          <p className="text-sm">Create your first server to get started</p>
+        </div>
+      )}
+
+      {/* No Search Results */}
+      {!loadingData && data.length > 0 && filteredData.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+          <SearchIcon sx={{ fontSize: 64, color: "gray", opacity: 0.3 }} />
+          <p className="mt-4 text-lg">No matches found</p>
+          <p className="text-sm">Try a different search term</p>
+        </div>
+      )}
+
+      {/* VM Cards Grid */}
+      {!loadingData && filteredData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
+          {filteredData.map((vm) => (
+            <VMCard
+              key={vm.id}
+              vm={vm}
+              onNavigate={handleNavigate}
+              onStartStop={handleStartStop}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Add New VM Dialog */}
+      {openBackdrop && (
+        <AddNewVM setOpen={setOpenBackdrop} getData={fetchData} />
+      )}
+    </div>
   );
 };
 

@@ -177,11 +177,14 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
               <Grid item xs={vmData ? 6 : 12}>
                 <Button
                   type="submit"
-                  style={{
+                  variant="contained"
+                  sx={{
                     backgroundColor: disableSave ? 'grey' : 'rgb(123, 0, 63)',
                     color: 'white',
                     boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
                     width: '100%',
+                    transition: 'all 0.2s ease',
+                    "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "#E64164" },
                   }}
                   onClick={handleSaveButton}
                   disabled={disableSave}
