@@ -205,3 +205,50 @@ def checkauth_admin_HTTPGET():
 
 
 
+
+@auth_bp.route('/api/account/change-password', methods=['POST'])
+@login_required
+def account_change_password_HTTPPOST():
+    postData = request.get_json()
+    timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+    # Validation
+    if not postData or not postData.get('currentPassword'):
+        return jsonify({'message': 'Current password is required'}), 400
+    
+    if not postData.get('newPassword'):
+        return jsonify({'message': 'New password is required'}), 400
+    
+    if len(postData.get('newPassword')) < 8:
+        return jsonify({'message': 'New password must be at least 8 characters'}), 400
+
+
+
+    # Verify current password
+    with get_db_connection() as conn:
+        sqlFetchData = conn.execute('SELECT Password FROM System_Users WHERE ID = ?', [current_user.id]).fetchone()
+        
+        if sqlFetchData is None:
+            return jsonify({'message': 'User not found'}), 404
+        
+        storedPasswordHash = sqlFetchData[0]
+        
+        # Check if current password is correct
+        if not bcrypt.checkpw(postData['currentPassword'].encode('utf-8'), storedPasswordHash.encode('utf-8')):
+            return jsonify({'message': 'Current password is incorrect'}), 401
+
+        # Hash new password and update
+        newPasswordHash = bcrypt.hashpw(postData['newPassword'].encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
+        conn.execute('UPDATE System_Users SET Password = ? WHERE ID = ?', [newPasswordHash, current_user.id])
+        
+        # Log activity
+        conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            [current_user.id, f'User {current_user.email} changed their password', timeNow])
+        
+        conn.commit()
+
+
+
+    # Return Success
+    return jsonify({'message': 'Password changed successfully'}), 200

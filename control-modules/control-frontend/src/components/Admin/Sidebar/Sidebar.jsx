@@ -121,12 +121,12 @@ const AdminSidebar = ({ authdata }) => {
 
           {/* ---- */}
           {open? <p className={styles.title}>ACCOUNT</p>:<p className={styles.title}>-----</p>}
-          {/* <Link href="/user/settings" style={{ textDecoration: "none" }}>
+          <Link href="/account" style={{ textDecoration: "none" }}>
             <li>
               <SettingsIcon className={styles.icon} />
-              {open? <span>Settings</span>:<></>}
+              {open? <span>Account</span>:<></>}
             </li>
-          </Link> */}
+          </Link>
 
           <Link href="/login" style={{ textDecoration: "none" }}>
             <li>
