@@ -305,7 +305,35 @@ def vmControl_HTTPPOST():
 
             # Return success
             return jsonify({'message':'OK'}), 200
+
         
+        # --- RENAME ---
+        elif(action == 'rename'):
+            
+            # Validation
+            if(not 'newName' in postData):
+                return jsonify({'message':'New name is required'}), 400
+            if(len(postData.get('newName')) < 3):
+                return jsonify({'message':'New name must be at least 3 characters long'}), 400
+            if(len(postData.get('newName')) > 30):
+                return jsonify({'message':'New name must be less than 30 characters long'}), 400
+            if(re.match(r'^[a-zA-Z0-9-_. ]+$', postData.get('newName')) is None):
+                return jsonify({'message':'New name can only contain letters, numbers, spaces, and hyphens'}), 400
+
+            # Update database
+            newName = postData.get('newName')
+            conn.execute('UPDATE Hosting_VirtualServers SET Name = ? WHERE ID = ?', [newName, virtualServerID])
+            conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+                [ 
+                    current_user.id, 
+                    f'Virtual server #{virtualServerID} renamed to "{newName}"', 
+                    timeNow 
+                ]
+            )
+            conn.commit()
+
+            # Return success
+            return jsonify({'message':'OK'}), 200
 
 
         # --- INVALID ---

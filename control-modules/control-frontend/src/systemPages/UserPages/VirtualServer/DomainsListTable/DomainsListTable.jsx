@@ -20,59 +20,27 @@ function QuickSearchToolbar({ triggerAddNew }) {
   const theme = useTheme();
 
   return (
-    <>
-      <Box
-        sx={{
-          p: 0.5,
-          pb: 0,
-        }}
-      >
-        <GridToolbarQuickFilter // style={{}}
-          quickFilterParser={(searchInput) =>
-            searchInput
-              .split(',')
-              .map((value) => value.trim())
-              .filter((value) => value !== '')
-          }
-          placeholder="Ieškoti..."
-        />
-        <GridToolbarColumnsButton
-          slotProps={{
-            button:{
-              sx: { 
-                marginLeft: '10px',
-                paddingLeft: '15px',
-                paddingRight: '10px',
-                color: 'white',
-                backgroundColor: 'rgb(123, 0, 63)',
-                "&:hover": {
-                  backgroundColor: 'rgb(230, 65, 100)',
-                },
-              }
-            }
-          }}
-        />
+    <Box sx={{ p: 0.5, pb: 0 }} >
 
-        <Button 
-          variant="contained"
-          sx={{
-            marginLeft: '10px',
-            paddingLeft: '15px',
-            paddingRight: '10px',
-            height: 30,
-            backgroundColor: 'rgb(123, 0, 63)',
-            "&:hover": {
-              backgroundColor: 'rgb(230, 65, 100)',
-            },
-          }}
-          onClick={() => { triggerAddNew() }}
-          >
-            <AddCircleOutlinedIcon style={{paddingRight: 8, fontSize: '22px'}}/>
-            Insert New
-        </Button>
-        
-      </Box>
-    </>
+      <Button 
+        variant="contained"
+        sx={{
+          marginLeft: '10px',
+          paddingLeft: '15px',
+          paddingRight: '10px',
+          height: 30,
+          backgroundColor: 'rgb(123, 0, 63)',
+          "&:hover": {
+            backgroundColor: 'rgb(230, 65, 100)',
+          },
+        }}
+        onClick={() => { triggerAddNew() }}
+        >
+          <AddCircleOutlinedIcon style={{paddingRight: 8, fontSize: '22px'}}/>
+          Insert New
+      </Button>
+      
+    </Box>
   );
 }
 
@@ -167,7 +135,8 @@ const DomainsListTable = ({ virtualServerID }) => {
       >
         <DataGrid
           sx={{
-            height: 'calc(100vh - 410px)',
+            height: 'calc(100vh - 620px)',
+            minHeight: '300px',
             cursor:'pointer',
           }}
           rows={data}
