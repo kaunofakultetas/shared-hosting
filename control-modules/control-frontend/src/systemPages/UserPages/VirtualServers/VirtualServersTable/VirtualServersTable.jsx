@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Button,
@@ -15,6 +15,7 @@ import {
   Typography,
   Switch,
   FormControlLabel,
+  CircularProgress,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import axios from "axios";
@@ -28,6 +29,134 @@ import DeleteIcon from "@mui/icons-material/Delete";
 
 import AddNewVM from "./AddNewVM/AddNewVM";
 import toast, { Toaster } from 'react-hot-toast';
+
+
+
+
+
+
+const LONG_PRESS_DURATION = 3000;
+
+const LongPressDeleteButton = ({ row, onDelete, theme }) => {
+  const [progress, setProgress] = useState(0);
+  const [isPressed, setIsPressed] = useState(false);
+  const animationRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const isPressedRef = useRef(false);
+  const eventRef = useRef(null);
+
+  const isDisabled = row.state === "running";
+
+  const animate = useCallback(() => {
+    if (!isPressedRef.current || !startTimeRef.current) return;
+
+    const elapsed = Date.now() - startTimeRef.current;
+    const newProgress = Math.min((elapsed / LONG_PRESS_DURATION) * 100, 100);
+    setProgress(newProgress);
+
+    if (elapsed >= LONG_PRESS_DURATION) {
+      setIsPressed(false);
+      isPressedRef.current = false;
+      setProgress(0);
+      onDelete(eventRef.current, row);
+      return;
+    }
+
+    animationRef.current = requestAnimationFrame(animate);
+  }, [onDelete, row]);
+
+  const startLongPress = useCallback((e) => {
+    if (isDisabled) return;
+    e.stopPropagation();
+    e.preventDefault();
+    
+    eventRef.current = e;
+    startTimeRef.current = Date.now();
+    isPressedRef.current = true;
+    setIsPressed(true);
+    setProgress(0);
+    animationRef.current = requestAnimationFrame(animate);
+  }, [isDisabled, animate]);
+
+  const cancelLongPress = useCallback((e) => {
+    if (!isPressedRef.current) return;
+    e.stopPropagation();
+    
+    const elapsed = startTimeRef.current ? Date.now() - startTimeRef.current : 0;
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    if (elapsed > 0 && elapsed < LONG_PRESS_DURATION) {
+      toast.error(<b>Hold for 3 seconds to delete</b>, { duration: 3000 });
+    }
+
+    isPressedRef.current = false;
+    setIsPressed(false);
+    setProgress(0);
+    startTimeRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => animationRef.current && cancelAnimationFrame(animationRef.current);
+  }, []);
+
+  const ProgressIcon = () => (
+    <div className="relative flex items-center justify-center w-6 h-6">
+      <CircularProgress
+        variant="determinate"
+        value={100}
+        size={24}
+        thickness={4}
+        className="absolute text-white/30"
+      />
+      <CircularProgress
+        variant="determinate"
+        value={progress}
+        size={24}
+        thickness={4}
+        sx={{
+          color: "white",
+          position: "absolute",
+          transform: "rotate(-90deg)",
+          "& .MuiCircularProgress-circle": {
+            strokeLinecap: "round",
+            transition: "none",
+          },
+        }}
+      />
+    </div>
+  );
+
+  return (
+    <Button
+      variant="contained"
+      disabled={isDisabled}
+      onMouseDown={startLongPress}
+      onMouseUp={cancelLongPress}
+      onMouseLeave={cancelLongPress}
+      onTouchStart={startLongPress}
+      onTouchEnd={cancelLongPress}
+      onContextMenu={(e) => e.preventDefault()}
+      className="select-none"
+      sx={{
+        textTransform: "none",
+        fontWeight: "bold",
+        backgroundColor: isPressed ? theme.palette.error.dark : theme.palette.error.main,
+        "&:hover": { backgroundColor: theme.palette.error.dark },
+        "&.Mui-disabled": {
+          backgroundColor: theme.palette.grey[500],
+          color: theme.palette.grey[300],
+        },
+      }}
+      startIcon={isPressed ? <ProgressIcon /> : <DeleteIcon />}
+    >
+      Delete
+    </Button>
+  );
+};
 
 
 
@@ -264,59 +393,22 @@ const VirtualServersTable = ({ authdata }) => {
                     ))}
                   </TableCell>
 
-                  {/* Actions Column */}
                   <TableCell>
-                    {/* Stop propagation so row-click won't fire */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                        cursor: "default",
-                      }}
+                    <div
+                      className="flex flex-col gap-2 cursor-default"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {/* Start/Stop Button */}
                       <Button
                         variant="contained"
                         onClick={(e) => handleStartStop(e, row)}
                         color={row.state === "running" ? "error" : "success"}
                         sx={{ textTransform: "none", fontWeight: "bold" }}
-                        startIcon={
-                          row.state === "running" ? (
-                            <StopIcon />
-                          ) : (
-                            <PlayArrowIcon />
-                          )
-                        }
+                        startIcon={row.state === "running" ? <StopIcon /> : <PlayArrowIcon />}
                       >
                         {row.state === "running" ? "Stop" : "Start"}
                       </Button>
-
-                      {/* Delete Button */}
-                      <Button
-                        variant="contained"
-                        onClick={(e) => handleDelete(e, row)}
-                        disabled={row.state === "running"}
-                        sx={{
-                          textTransform: "none",
-                          fontWeight: "bold",
-                          backgroundColor: theme.palette.error.main,
-                          "&:hover": {
-                            backgroundColor: theme.palette.error.dark,
-                          },
-                          // Force cursor for disabled button to remain default:
-                          "&.Mui-disabled": {
-                            cursor: "default",
-                            backgroundColor: theme.palette.grey[500],
-                            color: theme.palette.grey[300],
-                          },
-                        }}
-                        startIcon={<DeleteIcon />}
-                      >
-                        Delete
-                      </Button>
-                    </Box>
+                      <LongPressDeleteButton row={row} onDelete={handleDelete} theme={theme} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
