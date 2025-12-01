@@ -468,7 +468,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
                       icon={CodeIcon}
                       title="Visual Studio Code"
                       description="Code using Visual Studio Code program on your computer"
-                      onClick={() => openSystemPage("/docs")}
+                      onClick={() => openSystemPage("/docs/books/visual-studio-code/page/connect-vscode-with-your-server")}
                       color="#2563eb"
                     />
                   </div>
