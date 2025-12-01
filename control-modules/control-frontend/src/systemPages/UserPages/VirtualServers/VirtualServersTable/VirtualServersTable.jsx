@@ -24,6 +24,7 @@ import StorageIcon from "@mui/icons-material/Storage";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import DomainIcon from "@mui/icons-material/Domain";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import AddNewVM from "./AddNewVM/AddNewVM";
 import toast from "react-hot-toast";
@@ -262,6 +263,23 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
                   <span className="text-sm text-gray-700 font-medium">
                     {domain.domainname || "Unknown"}
                   </span>
+                  <Tooltip title="Open in new tab">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const protocol = domain.ssl === 1 ? "https" : "http";
+                        window.open(`${protocol}://${domain.domainname}`, "_blank");
+                      }}
+                      sx={{
+                        p: 0.5,
+                        color: "gray",
+                        "&:hover": { color: "#1976d2", bgcolor: "#e3f2fd" },
+                      }}
+                    >
+                      <OpenInNewIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                   {domain.iscloudflare === 1 && (
                     <Chip
                       label="Cloudflare"
