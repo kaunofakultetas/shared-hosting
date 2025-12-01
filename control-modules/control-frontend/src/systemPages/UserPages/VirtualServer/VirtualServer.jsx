@@ -19,7 +19,6 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import StorageIcon from "@mui/icons-material/Storage";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import CodeIcon from "@mui/icons-material/Code";
 import FolderIcon from "@mui/icons-material/Folder";
@@ -170,7 +169,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
 
 
   const openSystemPage = (path) => {
-    window.location.href = `${path}`;
+    window.open(path, "_blank");
   };
 
 
