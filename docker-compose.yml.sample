@@ -60,6 +60,9 @@ services:
   hosting-users-ssh-router:
     container_name: hosting-users-ssh-router
     image: vuknf/hosting-users-ssh-router:latest
+    user: 1000:1000
+    runtime: sysbox-runc
+    read_only: true
     environment:
       - BACKEND_SSH_API_URL=http://hosting-control-backend:8000/api/sshrouter
       - BACKEND_SSH_API_KEY=${BACKEND_SSH_API_KEY}
@@ -85,6 +88,9 @@ services:
   hosting-control-frontend:
     container_name: hosting-control-frontend
     image: vuknf/hosting-control-frontend:latest
+    user: 1000:1000
+    runtime: sysbox-runc
+    read_only: true
     environment:
       - BACKEND_API_URL=http://hosting-control-backend:8000
     volumes:
@@ -98,6 +104,9 @@ services:
   hosting-control-backend:
     container_name: hosting-control-backend
     image: vuknf/hosting-control-backend:latest
+    user: 1000:1000
+    runtime: sysbox-runc
+    read_only: true
     environment:
       - TMPDIR=/tmp/backend
       - DB_PATH=/data/database.db
@@ -106,7 +115,6 @@ services:
       - DOCKER_CONTROLLER_PORT=8000
 
       - BACKEND_SSH_API_KEY=${BACKEND_SSH_API_KEY}
-    read_only: true
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./_DATA/control-backend:/data
@@ -122,11 +130,9 @@ services:
   # Exit container for Docker Hub API access (L4 SNI proxy)
   hosting-control-backend-exit:
     container_name: hosting-control-backend-exit
-    image: hosting-control-backend-exit
-    build:
-      context: ./control-modules/control-backend-exit
-      dockerfile: Dockerfile
+    image: vuknf/hosting-control-backend-exit:latest
     user: 1000:1000
+    runtime: sysbox-runc
     read_only: true
     volumes:
       - ./control-modules/control-backend-exit/Caddyfile:/etc/caddy/Caddyfile:ro
@@ -141,11 +147,13 @@ services:
   hosting-control-docker:
     container_name: hosting-control-docker
     image: vuknf/hosting-control-docker:latest
+    user: root
+    runtime: sysbox-runc
+    read_only: true
     environment:
       - ROOT_DIR=${ROOT_DIR}
       - USERS_VM_DIR=SERVERS
       - APP_DEBUG=false
-    read_only: true
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
@@ -275,15 +283,20 @@ services:
   hosting-control-docs-drawio:
     container_name: hosting-control-docs-drawio
     image: jgraph/drawio:29.0.3
+    user: 1000:1000
+    runtime: sysbox-runc
     read_only: false
     networks:
       - isolated-control-panel
     restart: unless-stopped
 
 
+
   hosting-control-swagger:
     container_name: hosting-control-swagger
     image: swaggerapi/swagger-ui:v5.29.5
+    user: 1000:1000
+    runtime: sysbox-runc
     read_only: false
     volumes:
       - ./control-modules/control-swagger/swagger.yaml:/swagger.yaml:ro
@@ -349,6 +362,7 @@ services:
     image: registry:3.0.0
     user: 1000:1000
     runtime: sysbox-runc
+    read_only: true
     environment:
       REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
     volumes:
