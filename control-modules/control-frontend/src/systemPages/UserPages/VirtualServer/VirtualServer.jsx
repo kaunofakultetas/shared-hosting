@@ -226,9 +226,18 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
           </Button>
 
           {/* Header Card */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden relative">
+            {/* Ambient Glow */}
+            <div
+              className="absolute top-0 left-0 right-0 h-32 opacity-20 pointer-events-none"
+              style={{
+                background: isRunning
+                  ? "linear-gradient(to bottom, #22c55e 0%, transparent 100%)"
+                  : "linear-gradient(to bottom, #ef4444 0%, transparent 100%)",
+              }}
+            />
             {/* Status Bar */}
-            <div className={`h-1.5 ${isRunning ? "bg-green-500" : "bg-red-500"}`} />
+            <div className={`h-1.5 ${isRunning ? "bg-green-500" : "bg-red-500"} relative z-10`} />
 
             <div className="p-6">
               <div className="flex items-start justify-between">

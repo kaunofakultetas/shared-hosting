@@ -20,8 +20,8 @@ import StopIcon from "@mui/icons-material/Stop";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
-import StorageIcon from "@mui/icons-material/Storage";
 import SearchIcon from "@mui/icons-material/Search";
+import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import ClearIcon from "@mui/icons-material/Clear";
 import DomainIcon from "@mui/icons-material/Domain";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -166,11 +166,20 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
       onClick={() => onNavigate(vm)}
       className="group relative bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-300 cursor-pointer overflow-hidden"
     >
+      {/* Ambient Glow */}
+      <div
+        className="absolute top-0 left-0 right-0 h-24 opacity-15 pointer-events-none"
+        style={{
+          background: isRunning
+            ? "linear-gradient(to bottom, #22c55e 0%, transparent 100%)"
+            : "linear-gradient(to bottom, #ef4444 0%, transparent 100%)",
+        }}
+      />
       {/* Status Indicator Bar */}
       <div
         className={`absolute top-0 left-0 right-0 h-1 ${
           isRunning ? "bg-green-500" : "bg-red-500"
-        }`}
+        } z-10`}
       />
 
       {/* Card Content */}
@@ -316,9 +325,9 @@ const VMCard = ({ vm, onNavigate, onStartStop, onDelete }) => {
         {/* Docker Containers */}
         <div className="border-t border-gray-100 pt-3">
           <div className="flex items-center gap-2 mb-2">
-            <StorageIcon sx={{ fontSize: 16, color: "gray" }} />
+            <ViewInArIcon sx={{ fontSize: 16, color: "gray" }} />
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Containers
+              Docker Containers
             </span>
           </div>
           {vm.stacks && vm.stacks.length > 0 && (
@@ -557,7 +566,7 @@ const VirtualServersTable = ({ authdata }) => {
       {/* Empty State */}
       {!loadingData && data.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-          <StorageIcon sx={{ fontSize: 64, color: "gray", opacity: 0.3 }} />
+          <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
           <p className="mt-4 text-lg">No virtual servers found</p>
           <p className="text-sm">Create your first server to get started</p>
         </div>
@@ -566,7 +575,7 @@ const VirtualServersTable = ({ authdata }) => {
       {/* No Search Results */}
       {!loadingData && data.length > 0 && filteredData.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-          <SearchIcon sx={{ fontSize: 64, color: "gray", opacity: 0.3 }} />
+          <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
           <p className="mt-4 text-lg">No matches found</p>
           <p className="text-sm">Try a different search term</p>
         </div>
