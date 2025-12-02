@@ -321,6 +321,7 @@ services:
   hosting-users-firewall:
     container_name: hosting-users-firewall
     image: vuknf/hosting-users-firewall:latest
+    user: root
     runtime: sysbox-runc
     command: >-
       sh -c "
@@ -346,6 +347,9 @@ services:
       echo '[*] NAT outgoing traffic' &&
       iptables -t nat -A POSTROUTING -s 172.19.2.0/24 -o eth1 -j MASQUERADE &&
       iptables -t nat -A POSTROUTING -s 172.19.2.0/24 -o eth0 -j MASQUERADE &&
+
+      echo '[*] Starting DNS forwarder' &&
+      dnsmasq --no-daemon --no-resolv --server=8.8.8.8 --server=1.1.1.1 --log-queries &
 
       echo '[*] Router configuration complete' &&
       tail -f /dev/null"

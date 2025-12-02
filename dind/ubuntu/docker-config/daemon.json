@@ -1,5 +1,5 @@
 {
     "registry-mirrors": ["http://hosting-users-dockerhub-cache:5000"],
     "insecure-registries": ["hosting-users-dockerhub-cache:5000"],
-    "dns": ["1.1.1.1"]
+    "dns": ["172.19.2.1"]
 }
