@@ -30,7 +30,7 @@ export default async function Page() {
 
   if (response !== undefined && response.status === 200) {
     if (response.data.admin === 1) {
-      redirect('/vm');
+      redirect('/admin');
     } else {
       redirect('/vm');
     }
