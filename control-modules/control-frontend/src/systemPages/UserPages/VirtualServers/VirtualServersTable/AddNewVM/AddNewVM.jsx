@@ -184,7 +184,7 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
                     boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
                     width: '100%',
                     transition: 'all 0.2s ease',
-                    "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "#E64164" },
+                    "&:hover": disableSave ? 'none' : { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "#E64164" },
                   }}
                   onClick={handleSaveButton}
                   disabled={disableSave}
