@@ -175,7 +175,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             )
             dockerBackendResponse = update_caddy_config(conn)
             conn.commit()
-            return jsonify({'message':'OK'}), 200
+            return jsonify({'message':'ok'}), 200
 
 
 
@@ -199,7 +199,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             )
             dockerBackendResponse = update_caddy_config(conn)
             conn.commit()
-            return jsonify({'message':'OK'}), 200
+            return jsonify({'message':'ok'}), 200
         
 
 
@@ -215,7 +215,7 @@ def vm_dns_HTTPGET(virtualServerID, domainID=None):
             )
             dockerBackendResponse = update_caddy_config(conn)
             conn.commit()
-            return jsonify({'message':'OK'}), 200
+            return jsonify({'message':'ok'}), 200
         
 
 

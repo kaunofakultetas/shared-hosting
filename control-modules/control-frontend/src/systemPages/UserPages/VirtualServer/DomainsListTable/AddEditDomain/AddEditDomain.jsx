@@ -108,12 +108,10 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
     }
 
     const response = await axios.post(endpointUrl, requestData, { withCredentials: true });
-    if (response.data.type === 'ok') {
+    if (response.data.message === 'ok') {
       toast.success(<b>Domain created</b>, { duration: 3000 });
-    } else if (response.data.type === 'error') {
-      toast.error(<b>Error:<br/>{response.data.reason}</b>, { duration: 8000 });
     } else {
-      toast.error(<b>Error:<br/>Unknown response.</b>, { duration: 8000 });
+      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
     }
 
     getData();
@@ -135,12 +133,10 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
     };
 
     const response = await axios.put(endpointUrl, requestData, { withCredentials: true });
-    if (response.data.type === 'ok') {
+    if (response.data.message === 'ok') {
       toast.success(<b>Domain updated</b>, { duration: 3000 });
-    } else if (response.data.type === 'error') {
-      toast.error(<b>Error:<br/>{response.data.reason}</b>, { duration: 8000 });
     } else {
-      toast.error(<b>Error:<br/>Unknown response.</b>, { duration: 8000 });
+      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
     }
 
     getData();
@@ -150,12 +146,10 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
   async function handleDeleteButton() {
 
     const response = await axios.delete(endpointUrl+"/"+data.id, { withCredentials: true });
-    if (response.data.type === 'ok') {
+    if (response.data.message === 'ok') {
       toast.success(<b>Domain deleted</b>, { duration: 3000 });
-    } else if (response.data.type === 'error') {
-      toast.error(<b>Error:<br/>{response.data.reason}</b>, { duration: 8000 });
     } else {
-      toast.error(<b>Error:<br/>Unknown response.</b>, { duration: 8000 });
+      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
     }
 
     getData();
