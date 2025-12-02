@@ -135,7 +135,6 @@ const DomainsListTable = ({ virtualServerID }) => {
       >
         <DataGrid
           sx={{
-            height: 'calc(100vh - 620px)',
             minHeight: '300px',
             cursor:'pointer',
           }}

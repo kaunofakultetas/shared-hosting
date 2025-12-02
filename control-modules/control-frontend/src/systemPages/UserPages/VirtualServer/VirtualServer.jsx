@@ -426,7 +426,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
             </div>
 
             {/* Tab Content */}
-            <div className="p-6" style={{ height: "calc(100vh - 580px)", minHeight: "350px" }}>
+            <div className="p-6">
               {/* Controls Tab */}
               {currentTab === 0 && (
                 <div>
