@@ -110,10 +110,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
     return () => clearInterval(interval);
   }, [virtualServerID]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
+
 
   const handleStartStop = async () => {
     const action = vmData.state === "running" ? "stop" : "start";
@@ -129,15 +126,21 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
     }
   };
 
+
+
   const handleStartEditing = () => {
     setEditedName(vmData.name || "");
     setIsEditingName(true);
   };
 
+
+  
   const handleCancelEditing = () => {
     setIsEditingName(false);
     setEditedName("");
   };
+
+
 
   const handleSaveName = async () => {
     if (!editedName.trim()) {
@@ -338,27 +341,6 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-2">
-                  <Tooltip title="Refresh">
-                    <IconButton
-                      onClick={handleRefresh}
-                      disabled={refreshing}
-                      sx={{
-                        bgcolor: "#f3f4f6",
-                        "&:hover": { bgcolor: "#e5e7eb" },
-                      }}
-                    >
-                      <RefreshIcon
-                        sx={{
-                          fontSize: 22,
-                          animation: refreshing ? "spin 1s linear infinite" : "none",
-                          "@keyframes spin": {
-                            "0%": { transform: "rotate(0deg)" },
-                            "100%": { transform: "rotate(360deg)" },
-                          },
-                        }}
-                      />
-                    </IconButton>
-                  </Tooltip>
                   <Button
                     variant="contained"
                     onClick={handleStartStop}
