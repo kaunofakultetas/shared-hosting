@@ -244,7 +244,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
                 {/* Left: VM Info */}
                 <div className="flex items-start gap-5">
                   {/* VM Icon */}
-                  <div className="w-24 h-24 bg-gray-200 rounded-xl flex items-center justify-center p-3">
+                  <div className="w-32 h-32 bg-gray-200 rounded-xl flex items-center justify-center p-3">
                     <img 
                       src="/img/virtual-machine-icon.png" 
                       alt="Virtual Server" 
@@ -255,7 +255,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
                   {/* VM Details */}
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-xs font-mono bg-gray-300 px-2 py-0.5 rounded-full">
+                      <span className="text-md font-mono bg-gray-300 px-2 py-0.5 rounded-full">
                         #{virtualServerID}
                       </span>
                       <Chip
@@ -263,8 +263,8 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
                         size="small"
                         sx={{
                           fontWeight: 600,
-                          fontSize: "0.7rem",
-                          height: 22,
+                          fontSize: "1rem",
+                          height: 28,
                           backgroundColor: isRunning ? "green" : "red",
                           color: "white",
                         }}
