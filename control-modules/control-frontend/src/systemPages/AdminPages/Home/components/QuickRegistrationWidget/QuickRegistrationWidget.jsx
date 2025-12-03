@@ -47,7 +47,6 @@ const QuickRegistrationWidget = () => {
         setCode(response.data.code);
         setExpiry(expiryDate);
         setEnabled(true);
-        toast.success(response.data.message);
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create registration code');
@@ -63,7 +62,6 @@ const QuickRegistrationWidget = () => {
         setCode('');
         setExpiry(null);
         setRemainingTime('');
-        toast.success(response.data.message);
       }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete registration code');

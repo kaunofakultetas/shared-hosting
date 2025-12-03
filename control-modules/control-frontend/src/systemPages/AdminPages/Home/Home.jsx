@@ -7,6 +7,8 @@ import SystemOverviewWidget from "./components/SystemOverviewWidget/SystemOvervi
 import RecentActivityWidget from "./components/RecentActivityWidget/RecentActivityWidget";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { Toaster } from "react-hot-toast";
+
 
 // Icons
 import PeopleOutlinedIcon from '@mui/icons-material/PeopleOutlined';
@@ -64,6 +66,7 @@ const Home = ({ authdata }) => {
       <Navbar />
       <div className="flex">
         <Sidebar authdata={authdata} />
+        <Toaster />
         
         <div className="grow-[6] bg-gray-100 p-5" style={{ height: "calc(100vh - 105px)", overflowY: "auto" }}>
 
