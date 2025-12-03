@@ -43,7 +43,7 @@ const QuickRegistrationWidget = () => {
     try {
       const response = await axios.post('/api/account/registration-code', {}, { withCredentials: true });
       if (response.status === 200) {
-        const expiryDate = new Date(Date.now() + 30 * 60 * 1000);
+        const expiryDate = new Date(response.data.validUntil * 1000);
         setCode(response.data.code);
         setExpiry(expiryDate);
         setEnabled(true);

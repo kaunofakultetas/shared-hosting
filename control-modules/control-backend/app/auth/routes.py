@@ -283,7 +283,7 @@ def registration_code_HTTP():
                 [current_user.id, registrationCode, timestampNow_plus30mins])
             conn.commit()
 
-        return jsonify({'message': 'Registration code created successfully', 'code': registrationCode}), 200
+        return jsonify({'message': 'Registration code created successfully', 'code': registrationCode, 'validUntil': timestampNow_plus30mins}), 200
 
 
     # --- DELETE ---
