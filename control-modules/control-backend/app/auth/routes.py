@@ -11,8 +11,9 @@ from flask import Blueprint, request, Response, jsonify
 from flask_login import login_user, login_required, current_user
 import bcrypt
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
+import string
 import re
 
 from .user import load_user, admin_required, get_user_by_email, check_user_is_allowed_to_access_vm
@@ -252,3 +253,44 @@ def account_change_password_HTTPPOST():
 
     # Return Success
     return jsonify({'message': 'Password changed successfully'}), 200
+
+
+
+
+
+@auth_bp.route('/api/account/registration-code', methods=['GET', 'POST', 'DELETE'])
+@login_required
+@admin_required
+def registration_code_HTTP():
+
+    # --- GET ---
+    if request.method == 'GET':
+        with get_db_connection() as conn:
+            sqlFetchData = conn.execute('SELECT Code, ValidUntil FROM System_RegistrationCodes WHERE UserID = ?', 
+                [current_user.id]).fetchone()
+            if sqlFetchData is None:
+                return jsonify({'message': 'No registration code found'}), 404
+            return jsonify({'message': 'Registration code found', 'code': sqlFetchData[0], 'validUntil': sqlFetchData[1]}), 200
+
+
+    # --- CREATE ---
+    elif request.method == 'POST':
+        timestampNow_plus30mins = int((datetime.now() + timedelta(minutes=30)).timestamp())
+        registrationCode = ''.join(random.choices(string.ascii_letters + string.digits, k=8)).upper()
+
+        with get_db_connection() as conn:
+            conn.execute('INSERT OR REPLACE INTO System_RegistrationCodes (UserID, Code, ValidUntil) VALUES (?, ?, ?)', 
+                [current_user.id, registrationCode, timestampNow_plus30mins])
+            conn.commit()
+
+        return jsonify({'message': 'Registration code created successfully', 'code': registrationCode}), 200
+
+
+    # --- DELETE ---
+    elif request.method == 'DELETE':
+        with get_db_connection() as conn:
+            conn.execute('DELETE FROM System_RegistrationCodes WHERE UserID = ?', [current_user.id])
+            conn.commit()
+
+        return jsonify({'message': 'Registration code deleted successfully'}), 200
+

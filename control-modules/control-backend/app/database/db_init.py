@@ -34,6 +34,16 @@ def init_db_tables():
                 PRIMARY KEY("ID" AUTOINCREMENT)
             );
         ''')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS "System_RegistrationCodes" (
+                "ID"	        INTEGER NOT NULL UNIQUE,
+                "UserID"	    INTEGER NOT NULL,
+                "Code"	        TEXT NOT NULL UNIQUE,
+                "ValidUntil"	INTEGER NOT NULL,
+                PRIMARY KEY("ID" AUTOINCREMENT)
+            );
+        ''')
         #####################################################################
 
 
