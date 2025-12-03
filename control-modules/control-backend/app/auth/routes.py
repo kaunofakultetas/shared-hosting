@@ -266,6 +266,13 @@ def registration_code_HTTP():
     # --- GET ---
     if request.method == 'GET':
         with get_db_connection() as conn:
+            
+            # Delete expired registration codes
+            timestampNow = int(datetime.now().timestamp())
+            conn.execute('DELETE FROM System_RegistrationCodes WHERE ValidUntil < ?', [timestampNow])
+            conn.commit()
+
+            # Fetch registration code
             sqlFetchData = conn.execute('SELECT Code, ValidUntil FROM System_RegistrationCodes WHERE UserID = ?', 
                 [current_user.id]).fetchone()
             if sqlFetchData is None:
