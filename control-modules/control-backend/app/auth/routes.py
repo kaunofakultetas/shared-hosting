@@ -301,3 +301,66 @@ def registration_code_HTTP():
 
         return jsonify({'message': 'Registration code deleted successfully'}), 200
 
+
+
+
+
+@auth_bp.route('/api/register', methods=['POST'])
+def register_HTTPPOST():
+    postData = request.get_json()
+    timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestampNow = int(datetime.now().timestamp())
+
+    # Validate input
+    if not postData:
+        return jsonify({'message': 'No data provided'}), 400
+    
+    if not postData.get('registrationCode'):
+        return jsonify({'message': 'Registration code is required'}), 400
+    
+    if not postData.get('email'):
+        return jsonify({'message': 'Email is required'}), 400
+    
+    if not postData.get('password'):
+        return jsonify({'message': 'Password is required'}), 400
+    
+    if len(postData.get('password')) < 6:
+        return jsonify({'message': 'Password must be at least 6 characters'}), 400
+
+    # Validate email format
+    email = postData['email'].strip().lower()
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return jsonify({'message': 'Invalid email format'}), 400
+
+
+
+    registrationCode = postData['registrationCode'].strip().upper()
+
+    with get_db_connection() as conn:
+        # Check if registration code exists and is valid
+        codeData = conn.execute('SELECT ID, UserID FROM System_RegistrationCodes WHERE Code = ? AND ValidUntil > ?', 
+            [registrationCode, timestampNow]
+        ).fetchone()
+
+        if codeData is None:
+            return jsonify({'message': 'Invalid registration code'}), 400
+        
+        codeId, adminUserId = codeData
+        
+
+        # Create new user (Enabled by default since they have a valid registration code)
+        passwordHash = bcrypt.hashpw(postData['password'].encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
+        conn.execute(
+            'INSERT INTO System_Users (Email, Password, Admin, Enabled, LastLogin) VALUES (?, ?, ?, ?, ?)',
+            [email, passwordHash, 0, 1, '']
+        )
+
+
+        # Log activity
+        conn.execute('INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
+            [adminUserId, f'New user registered: {email}', timeNow]
+        )
+
+        conn.commit()
+
+    return jsonify({'message': 'Registration successful! You can now login.'}), 201

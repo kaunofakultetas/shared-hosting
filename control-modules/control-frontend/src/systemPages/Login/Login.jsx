@@ -1,266 +1,86 @@
 'use client';
-import React, { useState, useEffect, useRef } from "react";
-
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import BouncingDotsLoader from './components/BouncingDotsLoader/BouncingDotsLoader';
 import Particles from './components/Particles/Particles';
-
-import { Button, Box, Stack, FormControl, TextField } from "@mui/material";
-import Typography from '@mui/joy/Typography';
-
+import { TextField } from "@mui/material";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Image from 'next/image';
 
 
-const styles = {
-  loginPage: {
-    backgroundImage: "linear-gradient(to bottom right, #7b4397 , #dc2430)",
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: -2,
-    loginForm: {
-      maxWidth: 350,
-      margin: "0 auto",
-      display: "flex",
-      flexDirection: "column",
-      background: "white",
-      padding: 20,
-      marginTop: "10%",
-      borderRadius: 15,
-    },
-    errorBox: {
-      fontSize: '12px', 
-      color: 'red', 
-      textAlign: 'center', 
-      whiteSpace: 'pre-wrap'
-    },
-    footer: {
-      height: 100,
-      width: "100%",
-      position: "absolute",
-      bottom: 0,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    copyright: {
-      color: "#fff",
-      lineHeight: "10px",
-      fontSize: "0.7em",
-      marginTop: 50,
-      textAlign: "center",
-    },
-  },
-};
-
-
-
 
 function LoginForm({ selectedForm, setSelectedForm, handleLogin, errorBoxText }) {
-
   const [loggingIn, setLoggingIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-
-
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Enter') {
-        if(selectedForm === 0){
-          handleLogin(email, password);
-        }
+      if (event.key === 'Enter' && selectedForm === 0) {
+        handleLogin(email, password);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [email, password]);
-
-  
-
-
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [email, password, selectedForm, handleLogin]);
 
   return (
-    <form  style={styles.loginPage.loginForm}>
-      <Image alt="" src="/img/vuknflogo.png" width="330" height="192"/>
+    <form className="w-full max-w-[350px] flex flex-col bg-white p-5 rounded-2xl shadow-2xl">
+      <Image alt="VU KnF Logo" src="/img/vuknflogo.png" width={330} height={192} priority />
       
-      <Box style={{textAlign: "center", marginTop: 10}}>
-        <Typography component="h1" level="inherit" fontSize="1.1em" mb="0.25em">
-          App Hosting Platform
-        </Typography>
-      </Box>
-
-      <Stack spacing={2} style={{marginTop: 10, marginBottom: 60}} >
-        <FormControl size="lg" color="primary">
-          <TextField required variant="standard" label="Email" onChange={ (e) => {setEmail(e.currentTarget.value)}}/>
-        </FormControl>
-
-        <FormControl size="lg" color="primary">
-          <TextField required variant="standard" type="password" label="Password" onChange={ (e) => {setPassword(e.currentTarget.value)}}/>
-        </FormControl>
-      </Stack>
-
-      
-      <Box style={styles.loginPage.errorBox}>
-        {errorBoxText}
-      </Box>
-      
-      {loggingIn? 
-        <Button disabled={true} style={{backgroundColor: 'grey', color: 'white', pointerEvents: 'none', }}>
-          PLEASE WAIT <BouncingDotsLoader/>
-        </Button>
-      :
-        <Button onClick={() => handleLogin(email, password)} style={{backgroundColor: 'rgb(123, 0, 63)', color: 'white'}} >
-          LOGIN
-        </Button>
-      }
-
-      {/* <Button 
-        style={{ 
-          color: 'rgb(123, 0, 63)', 
-          marginTop: 15, 
-          border: '1px solid', 
-          borderRadius: 5 
-        }}
-        onClick={() => { setSelectedForm(1) }}
-      >
-        Neturiu paskyros
-      </Button> */}
-    </form>
-  );
-}
-
-
-
-
-
-function RegisterForm({ selectedForm, setSelectedForm, handleLogin }) {
-
-  const [errorBoxText, setErrorBoxText] = useState("");
-  const [studentUsername, setStudentUsername] = useState("");
-  const [studentAccessCode, setStudentAccessCode] = useState("");
-
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        if(selectedForm === 1){
-          if (studentAccessCode === "") {
-            handleRegister();
-          } else {
-            handleLogin(studentUsername, studentAccessCode);
-          }
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [studentUsername, studentAccessCode]);
-
-  const handleRegister = () => {
-    const registerUser = async () =>  {
-      await axios.post("/api/student/register", { username: studentUsername }).then((response) => {
-        if(response.data.status === "OK"){
-          setStudentUsername(response.data.username);
-          setStudentAccessCode(response.data.accessCode);
-        }
-        else{
-          setErrorBoxText(response.data.error);
-        }
-      });
-    }
-    registerUser();
-  }
-
-
-
-  return (
-    <form  style={styles.loginPage.loginForm}>
-
-
-      {studentAccessCode === "" &&
-        <Button 
-          style={{ 
-            backgroundColor: 'rgb(123, 0, 63)', 
-            color: 'white', 
-            width: 10, 
-            marginBottom: 30 
-          }}
-          onClick={() => setSelectedForm(0) }
-        >
-          <ArrowBackIcon/>
-        </Button>
-      }
-
-
-
-
-      <h3 style={{marginBottom: 30}}>Registracija Testui:</h3>
-      {studentAccessCode === "" &&
-        <div style={{marginBottom: 30, textAlign: 'justify' }}>
-          <b>Prisijungimo kodas</b> bus sugeneruotas atsitiktiniu būdu ir parodytas kai spustelsite mygtuką "Registruotis".
-        </div>
-      }
-      <div style={{marginBottom: 50, textAlign: 'justify' }}>
-        Užsirašykite šiuos prisijungimo duomenis jei norėsite rezultatą peržiūrėti vėliau arba testą tęsti vėliau.
+      <div className="text-center mt-3">
+        <h1 className="text-lg font-medium text-gray-700">App Hosting Platform</h1>
       </div>
 
+      <div className="flex flex-col gap-4 mt-4 mb-14">
+        <TextField 
+          required 
+          variant="standard" 
+          label="Email" 
+          onChange={(e) => setEmail(e.currentTarget.value)}
+          fullWidth
+        />
+        <TextField 
+          required 
+          variant="standard" 
+          type="password" 
+          label="Password" 
+          onChange={(e) => setPassword(e.currentTarget.value)}
+          fullWidth
+        />
+      </div>
 
-
-      {studentAccessCode === "" ?
-        <>
-          <Stack spacing={2} style={{marginBottom: 80}} >
-            <FormControl size="lg" color="primary">
-              <TextField required variant="standard" label="Prisijungimo Vardas" onChange={ (e) => setStudentUsername(e.currentTarget.value) }/>
-            </FormControl>
-          </Stack>
-
-          
-          <Box style={styles.loginPage.errorBox}>
-            {errorBoxText}
-          </Box>
-          
-          <Button 
-            style={{
-              backgroundColor: 'rgb(123, 0, 63)', 
-              color: 'white'
-            }}
-            onClick={() => { handleRegister() }}
-          >
-            REGISTRUOTIS
-          </Button>
-        </>
-      :
-        <>
-          <div>
-            Vardas: {studentUsername}
-          </div>
-          <div style={{marginBottom: 40}}>
-            Kodas: {studentAccessCode}
-          </div>
-          
-          
-          <Button 
-            style={{
-              backgroundColor: 'rgb(123, 0, 63)', 
-              color: 'white'
-            }}
-            onClick={() => handleLogin(studentUsername, studentAccessCode) }
-          >
-            PRADĖTI TESTĄ
-          </Button>
-        </>
-      }
+      {errorBoxText && (
+        <div className="text-xs text-red-500 text-center whitespace-pre-wrap mb-2">
+          {errorBoxText}
+        </div>
+      )}
       
+      {loggingIn ? (
+        <button 
+          disabled 
+          className="bg-gray-400 text-white py-2.5 px-4 rounded font-medium cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          PLEASE WAIT <BouncingDotsLoader />
+        </button>
+      ) : (
+        <button 
+          type="button"
+          onClick={() => handleLogin(email, password)} 
+          className="bg-[#7b003f] hover:bg-[#E64164] text-white py-2.5 px-4 rounded font-medium transition-colors cursor-pointer border-none"
+        >
+          LOGIN
+        </button>
+      )}
+
+      <button 
+        type="button"
+        className="text-[#7b003f] mt-4 border rounded py-2 px-4 bg-transparent hover:bg-[#E64164] hover:text-white transition-colors cursor-pointer font-medium"
+        onClick={() => setSelectedForm(1)}
+      >
+        Registration
+      </button>
     </form>
   );
 }
@@ -268,43 +88,223 @@ function RegisterForm({ selectedForm, setSelectedForm, handleLogin }) {
 
 
 
+function RegisterForm({ selectedForm, setSelectedForm }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorBoxText, setErrorBoxText] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  
+  const [registrationCode, setRegistrationCode] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Enter' && selectedForm === 1) {
+        event.preventDefault();
+        handleRegister();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [registrationCode, email, password, confirmPassword, selectedForm]);
+
+  const handleRegister = async () => {
+    setErrorBoxText("");
+    setSuccessMessage("");
+
+    // Client-side validation
+    if (!registrationCode.trim()) {
+      setErrorBoxText("Registration code is required");
+      return;
+    }
+    if (!email.trim()) {
+      setErrorBoxText("Email is required");
+      return;
+    }
+    if (!password) {
+      setErrorBoxText("Password is required");
+      return;
+    }
+    if (password.length < 6) {
+      setErrorBoxText("Password must be at least 6 characters");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorBoxText("Passwords do not match");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await axios.post("/api/register", { 
+        registrationCode: registrationCode.trim().toUpperCase(),
+        email: email.trim(),
+        password 
+      });
+      
+      if (response.status === 200 || response.status === 201) {
+        setSuccessMessage(response.data.message || "Registration successful! You can now login.");
+        // Clear form
+        setRegistrationCode("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+      } else {
+        setErrorBoxText(response.data.message || "Registration failed");
+      }
+    } catch (error) {
+      setErrorBoxText(error.response?.data?.message || "Registration failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form className="w-full max-w-[380px] flex flex-col bg-white p-6 rounded-2xl shadow-2xl">
+      <button 
+        type="button"
+        className="bg-[#7b003f] hover:bg-[#E64164] text-white w-10 h-10 mb-4 rounded flex items-center justify-center cursor-pointer border-none transition-colors"
+        onClick={() => setSelectedForm(0)}
+      >
+        <ArrowBackIcon />
+      </button>
+
+      <h3 className="mb-2 text-xl font-semibold text-gray-800">Create Account</h3>
+      <p className="mb-6 text-gray-500 text-sm">
+        Enter the registration code provided by your administrator
+      </p>
+
+      <div className="flex flex-col gap-4 mb-6">
+        <TextField 
+          required 
+          variant="standard" 
+          label="Registration Code"
+          value={registrationCode}
+          onChange={(e) => setRegistrationCode(e.currentTarget.value.toUpperCase())}
+          fullWidth
+          inputProps={{ 
+            style: { fontFamily: 'monospace', letterSpacing: '0.1em', textTransform: 'uppercase' }
+          }}
+          placeholder="XXXXXXXX"
+        />
+        <TextField 
+          required 
+          variant="standard" 
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.currentTarget.value)}
+          fullWidth
+        />
+        <TextField 
+          required 
+          variant="standard" 
+          type="password" 
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.currentTarget.value)}
+          fullWidth
+          helperText="At least 6 characters"
+        />
+        <TextField 
+          required 
+          variant="standard" 
+          type="password" 
+          label="Confirm Password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+          fullWidth
+        />
+      </div>
+
+      {errorBoxText && (
+        <div className="text-xs text-red-500 text-center whitespace-pre-wrap mb-3 p-2 bg-red-50 rounded">
+          {errorBoxText}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="text-xs text-green-600 text-center whitespace-pre-wrap mb-3 p-2 bg-green-50 rounded">
+          {successMessage}
+        </div>
+      )}
+      
+      {isSubmitting ? (
+        <button 
+          disabled 
+          className="bg-gray-400 text-white py-2.5 px-4 rounded font-medium cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          REGISTERING <BouncingDotsLoader />
+        </button>
+      ) : (
+        <button 
+          type="button"
+          className="bg-[#7b003f] hover:bg-[#E64164] text-white py-2.5 px-4 rounded font-medium transition-colors cursor-pointer border-none"
+          onClick={handleRegister}
+        >
+          REGISTER
+        </button>
+      )}
+
+      <div className="text-center mt-4 text-sm text-gray-500">
+        Already have an account?{' '}
+        <button 
+          type="button"
+          className="text-[#7b003f] hover:text-[#E64164] font-medium bg-transparent border-none cursor-pointer underline"
+          onClick={() => setSelectedForm(0)}
+        >
+          Login here
+        </button>
+      </div>
+    </form>
+  );
+}
 
 
 
 
 export default function Login({ deleteTokens }) {
-  
-  // Delete Cookies
   const deleteTokensRef = useRef(deleteTokens);
+  
   useEffect(() => {
     deleteTokensRef.current = deleteTokens;
   });
+  
   useEffect(() => {
     deleteTokensRef.current();
   }, []);
 
-
-
   const [selectedForm, setSelectedForm] = useState(0);
   const [loginErrorBoxText, setLoginErrorBoxText] = useState("");
 
-  async function handleLogin(email, password) {
-    await axios.post("/api/login", { email: email, password: password }).then((response) => {
-      if(response.data === "OK"){
-        window.location.href="/"
-      }
-      else{
+  const handleLogin = async (email, password) => {
+    try {
+      const response = await axios.post("/api/login", { email, password });
+      if (response.data === "OK") {
+        window.location.href = "/";
+      } else {
         setLoginErrorBoxText(response.data);
       }
-    });
-  }
+    } catch (error) {
+      setLoginErrorBoxText("Login failed");
+    }
+  };
 
   return (
-    <Box style={styles.loginPage}>
-      
-      <div style={{}}>
-        <div style={{ display: selectedForm === 0 ? 'block': 'none' }}>
+    <div 
+      className="min-h-screen w-full flex flex-col relative"
+      style={{ backgroundImage: "linear-gradient(to bottom right, #7b4397, #dc2430)" }}
+    >
+      {/* Particles background */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <Particles />
+      </div>
+
+      {/* Main content - centered */}
+      <div className="flex-1 flex items-center justify-center p-4 pb-16 relative z-10">
+        <div className={selectedForm === 0 ? 'block' : 'hidden'}>
           <LoginForm
             selectedForm={selectedForm}
             setSelectedForm={setSelectedForm}
@@ -313,25 +313,20 @@ export default function Login({ deleteTokens }) {
           />
         </div>
 
-        <div style={{ display: selectedForm === 1 ? 'block': 'none' }}>
+        <div className={selectedForm === 1 ? 'block' : 'hidden'}>
           <RegisterForm
             selectedForm={selectedForm}
             setSelectedForm={setSelectedForm}
-            handleLogin={handleLogin}
           />
         </div>
       </div>
-      
-      <Particles/>
 
-      <Box style={styles.loginPage.footer}>
-        <Box style={styles.loginPage.copyright}>
+      {/* Footer */}
+      <div className="py-4 text-center relative z-10">
+        <div className="text-white text-xs">
           Copyright © | All Rights Reserved | VUKnF
-        </Box>
-      </Box>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }
-
-
-
