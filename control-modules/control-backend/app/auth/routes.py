@@ -158,6 +158,11 @@ def usersList_HTTP():
             return Response(json.dumps({'type': 'error'}), mimetype='application/json')
 
 
+            # --- ILLEGAL ACTION ---
+            else:
+                return Response(json.dumps({'type': 'error', 'reason': 'Illegal action'}), mimetype='application/json')
+
+
 
 
 
