@@ -155,14 +155,14 @@ def usersList_HTTP():
                 conn.execute(' DELETE FROM System_Users WHERE ID = ? ', [ postData['id'] ])
                 conn.commit()
                 return Response(json.dumps({'type': 'ok'}), mimetype='application/json')
-            return Response(json.dumps({'type': 'error'}), mimetype='application/json')
-
-
+            
+            
             # --- ILLEGAL ACTION ---
             else:
                 return Response(json.dumps({'type': 'error', 'reason': 'Illegal action'}), mimetype='application/json')
 
 
+            return Response(json.dumps({'type': 'error'}), mimetype='application/json')
 
 
 
