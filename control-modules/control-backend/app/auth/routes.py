@@ -361,7 +361,7 @@ def register_HTTPPOST():
         ).fetchone()
         if sqlFetchData is None:
             return jsonify({'message': 'Invalid registration code'}), 400
-        adminUserId = sqlFetchData
+        adminUserId = sqlFetchData[0]
         
 
         # Check if email already exists
