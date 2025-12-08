@@ -44,7 +44,7 @@ export default function AddEditUser({ rowData, highestRowID, setOpen, getData })
     const response = await axios.post("/api/admin/users", postData, { withCredentials: true });
 
     if (response.data.type === 'ok') {
-      toast.success(<b>Išsaugota</b>, { duration: 3000 });
+      toast.success(<b>Saved</b>, { duration: 3000 });
     } else if (response.data.type === 'error') {
       toast.error(<b>Error: {response.data.reason}</b>, { duration: 8000 });
     } else {

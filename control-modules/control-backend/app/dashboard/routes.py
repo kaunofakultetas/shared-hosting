@@ -137,7 +137,7 @@ def dashboard_recentactivity_HTTPGET():
                 WITH GetRecentActivity AS (
                     SELECT
                         System_RecentActivity.ID,
-                        System_Users.Email AS UserEmail,
+                        IFNULL(System_Users.Email, 'Deleted User') AS UserEmail,
                         System_RecentActivity.Message,
                         System_RecentActivity.Time
                     FROM System_RecentActivity
