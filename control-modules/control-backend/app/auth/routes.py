@@ -87,6 +87,8 @@ def login_HTTPPOST():
 @admin_required
 def usersList_HTTP():
     with get_db_connection() as conn:
+
+        # --- GET ---
         if request.method == "GET":
             sqlFetchData = conn.execute(f'''
                 WITH GetUserServersCount AS (
@@ -116,9 +118,13 @@ def usersList_HTTP():
                     ON GetUserServersCount.OwnerID = System_Users.ID
             ''')
             return Response(json.dumps(json.loads(sqlFetchData.fetchone()[0]), indent=4), mimetype='application/json')
+
+
+        # --- POST ---
         elif request.method == "POST":
             postData = request.get_json()
 
+            # --- INSERT/UPDATE ---
             if(postData['action'] == 'insertupdate'):
                 passwordHash = bcrypt.hashpw(postData['password'].strip().encode('utf-8'), bcrypt.gensalt(rounds=12)).decode("utf-8")
 
@@ -138,7 +144,14 @@ def usersList_HTTP():
                 return Response(json.dumps({'type': 'ok'}), mimetype='application/json')
             
 
+            # --- DELETE ---
             elif(postData['action'] == 'delete'):
+                # Check if user has any virtual servers
+                sqlFetchData = conn.execute('SELECT ID FROM Hosting_VirtualServers WHERE OwnerID = ? AND Deleted = 0', [postData['id']]).fetchone()
+                if sqlFetchData is not None:
+                    return Response(json.dumps({'type': 'error', 'reason': 'User has virtual servers'}), mimetype='application/json')
+
+                # Delete user
                 conn.execute(' DELETE FROM System_Users WHERE ID = ? ', [ postData['id'] ])
                 conn.commit()
                 return Response(json.dumps({'type': 'ok'}), mimetype='application/json')
@@ -314,18 +327,15 @@ def register_HTTPPOST():
     # Validate input
     if not postData:
         return jsonify({'message': 'No data provided'}), 400
-    
     if not postData.get('registrationCode'):
         return jsonify({'message': 'Registration code is required'}), 400
-    
     if not postData.get('email'):
         return jsonify({'message': 'Email is required'}), 400
-    
     if not postData.get('password'):
         return jsonify({'message': 'Password is required'}), 400
-    
     if len(postData.get('password')) < 6:
         return jsonify({'message': 'Password must be at least 6 characters'}), 400
+
 
     # Validate email format
     email = postData['email'].strip().lower()
@@ -333,25 +343,31 @@ def register_HTTPPOST():
         return jsonify({'message': 'Invalid email format'}), 400
 
 
-
+    # Store registration code in the variable
     registrationCode = postData['registrationCode'].strip().upper()
 
+
+
     with get_db_connection() as conn:
+
         # Check if registration code exists and is valid
-        codeData = conn.execute('SELECT ID, UserID FROM System_RegistrationCodes WHERE Code = ? AND ValidUntil > ?', 
+        sqlFetchData = conn.execute('SELECT UserID FROM System_RegistrationCodes WHERE Code = ? AND ValidUntil > ?', 
             [registrationCode, timestampNow]
         ).fetchone()
-
-        if codeData is None:
+        if sqlFetchData is None:
             return jsonify({'message': 'Invalid registration code'}), 400
+        adminUserId = sqlFetchData
         
-        codeId, adminUserId = codeData
-        
+
+        # Check if email already exists
+        sqlFetchData = conn.execute('SELECT ID FROM System_Users WHERE Email = ?', [email]).fetchone()
+        if sqlFetchData is not None:
+            return jsonify({'message': 'Email already exists'}), 400
+
 
         # Create new user (Enabled by default since they have a valid registration code)
         passwordHash = bcrypt.hashpw(postData['password'].encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
-        conn.execute(
-            'INSERT INTO System_Users (Email, Password, Admin, Enabled, LastLogin) VALUES (?, ?, ?, ?, ?)',
+        conn.execute('INSERT INTO System_Users (Email, Password, Admin, Enabled, LastLogin) VALUES (?, ?, ?, ?, ?)',
             [email, passwordHash, 0, 1, '']
         )
 

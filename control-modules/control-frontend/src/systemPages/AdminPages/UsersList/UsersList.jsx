@@ -2,11 +2,13 @@
 import Sidebar from "@/components/Admin/Sidebar/Sidebar";
 import Navbar from "@/components/Navbar/Navbar"
 import UsersListTable from "./UsersListTable/UsersListTable"
+import { Toaster } from 'react-hot-toast';
 
 const UsersListPage = ({ authdata }) => {
   return (
     <div>
       <Navbar />
+      <Toaster />
       <div style={{display: 'flex', flexDirection: 'row'}}> 
         <Sidebar authdata={authdata}/>
         <UsersListTable/>

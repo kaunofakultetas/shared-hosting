@@ -32,6 +32,9 @@ DOCKER_CONTROLLER_HOST = os.getenv('DOCKER_CONTROLLER_HOST')
 DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT')
 
 
+# LITHUANIAN CHARSET
+LITHUANIAN_CHARS = 'aąbcčdeęėfghiįyjklmnopqrsštuųūvwxyzž0123456789_ '
+
 
 
 
@@ -201,9 +204,21 @@ def vmControl_HTTPPOST():
 
         # --- CREATE ---
         if(action == 'create'):
-            # Create virtual server in the database
-            timeNow = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Validation
+            if(not 'name' in postData):
+                return jsonify({'message':'Name is required'}), 400
+            if(len(postData.get('name')) < 3):
+                return jsonify({'message':'New name must be at least 3 characters long'}), 400
+            if(len(postData.get('name')) > 30):
+                return jsonify({'message':'Name must be less than 30 characters long'}), 400
+            for character in postData.get('name'):
+                if( character.lower() not in LITHUANIAN_CHARS):
+                    return jsonify({'message':'Name can only contain letters, numbers, spaces, and hyphens'}), 400
+
+            # Virtual server name
             serverName = postData.get('name')
+
+            # Create virtual server in the database
             sqlfetchdata = conn.execute('INSERT INTO Hosting_VirtualServers (OwnerID, Name, Enabled, Deleted, CreatedAt, UpdatedAt) VALUES (?, ?, ?, ?, ?, ?)', [current_user.id, serverName, 1, 0, timeNow, timeNow])
             virtualServerID = sqlfetchdata.lastrowid
 
@@ -317,8 +332,9 @@ def vmControl_HTTPPOST():
                 return jsonify({'message':'New name must be at least 3 characters long'}), 400
             if(len(postData.get('newName')) > 30):
                 return jsonify({'message':'New name must be less than 30 characters long'}), 400
-            if(re.match(r'^[a-zA-Z0-9-_. ]+$', postData.get('newName')) is None):
-                return jsonify({'message':'New name can only contain letters, numbers, spaces, and hyphens'}), 400
+            for character in postData.get('newName'):
+                if( character.lower() not in LITHUANIAN_CHARS):
+                    return jsonify({'message':'New name can only contain letters, numbers, spaces, and hyphens'}), 400
 
             # Update database
             newName = postData.get('newName')

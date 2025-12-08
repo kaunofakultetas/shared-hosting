@@ -46,9 +46,9 @@ export default function AddEditUser({ rowData, highestRowID, setOpen, getData })
     if (response.data.type === 'ok') {
       toast.success(<b>Išsaugota</b>, { duration: 3000 });
     } else if (response.data.type === 'error') {
-      toast.error(<b>Nepavyko:<br/>{response.data.reason}</b>, { duration: 8000 });
+      toast.error(<b>Error: {response.data.reason}</b>, { duration: 8000 });
     } else {
-      toast.error(<b>Nepavyko:<br/>Neaiškus atsakymas.</b>, { duration: 8000 });
+      toast.error(<b>Error: Unknown error.</b>, { duration: 8000 });
     }
     getData();
     setOpen(false);
