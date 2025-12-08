@@ -17,6 +17,7 @@ import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import ImportContactsIcon from '@mui/icons-material/ImportContacts';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ExtensionIcon from '@mui/icons-material/Extension';
+import ApiIcon from '@mui/icons-material/Api';
 
 
 // https://www.makeuseof.com/react-create-collapsible-side-navigation-menu/
@@ -110,6 +111,13 @@ const AdminSidebar = ({ authdata }) => {
                 <li>
                   <StorageIcon className={styles.icon} />
                   {open? <span>Database</span>:<></>}
+                </li>
+              </Link>
+
+              <Link href="/swagger" style={{ textDecoration: "none" }} target="_blank">
+                <li>
+                  <ApiIcon className={styles.icon} />
+                  {open? <span>API Documentation</span>:<></>}
                 </li>
               </Link>
             </>
