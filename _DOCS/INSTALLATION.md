@@ -41,6 +41,7 @@ sudo nano /etc/docker/daemon.json
             "path": "/usr/bin/sysbox-runc"
         }
     },
+    "bip": "172.20.0.1/16",
     "default-address-pools": [
         { "base": "172.20.0.0/16", "size": 24 },
         { "base": "172.21.0.0/16", "size": 24 },
@@ -66,39 +67,80 @@ cd shared-hosting
 
 <br>
 
-### 6. Portforward Ports
-Portforward system to two external IP addreses using your router.
-For the control IP address you will need to portforward:
+### 6. Port Forwarding Configuration
+Configure port forwarding on your router to route traffic from two public IP addresses to the Docker host.
+
+**Requirement**: You need **two public IP addresses**:
+- One for the control panel (e.g., `158.129.172.221`)
+- One for user applications (e.g., `158.129.172.222`)
+
+**Control IP Port Forwarding** (e.g., 158.129.172.221 → hosting.knf.vu.lt):
+| Public Port | Server Port | Protocol | Purpose |
+|-------------|-------------|----------|---------|
+| 22 | 10022 | TCP | SSH access |
+| 80 | 80 | TCP | HTTP (redirect) |
+| 443 | 443 | TCP | HTTPS (control panel) |
+| 8443 | 8443 | TCP | HTTPS (VM management) |
+
+**User Apps IP Port Forwarding** (e.g., 158.129.172.222 → knf-hosting.lt):
+| Public Port | Server Port | Protocol | Purpose |
+|-------------|-------------|----------|---------|
+| 80 | 10080 | TCP | HTTP (user apps) |
+| 443 | 10443 | TCP | HTTPS (user apps) |
+
+Example router configuration:
 ```
-server-ip:20080 --> control-external-ip:80
-server-ip:20443 --> control-external-ip:443
+# Control IP (158.129.172.221)
+158.129.172.221:22   → {server}:10022
+158.129.172.221:80   → {server}:80
+158.129.172.221:443  → {server}:443
+158.129.172.221:8443 → {server}:8443
+
+# User Apps IP (158.129.172.222)
+158.129.172.222:80   → {server}:10080
+158.129.172.222:443  → {server}:10443
 ```
 
-And for the shared hosted users apps:
-```
-server-ip:10080 --> users-apps-external-ip:80
-server-ip:10443 --> users-apps-external-ip:443
-```
+Replace `{server}` with your Docker host's internal IP address.
 
 <br>
 
-### 7. Control Panel Domain Name
-Configure control panel domain name for the control panel (```Default is hosting.knf.vu.lt```).
-Locate your terminal to the hosting system folder and open a Caddy configuration and edit:
+### 7. DNS Configuration
+Configure DNS records for both public IP addresses.
+
+**Control Panel Domain** (e.g., `hosting.knf.vu.lt`):
+```
+hosting.knf.vu.lt    A    158.129.172.221    (Control IP)
+```
+
+**User Applications Domain** (e.g., `knf-hosting.lt`):
+```
+knf-hosting.lt       A    158.129.172.222    (User Apps IP)
+*.knf-hosting.lt     A    158.129.172.222    (Wildcard for subdomains)
+```
+
+The wildcard record (`*.knf-hosting.lt`) allows users to create subdomains like `myapp.knf-hosting.lt` without additional DNS configuration.
+
+<br>
+
+### 8. Update Caddy Configuration
+Edit the control panel domain in the Caddyfile (default is `hosting.knf.vu.lt`):
 ```bash
 nano ./control-modules/control-caddy/Caddyfile
 ```
 
-Using your domain name provider configure your domain name to point to your control-external-ip.
+Replace `hosting.knf.vu.lt` with your control panel domain name.
 
 <br>
 
-### 8. Start Shared Hosting System
+### 9. Start Shared Hosting System
 ```bash
 ./runUpdateThisStack.sh
 ```
 
 <br>
 
-### 9. Access
-Open browser and locate: https://control-external-ip
+### 10. Access
+- **Control Panel**: https://hosting.knf.vu.lt
+- **SSH Access**: `ssh server{id}@hosting.knf.vu.lt`
+- **User Apps**: https://myapp.knf-hosting.lt (after configuration)
