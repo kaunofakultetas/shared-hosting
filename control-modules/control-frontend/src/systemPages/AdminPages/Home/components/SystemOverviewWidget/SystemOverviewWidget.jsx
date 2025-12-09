@@ -43,10 +43,24 @@ const SystemOverviewWidget = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Get color based on usage percentage
+  // Get color based on usage percentage (CPU / Docker Hub)
   const getUsageColor = (percentage) => {
     if (percentage >= 80) return { color: '#dc2626', bg: '#fef2f2', ring: '#fecaca' };
     if (percentage >= 60) return { color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' };
+    return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
+  };
+
+  // Get color based on usage percentage (RAM)
+  const getUsageColorRam = (percentage) => {
+      if (percentage >= 90) return { color: '#dc2626', bg: '#fef2f2', ring: '#fecaca' };
+      if (percentage >= 80) return { color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' };
+      return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
+    };
+
+  // Get color based on usage percentage (disk)
+  const getUsageColorDisk = (percentage) => {
+    if (percentage >= 90) return { color: '#dc2626', bg: '#fef2f2', ring: '#fecaca' };
+    if (percentage >= 80) return { color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' };
     return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
   };
 
@@ -89,7 +103,7 @@ const SystemOverviewWidget = () => {
 
         {/* RAM Usage */}
         {(() => {
-          const colors = getUsageColor(stats.memory_percent);
+          const colors = getUsageColorRam(stats.memory_percent);
           return (
             <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.bg }}>
               <div className="flex justify-center mb-3">
@@ -115,7 +129,7 @@ const SystemOverviewWidget = () => {
 
         {/* Disk Usage */}
         {(() => {
-          const colors = getUsageColor(stats.disk_percent);
+          const colors = getUsageColorDisk(stats.disk_percent);
           return (
             <div className="rounded-xl p-4 text-center" style={{ backgroundColor: colors.bg }}>
               <div className="flex justify-center mb-3">
