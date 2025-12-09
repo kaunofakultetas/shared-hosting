@@ -10,14 +10,21 @@ This repository contains the setup and deployment of shared hosting platform whi
 <br>
 
 ## Screenshots
-Main screen showing running virtual servers (outer user docker containers):
-<img width="1440" alt="Screenshot 2025-04-22 at 00 29 18" src="https://github.com/user-attachments/assets/78a80a1f-383e-4ead-8018-f6a9fee00ba6" />
 
-User virtual server control panel:
-<img width="1437" alt="Screenshot 2025-04-22 at 00 31 40" src="https://github.com/user-attachments/assets/b6fcb8d5-36f4-47bb-a538-6b554b511095" />
+<br>
 
-Command line interface via WEB browser using WebSSH2:
-<img width="713" alt="Screenshot 2025-04-22 at 00 32 04" src="https://github.com/user-attachments/assets/9b5c344a-e396-4490-b31c-919160638984" />
+### Main screen showing running virtual servers (outer user docker containers):
+<img width="1440" alt="Screenshot 2025-04-22 at 00 29 18" src="_DOCS/images/installation1.png" />
+
+<br>
+
+### User virtual server control panel:
+<img width="1437" alt="Screenshot 2025-04-22 at 00 31 40" src="_DOCS/images/installation2.png" />
+
+<br>
+
+### Command line interface via WEB browser using WebSSH2:
+<img width="713" alt="Screenshot 2025-04-22 at 00 32 04" src="_DOCS/images/installation3.png" />
 
 
 <br>
