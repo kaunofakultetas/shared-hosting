@@ -7,7 +7,7 @@ import { Toaster } from 'react-hot-toast';
 const UsersListPage = ({ authdata }) => {
   return (
     <div>
-      <Navbar />
+      <Navbar authdata={authdata} />
       <Toaster />
       <div style={{display: 'flex', flexDirection: 'row'}}> 
         <Sidebar authdata={authdata}/>

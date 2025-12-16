@@ -183,7 +183,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
+        <Navbar authdata={authdata} />
         <div className="flex">
           <Sidebar authdata={authdata} />
           <div className="flex-1 flex items-center justify-center h-[calc(100vh-105px)]">
@@ -201,7 +201,7 @@ const VirtualServerPage = ({ virtualServerID, authdata }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       <Toaster position="top-center" />
-      <Navbar />
+      <Navbar authdata={authdata} />
       <div className="flex">
         <Sidebar authdata={authdata} />
 

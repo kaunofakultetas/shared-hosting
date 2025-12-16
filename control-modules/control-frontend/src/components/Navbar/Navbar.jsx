@@ -3,10 +3,9 @@ import { useRouter } from 'next/router';
 import styles from './navbar.module.scss';
 import Link from "next/link";
 import { Button, Checkbox } from '@mui/material';
+import PersonIcon from '@mui/icons-material/Person';
 
-
-
-const Navbar = () => {
+const Navbar = ({ authdata }) => {
 
   return (
     <div className={styles.navbar}>
@@ -27,6 +26,37 @@ const Navbar = () => {
         </div>
 
         <div className={styles.items}>
+          
+          {/* User Mini Widget */}
+          <div className={styles.item} style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px',
+            marginRight: '20px',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <PersonIcon style={{ color: 'white', fontSize: '24px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <span style={{ 
+                color: 'white', 
+                fontSize: '0.85em', 
+                fontWeight: '600',
+                lineHeight: '1.2'
+              }}>
+                {authdata?.email || "User"}
+              </span>
+              <span style={{ 
+                color: 'rgba(255, 255, 255, 0.7)', 
+                fontSize: '0.7em',
+                lineHeight: '1.2'
+              }}>
+                {authdata?.admin === 1 ? "Administrator" : "User"}
+              </span>
+            </div>
+          </div>
           
           <div className={styles.item}>
             {/* <DarkModeOutlinedIcon

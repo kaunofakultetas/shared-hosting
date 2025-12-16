@@ -71,7 +71,7 @@ const AccountPage = ({ authdata }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       <Toaster position="top-center" />
-      <Navbar />
+      <Navbar authdata={authdata} />
       <div className="flex">
         <Sidebar authdata={authdata} />
 

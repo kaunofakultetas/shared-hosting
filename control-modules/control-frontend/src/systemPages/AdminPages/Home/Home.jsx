@@ -63,7 +63,7 @@ const Home = ({ authdata }) => {
 
   return (
     <div>
-      <Navbar />
+      <Navbar authdata={authdata} />
       <div className="flex">
         <Sidebar authdata={authdata} />
         <Toaster />

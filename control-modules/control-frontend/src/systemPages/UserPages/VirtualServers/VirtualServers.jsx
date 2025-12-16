@@ -7,7 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 const VirtualServersPage = ({ authdata }) => {
   return (
     <div>
-      <Navbar />
+      <Navbar authdata={authdata} />
       <Toaster />
       <div style={{display: 'flex', flexDirection: 'row'}}> 
         <Sidebar authdata={authdata}/>
