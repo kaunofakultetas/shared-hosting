@@ -385,3 +385,43 @@ def register_HTTPPOST():
         conn.commit()
 
     return jsonify({'message': 'Registration successful! You can now login.'}), 201
+
+
+
+
+@auth_bp.route('/api/account/recentactivity', methods=['GET'])
+@login_required
+def account_recentactivity_HTTPGET():
+    try:
+        with get_db_connection() as conn:
+            sqlFetchData = conn.execute('''
+                WITH GetRecentActivity AS (
+                    SELECT
+                        System_RecentActivity.ID,
+                        IFNULL(System_Users.Email, 'Deleted User') AS UserEmail,
+                        System_RecentActivity.Message,
+                        System_RecentActivity.Time
+                    FROM System_RecentActivity
+                    LEFT JOIN System_Users
+                        ON System_Users.ID = System_RecentActivity.UserID
+                    WHERE System_RecentActivity.UserID = ?
+                    ORDER BY System_RecentActivity.ID DESC
+                    LIMIT 5
+                )
+
+                SELECT 
+                    json_group_array(
+                        json_object(
+                            'log_id', ID,
+                            'email', UserEmail,
+                            'message', Message,
+                            'time', Time
+                        )
+                    )
+                FROM GetRecentActivity
+            ''', [current_user.id])
+            recent_activity = sqlFetchData.fetchone()[0]
+            recent_activity = json.loads(recent_activity)
+        return jsonify(recent_activity), 200
+    except Exception as e:
+        return jsonify({'message': f'Failed to get recent activity: {str(e)}'}), 500
