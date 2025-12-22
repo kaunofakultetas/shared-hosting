@@ -406,7 +406,7 @@ def account_recentactivity_HTTPGET():
                         ON System_Users.ID = System_RecentActivity.UserID
                     WHERE System_RecentActivity.UserID = ?
                     ORDER BY System_RecentActivity.ID DESC
-                    LIMIT 5
+                    LIMIT 500
                 )
 
                 SELECT 
