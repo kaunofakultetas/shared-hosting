@@ -7,6 +7,8 @@
 
 
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 import random
 import os
 import hashlib
@@ -35,6 +37,9 @@ def create_app():
 
     ###### Flask App Initialization ######
     app = Flask(__name__)
+
+    # Trust X-Forwarded-For headers from reverse proxy
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 
     # Initialize Flask extensions

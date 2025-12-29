@@ -72,7 +72,9 @@
         forward_auth hosting-control-backend:8000 {
             uri /api/checkauth/admin
         }
-        reverse_proxy hosting-control-dbgate:3000
+        reverse_proxy hosting-control-dbgate:3000 {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
 
@@ -87,26 +89,36 @@
     redir @docs_topics /docs/books/{re.tops.1} 301
 
     handle_path /docs* {
-        reverse_proxy hosting-control-docs-web:80
+        reverse_proxy hosting-control-docs-web:80 {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
     handle /draw/* {
-        reverse_proxy hosting-control-docs-drawio:8080
+        reverse_proxy hosting-control-docs-drawio:8080 {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
     handle /swagger* {
-        reverse_proxy hosting-control-swagger:8080
+        reverse_proxy hosting-control-swagger:8080  {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
 
 
     ####### API Endpoint #######
     handle /api/* {
-        reverse_proxy hosting-control-backend:8000
+        reverse_proxy hosting-control-backend:8000 {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
 
 
     ####### Frontend Endpoint #######
-    reverse_proxy hosting-control-frontend:3000
+    reverse_proxy hosting-control-frontend:3000 {
+        header_up X-Forwarded-For {remote_host}
+    }
 }
 
 
@@ -130,7 +142,9 @@
     }
 
     # Reverse proxy to user's dind
-    reverse_proxy hosting-users-dind-{http.request.cookie.virtual-server-id}:10080
+    reverse_proxy hosting-users-dind-{http.request.cookie.virtual-server-id}:10080 {
+        header_up X-Forwarded-For {remote_host}
+    }
 
     handle_errors 404 {
         respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
