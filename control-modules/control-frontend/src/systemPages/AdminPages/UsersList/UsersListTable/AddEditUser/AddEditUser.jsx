@@ -1,11 +1,137 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 
 import { Button, Modal, ModalDialog, Stack, Typography } from "@mui/joy";
-import { TextField, Box, FormControl, Grid, MenuItem } from "@mui/material";
+import { TextField, Box, FormControl, Grid, MenuItem, CircularProgress } from "@mui/material";
 
 import CancelIcon from '@mui/icons-material/Cancel';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 import toast from 'react-hot-toast';
+
+const LONG_PRESS_DURATION = 3000;
+
+// Long Press Delete Button Component
+const LongPressDeleteButton = ({ onDelete, disabled }) => {
+  const [progress, setProgress] = useState(0);
+  const [isPressed, setIsPressed] = useState(false);
+  const animationRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const isPressedRef = useRef(false);
+
+  const animate = useCallback(() => {
+    if (!isPressedRef.current || !startTimeRef.current) return;
+
+    const elapsed = Date.now() - startTimeRef.current;
+    const newProgress = Math.min((elapsed / LONG_PRESS_DURATION) * 100, 100);
+    setProgress(newProgress);
+
+    if (elapsed >= LONG_PRESS_DURATION) {
+      setIsPressed(false);
+      isPressedRef.current = false;
+      setProgress(0);
+      onDelete();
+      return;
+    }
+
+    animationRef.current = requestAnimationFrame(animate);
+  }, [onDelete]);
+
+  const startLongPress = useCallback(
+    (e) => {
+      if (disabled) return;
+      e.stopPropagation();
+      e.preventDefault();
+
+      startTimeRef.current = Date.now();
+      isPressedRef.current = true;
+      setIsPressed(true);
+      setProgress(0);
+      animationRef.current = requestAnimationFrame(animate);
+    },
+    [disabled, animate]
+  );
+
+  const cancelLongPress = useCallback((e) => {
+    if (!isPressedRef.current) return;
+    e.stopPropagation();
+
+    const elapsed = startTimeRef.current
+      ? Date.now() - startTimeRef.current
+      : 0;
+
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
+    if (elapsed > 0 && elapsed < LONG_PRESS_DURATION) {
+      toast.error(<b>Hold for 3 seconds to delete</b>, { duration: 3000 });
+    }
+
+    isPressedRef.current = false;
+    setIsPressed(false);
+    setProgress(0);
+    startTimeRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () =>
+      animationRef.current && cancelAnimationFrame(animationRef.current);
+  }, []);
+
+  return (
+    <Button
+      disabled={disabled}
+      onMouseDown={startLongPress}
+      onMouseUp={cancelLongPress}
+      onMouseLeave={cancelLongPress}
+      onTouchStart={startLongPress}
+      onTouchEnd={cancelLongPress}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        backgroundColor: disabled ? 'grey' : 'blue',
+        color: 'white',
+        boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
+        width: '100%',
+        userSelect: 'none',
+      }}
+    >
+      {isPressed ? (
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
+          <CircularProgress
+            variant="determinate"
+            value={100}
+            size={24}
+            thickness={4}
+            sx={{ color: 'rgba(255,255,255,0.3)', position: 'absolute' }}
+          />
+          <CircularProgress
+            variant="determinate"
+            value={progress}
+            size={24}
+            thickness={4}
+            sx={{
+              color: 'white',
+              position: 'absolute',
+              transform: 'rotate(-90deg)',
+              '& .MuiCircularProgress-circle': {
+                strokeLinecap: 'round',
+                transition: 'none',
+              },
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <DeleteIcon style={{ marginRight: 8 }} />
+          Delete
+        </>
+      )}
+    </Button>
+  );
+};
 
 
 
@@ -209,23 +335,17 @@ export default function AddEditUser({ rowData, highestRowID, setOpen, getData })
                   onClick={() => handleSaveButton()}
                   disabled={disableSave}
                 >
-                  {rowData !== undefined ? 'Save' : 'Create'}
+                  {rowData !== undefined ? (
+                    <><SaveIcon style={{ marginRight: 8 }} />Save</>
+                  ) : (
+                    <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+                  )}
                 </Button>
               </Grid>
 
               {rowData !== undefined && (
                 <Grid item xs={6}>
-                  <Button
-                    style={{
-                      backgroundColor: 'blue',
-                      color: 'white',
-                      boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                      width: '100%',
-                    }}
-                    onClick={() => handleDeleteButton()}
-                  >
-                    Delete
-                  </Button>
+                  <LongPressDeleteButton onDelete={handleDeleteButton} />
                 </Grid>
               )}
 

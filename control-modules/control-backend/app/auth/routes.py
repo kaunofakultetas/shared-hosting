@@ -146,6 +146,10 @@ def usersList_HTTP():
 
             # --- DELETE ---
             elif(postData['action'] == 'delete'):
+                # Prevent user from deleting himself
+                if int(postData['id']) == current_user.id:
+                    return Response(json.dumps({'type': 'error', 'reason': 'Cannot delete yourself'}), mimetype='application/json')
+
                 # Check if user has any virtual servers
                 sqlFetchData = conn.execute('SELECT ID FROM Hosting_VirtualServers WHERE OwnerID = ? AND Deleted = 0', [postData['id']]).fetchone()
                 if sqlFetchData is not None:
