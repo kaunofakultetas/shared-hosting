@@ -64,60 +64,50 @@
 
 {$HOSTING_DOMAIN} {
     tls {$TLS_LETSENCRYPT_EMAIL:internal}
-    import geo_block_non_vu
 
-    ####### DBGate Endpoint #######
-    redir /dbgate /dbgate/ 301
-    handle /dbgate/* {
-        forward_auth hosting-control-backend:8000 {
-            uri /api/checkauth/admin
+    route {
+        import geo_block_non_vu
+
+        ####### DBGate Endpoint #######
+        handle /dbgate/* {
+            forward_auth hosting-control-backend:8000 {
+                uri /api/checkauth/admin
+            }
+            reverse_proxy hosting-control-dbgate:3000 {
+                header_up X-Forwarded-For {remote_host}
+            }
         }
-        reverse_proxy hosting-control-dbgate:3000 {
-            header_up X-Forwarded-For {remote_host}
+
+        ####### Docs Endpoint #######
+        handle_path /docs* {
+            reverse_proxy hosting-control-docs-web:80 {
+                header_up X-Forwarded-For {remote_host}
+            }
         }
-    }
-
-
-
-    ####### Docs Endpoint #######
-    redir /docs /docs/ 301
-
-    @docs_categories path_regexp cats ^/docs/categories/?(.*)$
-    redir @docs_categories /docs/shelves/{re.cats.1} 301
-
-    @docs_topics path_regexp tops ^/docs/topics/?(.*)$
-    redir @docs_topics /docs/books/{re.tops.1} 301
-
-    handle_path /docs* {
-        reverse_proxy hosting-control-docs-web:80 {
-            header_up X-Forwarded-For {remote_host}
+        handle /draw/* {
+            reverse_proxy hosting-control-docs-drawio:8080 {
+                header_up X-Forwarded-For {remote_host}
+            }
         }
-    }
-    handle /draw/* {
-        reverse_proxy hosting-control-docs-drawio:8080 {
-            header_up X-Forwarded-For {remote_host}
+        handle /swagger* {
+            reverse_proxy hosting-control-swagger:8080 {
+                header_up X-Forwarded-For {remote_host}
+            }
         }
-    }
-    handle /swagger* {
-        reverse_proxy hosting-control-swagger:8080  {
-            header_up X-Forwarded-For {remote_host}
+
+        ####### API Endpoint #######
+        handle /api/* {
+            reverse_proxy hosting-control-backend:8000 {
+                header_up X-Forwarded-For {remote_host}
+            }
         }
-    }
 
-
-
-    ####### API Endpoint #######
-    handle /api/* {
-        reverse_proxy hosting-control-backend:8000 {
-            header_up X-Forwarded-For {remote_host}
+        ####### Frontend Endpoint #######
+        handle {
+            reverse_proxy hosting-control-frontend:3000 {
+                header_up X-Forwarded-For {remote_host}
+            }
         }
-    }
-
-
-
-    ####### Frontend Endpoint #######
-    reverse_proxy hosting-control-frontend:3000 {
-        header_up X-Forwarded-For {remote_host}
     }
 }
 
@@ -125,25 +115,28 @@
 
 {$HOSTING_DOMAIN}:8443 {
     tls {$TLS_LETSENCRYPT_EMAIL:internal}
-    import geo_block_non_vu
 
-    # Disable caching
-    header {
-        Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
-        Pragma "no-cache"
-    }
+    route {
+        import geo_block_non_vu
 
-    # Check if user is authenticated
-    forward_auth hosting-control-backend:8000 {
-        uri /api/checkauth/vm/{http.request.cookie.virtual-server-id}
-        # Strip WebSocket headers from the auth request to prevent backend confusion
-        header_up -Connection
-        header_up -Upgrade
-    }
+        # Disable caching
+        header {
+            Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+            Pragma "no-cache"
+        }
 
-    # Reverse proxy to user's dind
-    reverse_proxy hosting-users-dind-{http.request.cookie.virtual-server-id}:10080 {
-        header_up X-Forwarded-For {remote_host}
+        # Check if user is authenticated
+        forward_auth hosting-control-backend:8000 {
+            uri /api/checkauth/vm/{http.request.cookie.virtual-server-id}
+            # Strip WebSocket headers from the auth request to prevent backend confusion
+            header_up -Connection
+            header_up -Upgrade
+        }
+
+        # Reverse proxy to user's dind
+        reverse_proxy hosting-users-dind-{http.request.cookie.virtual-server-id}:10080 {
+            header_up X-Forwarded-For {remote_host}
+        }
     }
 
     handle_errors 404 {
@@ -154,7 +147,5 @@
     handle_errors {
         respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
     }
-
 }
-
 
