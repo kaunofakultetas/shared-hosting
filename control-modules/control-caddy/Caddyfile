@@ -139,10 +139,6 @@
         }
     }
 
-    handle_errors 404 {
-        respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500
-    }
-
     # Handle errors
     handle_errors {
         respond "Virtualaus serverio valdymo skydo pasiekti nepavyko." 500

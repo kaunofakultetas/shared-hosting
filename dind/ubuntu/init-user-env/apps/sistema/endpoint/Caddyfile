@@ -30,39 +30,37 @@
 
 
 :80 {
-    # Block non system IPs
-    handle {
+    route {
+        # Block non system IPs
         import block_non_system
-    }
 
-
-
-
-    # Disable caching
-    header {
-        Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
-        Pragma "no-cache"
-    }
-
-    # Docker Socket API
-    handle_path /dockersocket/* {
-        reverse_proxy unix//var/run/docker.sock
-    }
-    
-    # Filebrowser
-    handle /filebrowser* {
-        reverse_proxy sistema-filebrowser:80
-    }
-
-    # WebSSH2
-    handle /ssh/* {
-        reverse_proxy sistema-webssh2:2222 {
-            header_up Authorization "Basic cm9vdDpyb290"
+        
+        # Disable caching
+        header {
+            Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+            Pragma "no-cache"
         }
-    }
 
-    # Dockge (default)
-    handle {
-        reverse_proxy sistema-dockge:5001
+        # Docker Socket API
+        handle_path /dockersocket/* {
+            reverse_proxy unix//var/run/docker.sock
+        }
+        
+        # Filebrowser
+        handle /filebrowser* {
+            reverse_proxy sistema-filebrowser:80
+        }
+
+        # WebSSH2
+        handle /ssh/* {
+            reverse_proxy sistema-webssh2:2222 {
+                header_up Authorization "Basic cm9vdDpyb290"
+            }
+        }
+
+        # Dockge (default)
+        handle {
+            reverse_proxy sistema-dockge:5001
+        }
     }
 }
