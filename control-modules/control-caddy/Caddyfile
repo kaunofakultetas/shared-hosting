@@ -69,6 +69,7 @@
         import geo_block_non_vu
 
         ####### DBGate Endpoint #######
+        redir /dbgate /dbgate/
         handle /dbgate/* {
             forward_auth hosting-control-backend:8000 {
                 uri /api/checkauth/admin
