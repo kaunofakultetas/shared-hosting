@@ -33,7 +33,7 @@ DOCKER_CONTROLLER_PORT = os.getenv('DOCKER_CONTROLLER_PORT')
 
 
 # LITHUANIAN CHARSET
-LITHUANIAN_CHARS = 'aąbcčdeęėfghiįyjklmnopqrsštuųūvwxyzž0123456789_ '
+LITHUANIAN_CHARS = 'aąbcčdeęėfghiįyjklmnopqrsštuųūvwxyzž0123456789_() '
 
 
 
