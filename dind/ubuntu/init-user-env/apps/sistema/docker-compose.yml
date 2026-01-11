@@ -43,7 +43,7 @@ services:
 
   sistema-webssh2:
     container_name: sistema-webssh2
-    image: billchurch/webssh2:2.3.5
+    image: billchurch/webssh2:3.0.0
     networks:
       - external
     restart: unless-stopped
