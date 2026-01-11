@@ -32,10 +32,7 @@ services:
 
   sistema-filebrowser:
     container_name: sistema-filebrowser
-    image: sistema-filebrowser
-    build:
-      context: ./filebrowser
-      dockerfile: Dockerfile
+    image: vuknf/filebrowser-unauth:20260111
     read_only: false
     volumes:
       - /apps/aplikacijos:/data
