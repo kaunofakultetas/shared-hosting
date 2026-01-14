@@ -32,7 +32,7 @@ services:
 
   sistema-filebrowser:
     container_name: sistema-filebrowser
-    image: vuknf/filebrowser-unauth:20260111
+    image: vuknf/filebrowser-noauth:20260114
     read_only: false
     volumes:
       - /apps/aplikacijos:/data

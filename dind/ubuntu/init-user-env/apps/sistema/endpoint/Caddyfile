@@ -47,7 +47,8 @@
         }
         
         # Filebrowser
-        handle /filebrowser* {
+        redir /filebrowser /filebrowser/
+        handle /filebrowser/* {
             reverse_proxy sistema-filebrowser:80
         }
 
