@@ -130,7 +130,7 @@ services:
   # Exit container for Docker Hub API access (L4 SNI proxy)
   hosting-control-backend-exit:
     container_name: hosting-control-backend-exit
-    image: vuknf/hosting-control-backend-exit:latest
+    image: vuknf/caddy-l4:2.10
     user: 1000:1000
     runtime: sysbox-runc
     read_only: true
