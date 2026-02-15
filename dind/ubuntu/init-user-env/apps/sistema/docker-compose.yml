@@ -2,7 +2,7 @@ services:
 
   sistema-endpoint:
     container_name: sistema-endpoint
-    image: caddy:2.10-alpine
+    image: caddy:2.11-alpine
     read_only: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -44,7 +44,7 @@ services:
 
   sistema-webssh2:
     container_name: sistema-webssh2
-    image: billchurch/webssh2:3.0.0
+    image: billchurch/webssh2:4.0.1
     networks:
       - external
     restart: unless-stopped
