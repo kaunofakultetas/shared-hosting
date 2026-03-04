@@ -37,3 +37,8 @@ Virtualization structure is as follows:
 
 ## Installation
 Follow instructions here: [Installation Guide](https://github.com/kaunofakultetas/shared-hosting/blob/main/INSTALLATION.md) 
+
+<br>
+
+## Thesis
+The bachelor's thesis documenting this project in lithuanian is available [Here](_DOCS/thesis/TomasVanagas_BakalauroDarbas.pdf).
