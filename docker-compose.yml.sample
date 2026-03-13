@@ -6,7 +6,7 @@ services:
   # Endpoint of the system control panel
   hosting-control-caddy:
     container_name: hosting-control-caddy
-    image: caddy:2.10-alpine
+    image: caddy:2.11-alpine
     user: 1000:1000
     runtime: sysbox-runc
     read_only: true
@@ -34,7 +34,7 @@ services:
   # Users servers hosted apps WEB traffic endpoint
   hosting-users-caddy:
     container_name: hosting-users-caddy
-    image: caddy:2.10-alpine
+    image: caddy:2.11-alpine
     user: 1000:1000
     runtime: sysbox-runc
     read_only: true
@@ -130,7 +130,7 @@ services:
   # Exit container for Docker Hub API access (L4 SNI proxy)
   hosting-control-backend-exit:
     container_name: hosting-control-backend-exit
-    image: vuknf/caddy-l4:2.10
+    image: vuknf/caddy-l4:2.11
     user: 1000:1000
     runtime: sysbox-runc
     read_only: true
@@ -190,7 +190,7 @@ services:
 
   hosting-control-dockersocket:
     container_name: hosting-control-dockersocket
-    image: caddy:2.10-alpine
+    image: caddy:2.11-alpine
     user: 1000:1000
     runtime: sysbox-runc
     read_only: true
