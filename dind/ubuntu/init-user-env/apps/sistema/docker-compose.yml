@@ -18,7 +18,7 @@ services:
   sistema-dockge:
     container_name: sistema-dockge
     # image: louislam/dockge:1.5.0          # Original
-    image: vuknf/dockge-optimized:v1.5.0  # Optimized
+    image: vuknf/dockge-optimized:1.5.0   # Optimized
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./dockge/data:/app/data
