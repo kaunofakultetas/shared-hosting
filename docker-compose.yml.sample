@@ -206,7 +206,7 @@ services:
   # Database Browser
   hosting-control-dbgate:
     container_name: hosting-control-dbgate
-    image: dbgate/dbgate@sha256:909d27d1ed5bf4141de61a0c61017e0f8e0a26f320358fd37731967b7894603b
+    image: dbgate/dbgate:7.1.4
     environment:
       WEB_ROOT: /dbgate
 
