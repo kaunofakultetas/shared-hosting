@@ -13,6 +13,8 @@ services:
     environment:
       - HOSTING_DOMAIN=hosting.knf.vu.lt
       - TLS_LETSENCRYPT_EMAIL=internal # Self-Signed
+
+      - DBGATE_AUTH_HEADER=${DBGATE_AUTH_HEADER}
     volumes:
       - ./control-modules/control-caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./_DATA/control-caddy/caddy_data:/data
@@ -44,8 +46,6 @@ services:
       - ./_DATA/users-caddy/caddy_config:/config
       - ./_DATA/users-caddy/caddy_logs:/var/log/caddy
       - ./_DATA/users-caddy/certs:/config/certs:ro
-    depends_on:
-      - hosting-users-firewall
     ports:
       - 10080:80
       - 10443:443
@@ -209,6 +209,10 @@ services:
     image: dbgate/dbgate:7.1.4
     environment:
       WEB_ROOT: /dbgate
+
+      BASIC_AUTH: 1
+      LOGIN: dbgate
+      PASSWORD: ${DBGATE_PASSWORD}
 
       CONNECTIONS: con1
       LABEL_con1: App Hosting Platform - SQLite

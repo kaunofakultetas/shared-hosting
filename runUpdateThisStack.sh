@@ -92,6 +92,24 @@ fi
 
 
 
+############################# DBGATE BASIC AUTH AUTOSETUP ################################
+# Only generate if DBGATE_PASSWORD doesn't exist in .env
+if [ ! -f .env ] || ! grep -q "^DBGATE_PASSWORD=" .env; then
+    echo "Generating DBGATE credentials..."
+    DBGATE_PASSWORD="$(openssl rand -hex 32)"
+    DBGATE_AUTH_HEADER="$(echo -n "dbgate:$DBGATE_PASSWORD" | base64 -w 0)"
+
+    # Only add newline if file doesn't end with one
+    [ -f .env ] && [ -n "$(tail -c1 .env 2>/dev/null)" ] && echo "" >> .env
+    echo "DBGATE_PASSWORD=$DBGATE_PASSWORD" >> .env
+    echo "DBGATE_AUTH_HEADER=$DBGATE_AUTH_HEADER" >> .env
+    echo "DBGATE credentials added to .env"
+fi
+#########################################################################################
+
+
+
+
 # Create network and start containers
 sudo docker network create --subnet=172.18.0.0/24 external
 sudo docker-compose down
