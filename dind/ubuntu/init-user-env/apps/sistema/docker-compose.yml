@@ -33,7 +33,7 @@ services:
 
   sistema-filebrowser:
     container_name: sistema-filebrowser
-    image: vuknf/filebrowser-noauth:v2.61.1
+    image: vuknf/filebrowser-noauth:v2.62.2
     read_only: false
     user: root
     volumes:
