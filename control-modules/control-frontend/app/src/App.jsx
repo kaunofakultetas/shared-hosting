@@ -2,10 +2,11 @@
 //  [*] App — the root layout route
 //
 //  Every page in router.jsx renders through its outlet,
-//  wrapped in the style/theme stack and the AuthProvider (one
-//  /api/checkauth query per full page load — AuthGuard.jsx).
-//  The Navbar/Sidebar/Footer frame lives one level deeper, in
-//  AppShell.jsx, so it mounts once and survives navigation.
+//  wrapped in the i18n/theme providers (providers.jsx) and
+//  the AuthProvider (one /api/checkauth query per full page
+//  load — AuthGuard.jsx). The Navbar/Sidebar/Footer frame
+//  lives one level deeper, in AppShell.jsx, so it mounts once
+//  and survives navigation.
 //
 //  StyledEngineProvider injectFirst puts the MUI (emotion)
 //  styles BEFORE the Tailwind stylesheet in <head>, so
@@ -15,15 +16,15 @@
 //  Special case:
 //    - /login renders the bare outlet: no theme (the page
 //      styles itself with hardcoded colors — the --mui-*
-//      variables don't exist there) and no auth check — a
-//      failed check hard-redirects to /login, so running it
-//      there would loop
+//      variables don't exist there), no i18n (its strings
+//      stay hardcoded English, the default locale) and no
+//      auth check — a failed check hard-redirects to /login,
+//      so running it there would loop
 // -----------------------------------------------------------
 
 import { useLocation, useOutlet } from 'react-router-dom';
-import { ThemeProvider, StyledEngineProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import theme from '@/theme';
+import { StyledEngineProvider } from '@mui/material/styles';
+import Providers from '@/providers';
 import { AuthProvider } from '@/AuthGuard';
 
 
@@ -52,12 +53,11 @@ export default function App() {
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <Providers>
         <AuthProvider>
           {outlet}
         </AuthProvider>
-      </ThemeProvider>
+      </Providers>
     </StyledEngineProvider>
   );
 }

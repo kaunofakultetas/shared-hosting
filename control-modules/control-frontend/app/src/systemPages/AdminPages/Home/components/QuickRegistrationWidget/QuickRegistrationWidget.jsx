@@ -28,6 +28,7 @@ import axios from "axios";
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import toast from 'react-hot-toast';
 
+import { useTranslations } from "@/i18n";
 import { UniversalModal } from "@/components/UniversalModal";
 
 
@@ -49,11 +50,14 @@ import { UniversalModal } from "@/components/UniversalModal";
 //   - QuickRegistrationWidget (below)
 // -----------------------------------------------------------
 
-function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
+function CodeShareModal({ open, onClose, code, remainingTime, copyCode, sourceRect }) {
+  const t = useTranslations("PAGES.home");
+
   return (
     <UniversalModal
       open={open}
       onClose={onClose}
+      sourceRect={sourceRect}
       maxWidth={600}
       fullWidth
       showCloseButton={false}
@@ -62,8 +66,8 @@ function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
       sx={{ backgroundColor: '#1a1a2e', borderRadius: '16px', textAlign: 'center' }}
       contentSx={{ px: '40px', pb: '40px' }}
     >
-      <h2 className="text-white text-xl font-medium mb-2">Quick Registration Code</h2>
-      <p className="text-gray-400 text-sm mb-6">Share this code with students to register</p>
+      <h2 className="text-white text-xl font-medium mb-2">{t("QUICK_REGISTRATION.MODAL.title")}</h2>
+      <p className="text-gray-400 text-sm mb-6">{t("QUICK_REGISTRATION.MODAL.subtitle")}</p>
 
       <div
         className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-mono font-bold py-6 px-8 rounded-2xl mb-6 tracking-[0.3em] select-all cursor-pointer hover:scale-105 transition-transform"
@@ -76,7 +80,7 @@ function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
       <div className="flex items-center justify-center gap-2 text-orange-400 mb-6">
         <span className="text-lg">⏱</span>
         <span className="font-mono text-xl">{remainingTime}</span>
-        <span className="text-gray-400 text-sm">remaining</span>
+        <span className="text-gray-400 text-sm">{t("QUICK_REGISTRATION.MODAL.remaining")}</span>
       </div>
 
       <div className="flex gap-3 justify-center">
@@ -90,7 +94,7 @@ function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
             '&:hover': { backgroundColor: '#4f46e5' },
           }}
         >
-          Copy Code
+          {t("QUICK_REGISTRATION.MODAL.copy")}
         </Button>
         <Button
           variant="outlined"
@@ -102,7 +106,7 @@ function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
             '&:hover': { backgroundColor: '#374151', borderColor: '#6b7280' },
           }}
         >
-          Close
+          {t("QUICK_REGISTRATION.MODAL.close")}
         </Button>
       </div>
     </UniversalModal>
@@ -125,12 +129,15 @@ function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
 
 export default function QuickRegistrationWidget() {
 
+  const t = useTranslations("PAGES.home");
+
   const [isLoading, setIsLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [code, setCode] = useState('');
   const [expiry, setExpiry] = useState(null);
   const [remainingTime, setRemainingTime] = useState('');
   const [showCodeModal, setShowCodeModal] = useState(false);
+  const [modalSourceRect, setModalSourceRect] = useState(null);
 
 
   // Pick an existing unexpired code back up on mount (404
@@ -170,7 +177,7 @@ export default function QuickRegistrationWidget() {
         setEnabled(true);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create registration code');
+      toast.error(error.response?.data?.message || t("QUICK_REGISTRATION.create_failed"));
     }
   };
 
@@ -185,7 +192,7 @@ export default function QuickRegistrationWidget() {
         setRemainingTime('');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to delete registration code');
+      toast.error(error.response?.data?.message || t("QUICK_REGISTRATION.delete_failed"));
     }
   };
 
@@ -202,7 +209,7 @@ export default function QuickRegistrationWidget() {
       if (diff <= 0) {
         clearInterval(interval);
         await handleTurnOff();
-        toast('Quick Registration expired', { icon: '⏰' });
+        toast(t("QUICK_REGISTRATION.expired"), { icon: '⏰' });
         return;
       }
 
@@ -217,27 +224,31 @@ export default function QuickRegistrationWidget() {
 
   const copyCode = () => {
     navigator.clipboard.writeText(code);
-    toast.success('Code copied to clipboard!');
+    toast.success(t("QUICK_REGISTRATION.MODAL.copied"));
   };
 
 
   return (
     <>
       <div className="flex justify-between bg-white p-2.5 shadow-card rounded-[15px] h-[100px]">
-        {/* Left: label + the code (or OFF) */}
+        {/* Left: label + the code (or OFF); the share modal
+            flies out of the code chip */}
         <div className="flex flex-col justify-between">
-          <span className="font-bold text-sm text-gray-400">Quick Registration</span>
+          <span className="font-bold text-sm text-gray-400">{t("QUICK_REGISTRATION.title")}</span>
           {isLoading ? (
             <span className="text-3xl font-light text-gray-300">—</span>
           ) : enabled ? (
             <button
-              onClick={() => setShowCodeModal(true)}
+              onClick={(event) => {
+                setModalSourceRect(event.currentTarget.getBoundingClientRect());
+                setShowCodeModal(true);
+              }}
               className="bg-purple-100 text-purple-700 font-mono font-bold text-xl py-1 px-2 rounded tracking-widest hover:bg-purple-200 transition-colors cursor-pointer border-none"
             >
               {code}
             </button>
           ) : (
-            <span className="text-3xl font-light text-gray-400">OFF</span>
+            <span className="text-3xl font-light text-gray-400">{t("QUICK_REGISTRATION.off")}</span>
           )}
         </div>
 
@@ -252,7 +263,7 @@ export default function QuickRegistrationWidget() {
                 onClick={handleTurnOff}
                 className="bg-red-500 hover:bg-red-600 text-white text-xs font-medium py-1.5 w-20 rounded transition-colors cursor-pointer border-none"
               >
-                Turn OFF
+                {t("QUICK_REGISTRATION.turn_off")}
               </button>
             </>
           ) : (
@@ -262,7 +273,7 @@ export default function QuickRegistrationWidget() {
                 onClick={handleTurnOn}
                 className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-1.5 w-20 rounded transition-colors cursor-pointer border-none"
               >
-                Turn ON
+                {t("QUICK_REGISTRATION.turn_on")}
               </button>
             </>
           )}
@@ -275,6 +286,7 @@ export default function QuickRegistrationWidget() {
         code={code}
         remainingTime={remainingTime}
         copyCode={copyCode}
+        sourceRect={modalSourceRect}
       />
     </>
   );

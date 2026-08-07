@@ -1,0 +1,9 @@
+{
+  "justNow": "ką tik",
+  "minAgo": "prieš {n} min.",
+  "minsAgo": "prieš {n} min.",
+  "hourAgo": "prieš {n} val.",
+  "hoursAgo": "prieš {n} val.",
+  "dayAgo": "prieš {n} d.",
+  "daysAgo": "prieš {n} d."
+}

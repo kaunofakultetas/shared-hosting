@@ -1,0 +1,48 @@
+{
+  "HEADER": {
+    "title": "Virtual Servers",
+    "count_one": "{n} server total",
+    "count_many": "{n} servers total",
+    "filtered_one": "{shown} of {total} server",
+    "filtered_many": "{shown} of {total} servers",
+    "show_other_users": "Show other users",
+    "search_placeholder": "Search VMs...",
+    "new_server": "New Server"
+  },
+  "EMPTY": {
+    "none_title": "No virtual servers found",
+    "none_subtitle": "Create your first server to get started",
+    "no_match_title": "No matches found",
+    "no_match_subtitle": "Try a different search term"
+  },
+  "CARD": {
+    "running": "Running",
+    "stopped": "Stopped",
+    "stop_server": "Stop Server",
+    "start_server": "Start Server",
+    "stop_first": "Stop server first",
+    "hold_to_delete": "Hold to delete",
+    "unnamed": "Unnamed Server",
+    "domain_names": "Domain Names",
+    "open_new_tab": "Open in new tab",
+    "docker_containers": "Docker Containers",
+    "hold_toast": "Hold for 3 seconds to delete"
+  },
+  "TOASTS": {
+    "stopping": "Stopping server: #{id}",
+    "starting": "Starting server: #{id}",
+    "deleting": "Deleting server: #{id}"
+  },
+  "ADD_MODAL": {
+    "title": "New Virtual Server",
+    "name": "Virtual Server Name",
+    "image": "Virtual Server Image",
+    "creating": "Creating...",
+    "create": "Create",
+    "save": "Save",
+    "delete": "Delete VM",
+    "hold_to_delete": "Hold for 3 seconds to delete",
+    "created": "Server is being created. Please wait 1 minute...",
+    "failed": "Failed to create server. Please try again."
+  }
+}

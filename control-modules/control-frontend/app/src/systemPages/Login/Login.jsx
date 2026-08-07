@@ -14,8 +14,10 @@
 //  login the page hard-navigates to "/" and HomeRedirect
 //  sends the user to their home by role.
 //
-//  This page renders bare — App skips the auth provider on
-//  /login, a failed check would hard-redirect here and loop.
+//  This page renders bare — App skips every provider on
+//  /login (a failed auth check would hard-redirect here and
+//  loop), so no i18n either: the strings stay hardcoded
+//  English, the app's default locale.
 //
 //  Split into (root component last):
 //

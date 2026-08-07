@@ -36,6 +36,7 @@ import axios from "axios";
 
 import { Button, Stack, TextField, MenuItem } from "@mui/material";
 
+import { useTranslations } from "@/i18n";
 import { UniversalModal } from "@/components/UniversalModal";
 import { LongPressDeleteButton } from "@/components/LongPressButton";
 
@@ -62,7 +63,7 @@ import toast from 'react-hot-toast';
 //   - AddEditUser (below) — the modal's `actions` slot
 // -----------------------------------------------------------
 
-function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
+function ModalActions({ isEditing, disableSave, onSave, onDelete, t }) {
   return (
     <div style={{ display: 'flex', gap: '8px' }}>
       <Button
@@ -74,9 +75,9 @@ function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
         disabled={disableSave}
       >
         {isEditing ? (
-          <><SaveIcon style={{ marginRight: 8 }} />Save</>
+          <><SaveIcon style={{ marginRight: 8 }} />{t("EDIT_MODAL.save")}</>
         ) : (
-          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />{t("EDIT_MODAL.create")}</>
         )}
       </Button>
 
@@ -85,10 +86,10 @@ function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
           fullWidth
           sx={{ flex: 1 }}
           onComplete={onDelete}
-          uncompletedToastMessage="Hold for 3 seconds to delete"
+          uncompletedToastMessage={t("EDIT_MODAL.hold_to_delete")}
         >
           <DeleteIcon sx={{ mr: 1 }} />
-          Delete
+          {t("EDIT_MODAL.delete")}
         </LongPressDeleteButton>
       }
     </div>
@@ -114,20 +115,20 @@ function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
 //   - AddEditUser (below) — the modal's children
 // -----------------------------------------------------------
 
-function FormFields({ form, updateField, isEditing, changePassword, setChangePassword, passwordsMatch }) {
+function FormFields({ form, updateField, isEditing, changePassword, setChangePassword, passwordsMatch, t }) {
   return (
     <Stack spacing={3}>
 
-      <TextField required fullWidth type="email" label="Email" value={form.email} onChange={updateField('email')} />
+      <TextField required fullWidth type="email" label={t("EDIT_MODAL.email")} value={form.email} onChange={updateField('email')} />
 
-      <TextField select fullWidth label="Admin?" value={form.admin} onChange={updateField('admin')}>
-        <MenuItem value={1}>Yes</MenuItem>
-        <MenuItem value={0}>No</MenuItem>
+      <TextField select fullWidth label={t("EDIT_MODAL.admin")} value={form.admin} onChange={updateField('admin')}>
+        <MenuItem value={1}>{t("EDIT_MODAL.yes")}</MenuItem>
+        <MenuItem value={0}>{t("EDIT_MODAL.no")}</MenuItem>
       </TextField>
 
-      <TextField select fullWidth label="Enabled?" value={form.enabled} onChange={updateField('enabled')}>
-        <MenuItem value={1}>Yes</MenuItem>
-        <MenuItem value={0}>No</MenuItem>
+      <TextField select fullWidth label={t("EDIT_MODAL.enabled")} value={form.enabled} onChange={updateField('enabled')}>
+        <MenuItem value={1}>{t("EDIT_MODAL.yes")}</MenuItem>
+        <MenuItem value={0}>{t("EDIT_MODAL.no")}</MenuItem>
       </TextField>
 
       {isEditing && !changePassword && (
@@ -137,7 +138,7 @@ function FormFields({ form, updateField, isEditing, changePassword, setChangePas
           sx={{ color: 'black', borderColor: 'black' }}
           onClick={() => setChangePassword(true)}
         >
-          Change Password
+          {t("EDIT_MODAL.change_password")}
         </Button>
       )}
 
@@ -147,7 +148,7 @@ function FormFields({ form, updateField, isEditing, changePassword, setChangePas
             required
             fullWidth
             type="password"
-            label="Password"
+            label={t("EDIT_MODAL.password")}
             value={form.password}
             onChange={updateField('password')}
           />
@@ -155,10 +156,10 @@ function FormFields({ form, updateField, isEditing, changePassword, setChangePas
             required
             fullWidth
             type="password"
-            label="Repeat Password"
+            label={t("EDIT_MODAL.confirm_password")}
             value={form.confirmPassword}
             error={!passwordsMatch && form.confirmPassword !== ''}
-            helperText={!passwordsMatch && form.confirmPassword !== '' ? 'Passwords do not match' : ''}
+            helperText={!passwordsMatch && form.confirmPassword !== '' ? t("EDIT_MODAL.mismatch") : ''}
             onChange={updateField('confirmPassword')}
           />
         </>
@@ -188,7 +189,9 @@ function FormFields({ form, updateField, isEditing, changePassword, setChangePas
 //     (create)
 // -----------------------------------------------------------
 
-export default function AddEditUser({ rowData, setOpen, getData }) {
+export default function AddEditUser({ rowData, setOpen, getData, sourceRect }) {
+
+  const t = useTranslations("PAGES.usersList");
 
   // Animated close — the modal flies back before the parent
   // unmounts it (see UniversalModal's closeRef)
@@ -217,11 +220,11 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
     const response = await axios.post("/api/admin/users", postData, { withCredentials: true });
 
     if (response.data.type === 'ok') {
-      toast.success(<b>Saved</b>, { duration: 3000 });
+      toast.success(<b>{t("EDIT_MODAL.TOASTS.saved")}</b>, { duration: 3000 });
     } else if (response.data.type === 'error') {
-      toast.error(<b>Error: {response.data.reason}</b>, { duration: 8000 });
+      toast.error(<b>{t("EDIT_MODAL.TOASTS.error", { reason: response.data.reason })}</b>, { duration: 8000 });
     } else {
-      toast.error(<b>Error: Unknown error.</b>, { duration: 8000 });
+      toast.error(<b>{t("EDIT_MODAL.TOASTS.unknown")}</b>, { duration: 8000 });
     }
     getData();
     modalCloseRef.current?.();
@@ -258,7 +261,8 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
       open={true}
       onClose={() => setOpen(false)}
       closeRef={modalCloseRef}
-      title="User"
+      title={t("EDIT_MODAL.title")}
+      sourceRect={sourceRect}
       maxWidth={500}
       fullWidth
       showCancel={false}
@@ -269,6 +273,7 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
           disableSave={disableSave}
           onSave={handleSaveButton}
           onDelete={handleDeleteButton}
+          t={t}
         />
       }
     >
@@ -279,6 +284,7 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
         changePassword={changePassword}
         setChangePassword={setChangePassword}
         passwordsMatch={passwordsMatch}
+        t={t}
       />
     </UniversalModal>
   );

@@ -1,0 +1,67 @@
+{
+  "HEADER": {
+    "back": "Back to Virtual Servers",
+    "running": "Running",
+    "stopped": "Stopped",
+    "unnamed": "Unnamed Server",
+    "rename": "Rename server",
+    "save": "Save",
+    "cancel": "Cancel",
+    "stop_server": "Stop Server",
+    "start_server": "Start Server",
+    "docker_containers": "Docker Containers"
+  },
+  "TOASTS": {
+    "stopping": "Stopping server...",
+    "starting": "Starting server...",
+    "operation_failed": "Operation failed",
+    "renamed": "Server renamed successfully",
+    "rename_failed": "Failed to rename server",
+    "name_empty": "Name cannot be empty"
+  },
+  "TABS": {
+    "controls": "Controls",
+    "domains": "Domain Names"
+  },
+  "CONTROLS": {
+    "intro": "Manage your virtual server with these tools:",
+    "dockge_desc": "Manage Docker containers and stacks visually",
+    "filebrowser": "File Browser",
+    "filebrowser_desc": "Browse and manage files on your server",
+    "ssh": "SSH Terminal",
+    "ssh_desc": "Access command-line interface remotely",
+    "vscode_desc": "Code using Visual Studio Code program on your computer"
+  },
+  "DOMAINS_TABLE": {
+    "id": "ID",
+    "domainname": "Domain name",
+    "cloudflare": "Is Cloudflare?",
+    "ssl": "Is SSL?",
+    "yes": "Yes",
+    "no": "No",
+    "insert_new": "Insert New"
+  },
+  "DOMAIN_MODAL": {
+    "title": "Domain Name",
+    "use_faculty": "Use faculty supplied domain name",
+    "subdomain": "Subdomain",
+    "domain": "Domain",
+    "domain_name": "Domain name",
+    "protocol": "HTTP or HTTPS ?",
+    "https": "HTTPS",
+    "http": "HTTP",
+    "show_advanced": "Show advanced options",
+    "hide_advanced": "Hide advanced options",
+    "cloudflare": "Cloudflare?",
+    "yes": "Yes",
+    "no": "No",
+    "save": "Save",
+    "create": "Create",
+    "delete": "Delete",
+    "hold_to_delete": "Hold for 3 seconds to delete",
+    "created": "Domain created",
+    "updated": "Domain updated",
+    "deleted": "Domain deleted",
+    "error": "Error: {message}"
+  }
+}

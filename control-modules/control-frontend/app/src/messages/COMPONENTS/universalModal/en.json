@@ -1,0 +1,21 @@
+{
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "CONFIRM_MODAL": {
+    "title": "Confirm Action",
+    "confirm": "Confirm"
+  },
+  "DELETE_MODAL": {
+    "title": "Delete",
+    "description": "Are you sure you want to delete? This action is irreversible.",
+    "confirm": "Delete"
+  },
+  "ALERT_MODAL": {
+    "title": "Information",
+    "confirm": "OK"
+  },
+  "WARNING_MODAL": {
+    "title": "Warning",
+    "confirm": "Understood"
+  }
+}

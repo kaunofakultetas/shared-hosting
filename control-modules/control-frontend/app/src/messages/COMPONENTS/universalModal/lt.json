@@ -1,0 +1,21 @@
+{
+  "confirm": "Patvirtinti",
+  "cancel": "Atšaukti",
+  "CONFIRM_MODAL": {
+    "title": "Patvirtinti veiksmą",
+    "confirm": "Patvirtinti"
+  },
+  "DELETE_MODAL": {
+    "title": "Ištrinti",
+    "description": "Ar tikrai norite ištrinti? Šis veiksmas negrįžtamas.",
+    "confirm": "Ištrinti"
+  },
+  "ALERT_MODAL": {
+    "title": "Informacija",
+    "confirm": "Gerai"
+  },
+  "WARNING_MODAL": {
+    "title": "Įspėjimas",
+    "confirm": "Supratau"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "HEADER": {
+    "title": "Naudotojų sąrašas",
+    "search_placeholder": "Ieškoti...",
+    "insert_new": "Pridėti naują"
+  },
+  "COLUMNS": {
+    "id": "ID",
+    "email": "El. paštas",
+    "servers": "Serveriai",
+    "admin": "Administratorius?",
+    "enabled": "Įjungtas?",
+    "lastseen": "Paskutinį kartą matytas"
+  },
+  "PILLS": {
+    "yes": "Taip",
+    "no": "Ne",
+    "enabled": "Įjungtas",
+    "disabled": "Išjungtas"
+  },
+  "EDIT_MODAL": {
+    "title": "Naudotojas",
+    "email": "El. paštas",
+    "admin": "Administratorius?",
+    "enabled": "Įjungtas?",
+    "yes": "Taip",
+    "no": "Ne",
+    "change_password": "Keisti slaptažodį",
+    "password": "Slaptažodis",
+    "confirm_password": "Pakartokite slaptažodį",
+    "mismatch": "Slaptažodžiai nesutampa",
+    "save": "Išsaugoti",
+    "create": "Sukurti",
+    "delete": "Ištrinti",
+    "hold_to_delete": "Laikykite 3 sekundes, kad ištrintumėte",
+    "TOASTS": {
+      "saved": "Išsaugota",
+      "error": "Klaida: {reason}",
+      "unknown": "Klaida: nežinoma klaida."
+    }
+  }
+}

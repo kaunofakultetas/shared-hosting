@@ -4,16 +4,9 @@
 //  A numbered MUI Pagination wired to the DataGrid api
 //  context, selected page in the brand burgundy.
 //
-//  Carried over from the old app as-is. Note: both consumers
-//  pass it as `slots={{ Pagination: ... }}` — DataGrid v7
-//  slot keys are camelCase (`pagination`), so the capitalized
-//  key is silently ignored and the grids actually render the
-//  DEFAULT pagination. Kept byte-identical anyway: fixing the
-//  key would change the visible behavior.
-//
 //  Used by:
-//    - UsersListTable — the Pagination slot (see note)
-//    - DomainsListTable — the Pagination slot (see note)
+//    - UsersListTable — the pagination slot
+//    - DomainsListTable — the pagination slot
 // -----------------------------------------------------------
 
 import { gridPageCountSelector, gridPageSelector, useGridApiContext, useGridSelector } from "@mui/x-data-grid";
@@ -31,8 +24,7 @@ import PaginationItem from '@mui/material/PaginationItem';
 // -----------------------------------------------------------
 //
 // Used by:
-//   - UsersListTable / DomainsListTable — the Pagination slot
-//     (currently inert — see the file header)
+//   - UsersListTable / DomainsListTable — the pagination slot
 // -----------------------------------------------------------
 
 export default function CustomPagination() {

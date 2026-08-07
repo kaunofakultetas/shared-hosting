@@ -2,9 +2,13 @@
 //  [*] Navbar — the burgundy top bar
 //
 //  Shown on every signed-in page: VU logo linking to /, the
-//  "App Hosting Platform" pill (also a link to /), and on the
-//  right a user mini widget (email + role, links to /account)
-//  and the logout button.
+//  app-title pill (also a link to /), and on the right a user
+//  mini widget (email + role, links to /account), the
+//  language switcher and the logout button.
+//
+//  The switcher shows the language you would SWITCH TO
+//  ("Lietuvių" while in English and vice versa) — the tracer
+//  original labels it the other way around.
 //
 //  Logging out is just a hard navigation to /login — the
 //  login page drops the session cookie on mount.
@@ -16,6 +20,9 @@
 import { Link } from "react-router-dom";
 import { Button } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
+
+import { useTranslations, useLocale } from "@/i18n";
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 
 
@@ -33,6 +40,9 @@ import PersonIcon from '@mui/icons-material/Person';
 
 export default function Navbar({ authdata }) {
 
+  const locale = useLocale();
+  const t = useTranslations("navbar");
+
   return (
     <div className="h-[75px] w-full relative flex items-center text-sm bg-primary border-b-[0.5px] border-b-[rgb(231,228,228)]">
 
@@ -49,7 +59,7 @@ export default function Navbar({ authdata }) {
         <div>
           <Link to="/" className="no-underline">
             <div className="border border-solid border-white rounded-[15px] text-white p-2 px-3">
-              App Hosting Platform
+              {t("title")}
             </div>
           </Link>
         </div>
@@ -76,18 +86,25 @@ export default function Navbar({ authdata }) {
                   fontWeight: '600',
                   lineHeight: '1.2'
                 }}>
-                  {authdata?.email || "User"}
+                  {authdata?.email || t("user")}
                 </span>
                 <span style={{
                   color: 'rgba(255, 255, 255, 0.7)',
                   fontSize: '0.7em',
                   lineHeight: '1.2'
                 }}>
-                  {authdata?.admin === 1 ? "Administrator" : "User"}
+                  {authdata?.admin === 1 ? t("administrator") : t("user")}
                 </span>
               </div>
             </div>
           </Link>
+
+          {/* Language switcher — offers the "other" language */}
+          {locale === "en" ?
+            <LanguageSwitcher targetLocale="lt" label={t("lithuanian")} />
+          :
+            <LanguageSwitcher targetLocale="en" label={t("english")} />
+          }
 
           {/* Logout — background comes from the theme's
               contained-primary default (hover turns pink) */}
@@ -96,7 +113,7 @@ export default function Navbar({ authdata }) {
             style={{ width: "100%", border: '1px solid rgba(255, 255, 255, 1)' }}
             onClick={() => { window.location.href = "/login" }}
           >
-            Logout
+            {t("logout")}
           </Button>
 
         </div>

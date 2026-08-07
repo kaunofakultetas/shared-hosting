@@ -28,6 +28,8 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from "axios";
 
+import { useTranslations } from "@/i18n";
+
 import MemoryIcon from '@mui/icons-material/Memory';
 import StorageIcon from '@mui/icons-material/Storage';
 import SdStorageIcon from '@mui/icons-material/SdStorage';
@@ -160,6 +162,8 @@ function StatCell({ colors, icon: Icon, value, label, barPercent }) {
 
 export default function SystemOverviewWidget() {
 
+  const t = useTranslations("PAGES.home");
+
   // Host resource stats, polled every 2 seconds
   const { data: stats = {
     cpu_percent: 0,
@@ -199,14 +203,14 @@ export default function SystemOverviewWidget() {
 
   return (
     <div className="grow-[2] basis-0 shadow-md p-5 rounded-xl bg-white min-h-64">
-      <h3 className="text-gray-500 mb-6 text-base font-medium">System Overview</h3>
+      <h3 className="text-gray-500 mb-6 text-base font-medium">{t("SYSTEM_OVERVIEW.title")}</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCell
           colors={cpuColors}
           icon={MemoryIcon}
           value={<>{formatValue(stats.cpu_percent)}%</>}
-          label={<>CPU<br/>({formatValue(stats.cpu_cores)} cores)</>}
+          label={<>{t("SYSTEM_OVERVIEW.cpu")}<br/>({formatValue(stats.cpu_cores)} {t("SYSTEM_OVERVIEW.cores")})</>}
           barPercent={stats.cpu_percent}
         />
 
@@ -214,7 +218,7 @@ export default function SystemOverviewWidget() {
           colors={ramColors}
           icon={StorageIcon}
           value={<>{formatValue(stats.memory_percent)}%</>}
-          label={<>RAM<br/>({formatValue(stats.memory_used_gb)}/{formatValue(stats.memory_total_gb)} GB)</>}
+          label={<>{t("SYSTEM_OVERVIEW.ram")}<br/>({formatValue(stats.memory_used_gb)}/{formatValue(stats.memory_total_gb)} GB)</>}
           barPercent={stats.memory_percent}
         />
 
@@ -222,7 +226,7 @@ export default function SystemOverviewWidget() {
           colors={diskColors}
           icon={SdStorageIcon}
           value={<>{formatValue(stats.disk_percent)}%</>}
-          label={<>Disk<br/>({formatValue(stats.disk_used_gb)}/{formatValue(stats.disk_total_gb)} GB)</>}
+          label={<>{t("SYSTEM_OVERVIEW.disk")}<br/>({formatValue(stats.disk_used_gb)}/{formatValue(stats.disk_total_gb)} GB)</>}
           barPercent={stats.disk_percent}
         />
 
@@ -230,7 +234,7 @@ export default function SystemOverviewWidget() {
           colors={dockerhubColors}
           icon={CloudDownloadIcon}
           value={dockerhub ? dockerhub.remaining : (isPending ? '—' : 'N/A')}
-          label={<>Docker Hub<br/>({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isPending ? '—' : 'N/A')})</>}
+          label={<>{t("SYSTEM_OVERVIEW.dockerhub")}<br/>({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isPending ? '—' : 'N/A')})</>}
           barPercent={dockerhubPercent}
         />
       </div>

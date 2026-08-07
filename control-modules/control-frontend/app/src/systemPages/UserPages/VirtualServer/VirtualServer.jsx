@@ -30,6 +30,7 @@
 // -----------------------------------------------------------
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
 import {
@@ -44,6 +45,7 @@ import {
 } from "@mui/material";
 import toast from "react-hot-toast";
 
+import { useTranslations } from "@/i18n";
 import DomainsListTable from "./DomainsListTable/DomainsListTable";
 
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -94,6 +96,7 @@ import CloseIcon from "@mui/icons-material/Close";
 
 function useVirtualServer(virtualServerID) {
 
+  const t = useTranslations("PAGES.vmDetail");
   const queryClient = useQueryClient();
 
   const { data: vmData = null, error } = useQuery({
@@ -121,12 +124,12 @@ function useVirtualServer(virtualServerID) {
     try {
       await axios.post("/api/vm/control", { virtualServerID: vmData.id, action });
       toast.success(
-        <b>{action === "stop" ? "Stopping" : "Starting"} server...</b>,
+        <b>{t(action === "stop" ? "TOASTS.stopping" : "TOASTS.starting")}</b>,
         { duration: 5000 }
       );
       refreshVm();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || "Operation failed";
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || t("TOASTS.operation_failed");
       toast.error(<b>{errorMessage}</b>);
     }
   };
@@ -141,11 +144,11 @@ function useVirtualServer(virtualServerID) {
         action: "rename",
         newName,
       });
-      toast.success(<b>Server renamed successfully</b>);
+      toast.success(<b>{t("TOASTS.renamed")}</b>);
       refreshVm();
       return true;
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || "Failed to rename server";
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || t("TOASTS.rename_failed");
       toast.error(<b>{errorMessage}</b>);
       return false;
     }
@@ -306,6 +309,9 @@ function DetailSkeleton() {
 
 export default function VirtualServerPage({ virtualServerID }) {
 
+  const t = useTranslations("PAGES.vmDetail");
+  const navigate = useNavigate();
+
   const { vmData, startStop, rename } = useVirtualServer(virtualServerID);
 
   const [currentTab, setCurrentTab] = useState(0);
@@ -327,7 +333,7 @@ export default function VirtualServerPage({ virtualServerID }) {
 
   const handleSaveName = async () => {
     if (!editedName.trim()) {
-      toast.error(<b>Name cannot be empty</b>);
+      toast.error(<b>{t("TOASTS.name_empty")}</b>);
       return;
     }
     if (await rename(editedName.trim())) {
@@ -361,10 +367,11 @@ export default function VirtualServerPage({ virtualServerID }) {
 
   return (
     <div className="flex-1 p-4 overflow-y-auto h-[calc(100vh-105px)] bg-gray-100">
-      {/* Back Button — contained-primary from the theme */}
+      {/* Back Button — contained-primary from the theme,
+          client-side navigation back to the cached list */}
       <Button
         variant="contained"
-        onClick={() => (window.location.href = "/vm")}
+        onClick={() => navigate("/vm")}
         startIcon={<ArrowBackIcon />}
         sx={{
           mb: 2,
@@ -372,7 +379,7 @@ export default function VirtualServerPage({ virtualServerID }) {
           borderRadius: 2,
         }}
       >
-        Back to Virtual Servers
+        {t("HEADER.back")}
       </Button>
 
       {/* Header Card */}
@@ -409,7 +416,7 @@ export default function VirtualServerPage({ virtualServerID }) {
                     #{virtualServerID}
                   </span>
                   <Chip
-                    label={isRunning ? "Running" : "Stopped"}
+                    label={isRunning ? t("HEADER.running") : t("HEADER.stopped")}
                     size="small"
                     sx={{
                       fontWeight: 600,
@@ -441,7 +448,7 @@ export default function VirtualServerPage({ virtualServerID }) {
                         },
                       }}
                     />
-                    <Tooltip title="Save">
+                    <Tooltip title={t("HEADER.save")}>
                       <IconButton
                         onClick={handleSaveName}
                         sx={{
@@ -453,7 +460,7 @@ export default function VirtualServerPage({ virtualServerID }) {
                         <CheckIcon />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title="Cancel">
+                    <Tooltip title={t("HEADER.cancel")}>
                       <IconButton
                         onClick={handleCancelEditing}
                         sx={{
@@ -469,9 +476,9 @@ export default function VirtualServerPage({ virtualServerID }) {
                 ) : (
                   <div className="flex items-center gap-2 mb-3 mt-5">
                     <h1 className="text-2xl font-bold text-gray-800">
-                      {vmData.name || "Unnamed Server"}
+                      {vmData.name || t("HEADER.unnamed")}
                     </h1>
-                    <Tooltip title="Rename server">
+                    <Tooltip title={t("HEADER.rename")}>
                       <IconButton
                         onClick={handleStartEditing}
                         size="small"
@@ -516,7 +523,7 @@ export default function VirtualServerPage({ virtualServerID }) {
                   },
                 }}
               >
-                {isRunning ? "Stop Server" : "Start Server"}
+                {isRunning ? t("HEADER.stop_server") : t("HEADER.start_server")}
               </Button>
             </div>
           </div>
@@ -527,7 +534,7 @@ export default function VirtualServerPage({ virtualServerID }) {
               <div className="flex items-center gap-2 mb-3">
                 <ViewInArIcon sx={{ fontSize: 18, color: "gray" }} />
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Docker Containers
+                  {t("HEADER.docker_containers")}
                 </span>
               </div>
               <div className="space-y-3">
@@ -573,8 +580,8 @@ export default function VirtualServerPage({ virtualServerID }) {
               },
             }}
           >
-            <Tab icon={<SettingsIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="Controls" />
-            <Tab icon={<DnsIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="Domain Names" />
+            <Tab icon={<SettingsIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={t("TABS.controls")} />
+            <Tab icon={<DnsIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={t("TABS.domains")} />
           </Tabs>
         </div>
 
@@ -584,34 +591,34 @@ export default function VirtualServerPage({ virtualServerID }) {
           {currentTab === 0 && (
             <div>
               <p className="text-gray-600 mb-6">
-                Manage your virtual server with these tools:
+                {t("CONTROLS.intro")}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                 <ControlCard
                   icon={ViewInArIcon}
                   title="Dockge"
-                  description="Manage Docker containers and stacks visually"
+                  description={t("CONTROLS.dockge_desc")}
                   onClick={() => openTool("/")}
                   color="#2563eb"
                 />
                 <ControlCard
                   icon={FolderIcon}
-                  title="File Browser"
-                  description="Browse and manage files on your server"
+                  title={t("CONTROLS.filebrowser")}
+                  description={t("CONTROLS.filebrowser_desc")}
                   onClick={() => openTool("/filebrowser")}
                   color="#16a34a"
                 />
                 <ControlCard
                   icon={TerminalIcon}
-                  title="SSH Terminal"
-                  description="Access command-line interface remotely"
+                  title={t("CONTROLS.ssh")}
+                  description={t("CONTROLS.ssh_desc")}
                   onClick={() => openTool("/ssh/host/172.18.0.1")}
                   color="#9333ea"
                 />
                 <ControlCard
                   icon={CodeIcon}
                   title="Visual Studio Code"
-                  description="Code using Visual Studio Code program on your computer"
+                  description={t("CONTROLS.vscode_desc")}
                   onClick={() => openSystemPage("/docs/books/visual-studio-code/page/connect-vscode-with-your-server")}
                   color="#2563eb"
                 />

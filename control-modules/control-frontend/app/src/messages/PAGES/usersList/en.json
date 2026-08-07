@@ -1,0 +1,42 @@
+{
+  "HEADER": {
+    "title": "Users List",
+    "search_placeholder": "Search...",
+    "insert_new": "Insert New"
+  },
+  "COLUMNS": {
+    "id": "ID",
+    "email": "Email",
+    "servers": "Servers",
+    "admin": "Admin?",
+    "enabled": "Enabled?",
+    "lastseen": "Last Seen"
+  },
+  "PILLS": {
+    "yes": "Yes",
+    "no": "No",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "EDIT_MODAL": {
+    "title": "User",
+    "email": "Email",
+    "admin": "Admin?",
+    "enabled": "Enabled?",
+    "yes": "Yes",
+    "no": "No",
+    "change_password": "Change Password",
+    "password": "Password",
+    "confirm_password": "Repeat Password",
+    "mismatch": "Passwords do not match",
+    "save": "Save",
+    "create": "Create",
+    "delete": "Delete",
+    "hold_to_delete": "Hold for 3 seconds to delete",
+    "TOASTS": {
+      "saved": "Saved",
+      "error": "Error: {reason}",
+      "unknown": "Error: Unknown error."
+    }
+  }
+}

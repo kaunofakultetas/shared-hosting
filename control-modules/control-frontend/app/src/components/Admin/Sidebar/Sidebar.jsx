@@ -15,9 +15,11 @@
 //  key, so the old sidebar's saved choice carries over).
 //
 //  The links live in the SECTIONS table — one entry per
-//  group. An `adminOnly` key on a section or item hides it
-//  from regular users (authdata.admin), and the row matching
-//  the current route is highlighted in the brand tint.
+//  group, labels resolved from the "sidebar" translation
+//  namespace. An `adminOnly` key on a section or item hides
+//  it from regular users (authdata.admin), and the row
+//  matching the current route is highlighted in the brand
+//  tint.
 //
 //  Unlike the tracer original there is no keepalive re-sync
 //  machinery here: AppShell mounts this component exactly
@@ -47,6 +49,8 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
+
+import { useTranslations } from "@/i18n";
 
 // Pin/unpin the sidebar
 import PushPinIcon from '@mui/icons-material/PushPin';
@@ -98,14 +102,15 @@ const CLOSE_DELAY_MS = 200;
 // SECTIONS
 // -----------------------------------------------------------
 //
-// The whole navigation as data: one entry per section. Adding
-// a link is a one-line edit here — no JSX involved.
+// The whole navigation as data: one entry per section, labels
+// are keys into the "sidebar" translation namespace. Adding a
+// link is a one-line edit here — no JSX involved.
 //
 // Entry fields:
-//   - title      — section heading
+//   - title      — section heading key
 //   - adminOnly  — on a section or an item: only rendered for
 //                  authdata.admin === 1
-//   - items[]    — href, icon component, label, and
+//   - items[]    — href, icon component, label key, and
 //                  `external: true` for links that open in a
 //                  new tab via a plain <a> (/docs, /dbgate
 //                  and /swagger are separate services behind
@@ -120,33 +125,33 @@ const CLOSE_DELAY_MS = 200;
 
 const SECTIONS = [
   {
-    title: "CONTROL",
+    title: "CONTROL.TITLE",
     items: [
-      { href: "/admin", icon: DashboardIcon, label: "Dashboard", adminOnly: true },
-      { href: "/vm", icon: ViewInArIcon, label: "Virtual Servers" },
+      { href: "/admin", icon: DashboardIcon, label: "CONTROL.dashboard", adminOnly: true },
+      { href: "/vm", icon: ViewInArIcon, label: "CONTROL.virtual_servers" },
     ],
   },
   {
-    title: "INFORMATION",
+    title: "INFORMATION.TITLE",
     items: [
-      { href: "/docs", icon: ImportContactsIcon, label: "Documentation", external: true },
-      { href: "https://awesome-docker-compose.com/apps", icon: ExtensionIcon, label: "Examples", external: true },
+      { href: "/docs", icon: ImportContactsIcon, label: "INFORMATION.documentation", external: true },
+      { href: "https://awesome-docker-compose.com/apps", icon: ExtensionIcon, label: "INFORMATION.examples", external: true },
     ],
   },
   {
-    title: "ADMIN",
+    title: "ADMIN.TITLE",
     adminOnly: true,
     items: [
-      { href: "/admin/users", icon: PersonOutlineIcon, label: "Users" },
-      { href: "/dbgate", icon: StorageIcon, label: "Database", external: true },
-      { href: "/swagger", icon: ApiIcon, label: "API Documentation", external: true },
+      { href: "/admin/users", icon: PersonOutlineIcon, label: "ADMIN.users" },
+      { href: "/dbgate", icon: StorageIcon, label: "ADMIN.database", external: true },
+      { href: "/swagger", icon: ApiIcon, label: "ADMIN.api_documentation", external: true },
     ],
   },
   {
-    title: "ACCOUNT",
+    title: "ACCOUNT.TITLE",
     items: [
-      { href: "/account", icon: SettingsIcon, label: "Account" },
-      { href: "/login", icon: ExitToAppIcon, label: "Logout" },
+      { href: "/account", icon: SettingsIcon, label: "ACCOUNT.account" },
+      { href: "/login", icon: ExitToAppIcon, label: "ACCOUNT.logout" },
     ],
   },
 ];
@@ -495,10 +500,10 @@ function MenuItem({ href, icon: Icon, label, open, active, external = false }) {
 //   - Sidebar (below) — first row of the list
 // -----------------------------------------------------------
 
-function PinButton({ pinned, onToggle }) {
+function PinButton({ pinned, onToggle, t }) {
   return (
     <Tooltip
-      title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+      title={pinned ? t("PIN.unpin") : t("PIN.pin")}
       placement="right"
       disableInteractive
       slotProps={{ tooltip: { sx: { backgroundColor: '#000', fontSize: '13px' } } }}
@@ -534,18 +539,18 @@ function PinButton({ pinned, onToggle }) {
 //   - Sidebar (below) — inside the panel
 // -----------------------------------------------------------
 
-function SidebarLinks({ sections, open, activeHref }) {
+function SidebarLinks({ sections, open, activeHref, t }) {
   return (
     <>
       {sections.map((section) => (
         <div key={section.title}>
-          <SectionTitle title={section.title} open={open} />
+          <SectionTitle title={t(section.title)} open={open} />
           {section.items.map((item) => (
             <MenuItem
               key={item.href}
               href={item.href}
               icon={item.icon}
-              label={item.label}
+              label={t(item.label)}
               open={open}
               active={item.href === activeHref}
               external={item.external}
@@ -579,6 +584,8 @@ function SidebarLinks({ sections, open, activeHref }) {
 // -----------------------------------------------------------
 
 export default function Sidebar({ authdata }) {
+
+  const t = useTranslations("sidebar");
 
   const { pathname } = useLocation();
   const ghostRef = useRef(null);
@@ -614,14 +621,14 @@ export default function Sidebar({ authdata }) {
             classes as the real labels so it measures true. */}
         <div ref={ghostRef} aria-hidden="true" className="absolute invisible h-0 overflow-hidden w-max whitespace-nowrap text-[13px] font-semibold">
           {sections.flatMap((section) => section.items).map((item) => (
-            <div key={item.href}>{item.label}</div>
+            <div key={item.href}>{t(item.label)}</div>
           ))}
         </div>
 
         <div className="px-[10px]">
           <ul className="list-none m-0 p-0">
-            <PinButton pinned={pinned} onToggle={togglePinned} />
-            <SidebarLinks sections={sections} open={open} activeHref={activeHref} />
+            <PinButton pinned={pinned} onToggle={togglePinned} t={t} />
+            <SidebarLinks sections={sections} open={open} activeHref={activeHref} t={t} />
           </ul>
         </div>
       </div>

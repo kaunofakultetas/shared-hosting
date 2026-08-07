@@ -5,8 +5,7 @@
 //  title/description header with an optional variant icon,
 //  arbitrary children as the body, and either the standard
 //  Confirm/Cancel pair or fully custom action buttons.
-//  Carried over 1:1 from the tracer system, minus its i18n
-//  (all defaults are plain English here).
+//  Carried over 1:1 from the tracer system.
 //
 //  Variants ("default" | "danger" | "warning" | "info" |
 //  "success") pick the header icon and the confirm button
@@ -26,7 +25,7 @@
 //    StandardActions  — the Confirm/Cancel button bar
 //    UniversalModal   — the modal itself (default export)
 //    ConfirmModal / DeleteModal / AlertModal / WarningModal
-//                     — thin presets with stock wording
+//                     — thin presets with translated defaults
 //
 //  Imported via the folder's index.js:
 //    @/components/UniversalModal
@@ -49,6 +48,8 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+
+import { useTranslations } from "@/i18n";
 
 
 // One duration for everything the flow animation moves — the
@@ -250,9 +251,10 @@ export default function UniversalModal({
   actions,
 
   // Standard action buttons (used when 'actions' prop is not
-  // provided)
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  // provided); confirmText/cancelText fall back to translated
+  // defaults when the caller gives none
+  confirmText,
+  cancelText,
   onConfirm,
   onCancel,
   showCancel = true,
@@ -288,6 +290,8 @@ export default function UniversalModal({
   sx = {},
   contentSx = {},
 }) {
+
+  const t = useTranslations("COMPONENTS.universalModal");
 
   const variantConfig = VARIANTS[variant] || VARIANTS.default;
 
@@ -497,10 +501,10 @@ export default function UniversalModal({
         {!actions && (showConfirm || showCancel) && (
           <StandardActions
             showCancel={showCancel}
-            cancelText={cancelText}
+            cancelText={cancelText ?? t("cancel")}
             onCancel={handleCancel}
             showConfirm={showConfirm}
-            confirmText={confirmText}
+            confirmText={confirmText ?? t("confirm")}
             confirmColor={variantConfig.confirmColor}
             onConfirm={handleConfirm}
             confirmDisabled={confirmDisabled}
@@ -522,23 +526,27 @@ export default function UniversalModal({
 // ConfirmModal
 // -----------------------------------------------------------
 //
-// Preset: generic "are you sure?" dialog — default variant
-// with a Confirm/Cancel pair. All props pass through, so
-// anything can still be overridden.
+// Preset: generic "are you sure?" dialog — default variant,
+// translated "Confirm action" title and Confirm/Cancel pair.
+// All props pass through, so anything can still be
+// overridden.
 //
 // Nothing calls this preset here at the moment — kept for
 // parity with the tracer copy.
 // -----------------------------------------------------------
 
 export function ConfirmModal({
-  title = "Confirm Action",
-  confirmText = "Confirm",
+  title,
+  confirmText,
   ...props
 }) {
+
+  const t = useTranslations("COMPONENTS.universalModal");
+
   return (
     <UniversalModal
-      title={title}
-      confirmText={confirmText}
+      title={title ?? t("CONFIRM_MODAL.title")}
+      confirmText={confirmText ?? t("CONFIRM_MODAL.confirm")}
       showCancel={true}
       {...props}
     />
@@ -556,24 +564,27 @@ export function ConfirmModal({
 // -----------------------------------------------------------
 //
 // Preset: delete confirmation — danger variant (red confirm,
-// error icon) with irreversible-action wording. Pass
-// onConfirm with the actual delete call.
+// error icon) with translated irreversible-action wording.
+// Pass onConfirm with the actual delete call.
 //
 // Nothing calls this preset here at the moment — kept for
 // parity with the tracer copy.
 // -----------------------------------------------------------
 
 export function DeleteModal({
-  title = "Delete",
-  description = "Are you sure you want to delete? This action is irreversible.",
-  confirmText = "Delete",
+  title,
+  description,
+  confirmText,
   ...props
 }) {
+
+  const t = useTranslations("COMPONENTS.universalModal");
+
   return (
     <UniversalModal
-      title={title}
-      description={description}
-      confirmText={confirmText}
+      title={title ?? t("DELETE_MODAL.title")}
+      description={description ?? t("DELETE_MODAL.description")}
+      confirmText={confirmText ?? t("DELETE_MODAL.confirm")}
       variant="danger"
       {...props}
     />
@@ -591,23 +602,26 @@ export function DeleteModal({
 // -----------------------------------------------------------
 //
 // Preset: informational notice — info variant with a single
-// "OK" button (cancel hidden by default since there is
-// nothing to cancel).
+// translated "OK" button (cancel hidden by default since
+// there is nothing to cancel).
 //
 // Nothing calls this preset here at the moment — kept for
 // parity with the tracer copy.
 // -----------------------------------------------------------
 
 export function AlertModal({
-  title = "Information",
-  confirmText = "OK",
+  title,
+  confirmText,
   showCancel = false,
   ...props
 }) {
+
+  const t = useTranslations("COMPONENTS.universalModal");
+
   return (
     <UniversalModal
-      title={title}
-      confirmText={confirmText}
+      title={title ?? t("ALERT_MODAL.title")}
+      confirmText={confirmText ?? t("ALERT_MODAL.confirm")}
       showCancel={showCancel}
       variant="info"
       {...props}
@@ -625,7 +639,7 @@ export function AlertModal({
 // WarningModal
 // -----------------------------------------------------------
 //
-// Preset: warning notice — warning variant with an
+// Preset: warning notice — warning variant, translated
 // "Understood" confirm. Keeps the cancel button (unlike
 // AlertModal) in case the caller wires onCancel to back out.
 //
@@ -634,14 +648,17 @@ export function AlertModal({
 // -----------------------------------------------------------
 
 export function WarningModal({
-  title = "Warning",
-  confirmText = "Understood",
+  title,
+  confirmText,
   ...props
 }) {
+
+  const t = useTranslations("COMPONENTS.universalModal");
+
   return (
     <UniversalModal
-      title={title}
-      confirmText={confirmText}
+      title={title ?? t("WARNING_MODAL.title")}
+      confirmText={confirmText ?? t("WARNING_MODAL.confirm")}
       variant="warning"
       {...props}
     />

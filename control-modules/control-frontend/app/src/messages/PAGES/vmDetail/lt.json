@@ -1,0 +1,67 @@
+{
+  "HEADER": {
+    "back": "Grįžti į virtualius serverius",
+    "running": "Veikia",
+    "stopped": "Sustabdytas",
+    "unnamed": "Serveris be pavadinimo",
+    "rename": "Pervadinti serverį",
+    "save": "Išsaugoti",
+    "cancel": "Atšaukti",
+    "stop_server": "Stabdyti serverį",
+    "start_server": "Paleisti serverį",
+    "docker_containers": "Docker konteineriai"
+  },
+  "TOASTS": {
+    "stopping": "Serveris stabdomas...",
+    "starting": "Serveris paleidžiamas...",
+    "operation_failed": "Operacija nepavyko",
+    "renamed": "Serveris pervadintas",
+    "rename_failed": "Nepavyko pervadinti serverio",
+    "name_empty": "Pavadinimas negali būti tuščias"
+  },
+  "TABS": {
+    "controls": "Valdymas",
+    "domains": "Domenų vardai"
+  },
+  "CONTROLS": {
+    "intro": "Valdykite savo virtualų serverį šiais įrankiais:",
+    "dockge_desc": "Vizualiai valdykite Docker konteinerius ir stack'us",
+    "filebrowser": "Failų naršyklė",
+    "filebrowser_desc": "Naršykite ir tvarkykite serverio failus",
+    "ssh": "SSH terminalas",
+    "ssh_desc": "Nuotolinė komandinės eilutės prieiga",
+    "vscode_desc": "Programuokite naudodami Visual Studio Code savo kompiuteryje"
+  },
+  "DOMAINS_TABLE": {
+    "id": "ID",
+    "domainname": "Domeno vardas",
+    "cloudflare": "Ar Cloudflare?",
+    "ssl": "Ar SSL?",
+    "yes": "Taip",
+    "no": "Ne",
+    "insert_new": "Pridėti naują"
+  },
+  "DOMAIN_MODAL": {
+    "title": "Domeno vardas",
+    "use_faculty": "Naudoti fakulteto suteiktą domeną",
+    "subdomain": "Subdomenas",
+    "domain": "Domenas",
+    "domain_name": "Domeno vardas",
+    "protocol": "HTTP ar HTTPS?",
+    "https": "HTTPS",
+    "http": "HTTP",
+    "show_advanced": "Rodyti papildomas parinktis",
+    "hide_advanced": "Slėpti papildomas parinktis",
+    "cloudflare": "Cloudflare?",
+    "yes": "Taip",
+    "no": "Ne",
+    "save": "Išsaugoti",
+    "create": "Sukurti",
+    "delete": "Ištrinti",
+    "hold_to_delete": "Laikykite 3 sekundes, kad ištrintumėte",
+    "created": "Domenas sukurtas",
+    "updated": "Domenas atnaujintas",
+    "deleted": "Domenas ištrintas",
+    "error": "Klaida: {message}"
+  }
+}

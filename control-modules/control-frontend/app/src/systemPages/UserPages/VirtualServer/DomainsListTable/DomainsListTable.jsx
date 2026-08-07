@@ -5,30 +5,34 @@
 //  VM's domains (id, name, Cloudflare?, SSL?) — a TanStack
 //  query on /api/vm/dns/<id>, invalidated on every save/
 //  delete and dialog close. Clicking a row opens
-//  AddEditDomain prefilled; the toolbar's Insert New opens it
-//  empty. A 401 bounces to /login.
+//  AddEditDomain prefilled (the modal flies out of the
+//  clicked row); the toolbar's Insert New opens it empty. A
+//  401 bounces to /login.
 //
-//  Note: the LoadingOverlay/Pagination entries in `slots` are
-//  capitalized, but DataGrid v7 slot keys are camelCase — the
-//  grid actually renders its DEFAULT overlay and pagination.
-//  Kept byte-identical from the old app on purpose.
+//  Column headers and the toolbar label come from the
+//  "PAGES.vmDetail" namespace; the grid's built-in texts are
+//  themed through the DataGrid locale merge in providers.jsx
+//  — no localeText prop here.
 //
 //  Split into (root component last):
 //
-//    QuickSearchToolbar — just the burgundy Insert New button
-//    DomainsListTable   — grid + dialog state (default export)
+//    QuickSearchToolbar      — just the Insert New button
+//    DomainsListTable_Columns — column set built from t
+//    DomainsListTable        — grid + dialog state (default
+//                              export)
 //
 //  Used by:
 //    - VirtualServer.jsx — the Domain Names tab
 // -----------------------------------------------------------
 
 import { DataGrid } from "@mui/x-data-grid";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
 import { Box, Button, LinearProgress } from '@mui/material';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 
+import { useTranslations } from '@/i18n';
 import CustomPagination from '@/components/Other/ButtonsPagination/ButtonsPagination';
 import AddEditDomain from "./AddEditDomain/AddEditDomain";
 
@@ -44,13 +48,14 @@ import AddEditDomain from "./AddEditDomain/AddEditDomain";
 //
 // The grid toolbar — despite the name it only holds the
 // Insert New button (no search field here, unlike the users
-// list).
+// list). The click passes its event up so the dialog can fly
+// out of the button.
 //
 // Used by:
 //   - DomainsListTable (below) — the toolbar slot
 // -----------------------------------------------------------
 
-function QuickSearchToolbar({ triggerAddNew }) {
+function QuickSearchToolbar({ insertNewLabel, triggerAddNew }) {
   return (
     <Box sx={{ p: 0.5, pb: 0 }} >
 
@@ -63,14 +68,62 @@ function QuickSearchToolbar({ triggerAddNew }) {
           paddingRight: '10px',
           height: 30,
         }}
-        onClick={() => { triggerAddNew() }}
+        onClick={(event) => { triggerAddNew(event) }}
         >
           <AddCircleOutlinedIcon style={{paddingRight: 8, fontSize: '22px'}}/>
-          Insert New
+          {insertNewLabel}
       </Button>
 
     </Box>
   );
+}
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// DomainsListTable_Columns
+// -----------------------------------------------------------
+//
+// Builds the column set with translated headers — a function
+// (not a constant) because it needs t.
+//
+// Used by:
+//   - DomainsListTable (below) — memoized on t
+// -----------------------------------------------------------
+
+function DomainsListTable_Columns(t) {
+  return [
+    {
+      field: "id",
+      headerName: t("DOMAINS_TABLE.id"),
+      width: 70
+    },
+    {
+      field: "domainname",
+      headerName: t("DOMAINS_TABLE.domainname"),
+      width: 350,
+    },
+    {
+      field: "iscloudflare",
+      headerName: t("DOMAINS_TABLE.cloudflare"),
+      width: 120,
+      renderCell: (params) => {
+        return <div style={{textAlign: 'center'}}>{params.value == 1 ? t("DOMAINS_TABLE.yes") : t("DOMAINS_TABLE.no")}</div>
+      }
+    },
+    {
+      field: "ssl",
+      headerName: t("DOMAINS_TABLE.ssl"),
+      width: 120,
+      renderCell: (params) => {
+        return <div style={{textAlign: 'center'}}>{params.value == 1 ? t("DOMAINS_TABLE.yes") : t("DOMAINS_TABLE.no")}</div>
+      }
+    }
+  ];
 }
 
 
@@ -88,6 +141,11 @@ function QuickSearchToolbar({ triggerAddNew }) {
 // -----------------------------------------------------------
 
 export default function DomainsListTable({ virtualServerID }) {
+
+  const t = useTranslations("PAGES.vmDetail");
+
+  // Memoize columns so they don't reset on data refetch
+  const columns = useMemo(() => DomainsListTable_Columns(t), [t]);
 
   const [openBackdrop, setOpenBackdrop] = useState(false);
   const queryClient = useQueryClient();
@@ -111,47 +169,21 @@ export default function DomainsListTable({ virtualServerID }) {
     queryClient.invalidateQueries({ queryKey: ['vm-dns', virtualServerID] });
 
 
-  const DomainsListTable_Columns = [
-    {
-      field: "id",
-      headerName: "ID",
-      width: 70
-    },
-    {
-      field: "domainname",
-      headerName: "Domain name",
-      width: 350,
-    },
-    {
-      field: "iscloudflare",
-      headerName: "Is Cloudflare?",
-      width: 120,
-      renderCell: (params) => {
-        return <div style={{textAlign: 'center'}}>{params.value == 1 ? 'Yes' : 'No'}</div>
-      }
-    },
-    {
-      field: "ssl",
-      headerName: "Is SSL?",
-      width: 120,
-      renderCell: (params) => {
-        return <div style={{textAlign: 'center'}}>{params.value == 1 ? 'Yes' : 'No'}</div>
-      }
-    }
-  ];
-
-
-  // A clicked row opens the dialog prefilled; Insert New opens
-  // it empty; any close refreshes the grid
+  // A clicked row opens the dialog prefilled (flying out of
+  // the row); Insert New opens it empty (flying out of the
+  // button); any close refreshes the grid
   const [domainLineData, setDomainLineData] = useState();
+  const [modalSourceRect, setModalSourceRect] = useState(null);
 
-  const handleRowClick = (params) => {
+  const handleRowClick = (params, event) => {
+    setModalSourceRect(event?.currentTarget?.getBoundingClientRect() ?? null);
     let modifiedParams = { ...params };
     setDomainLineData(modifiedParams);
     setOpenBackdrop(true);
   };
 
-  const triggerAddNew = () => {
+  const triggerAddNew = (event) => {
+    setModalSourceRect(event?.currentTarget?.getBoundingClientRect() ?? null);
     setDomainLineData(undefined);
     setOpenBackdrop(true);
   }
@@ -178,18 +210,18 @@ export default function DomainsListTable({ virtualServerID }) {
             cursor:'pointer',
           }}
           rows={data}
-          columns={DomainsListTable_Columns}
-          pageSize={100}
-          rowsPerPageOptions={[100]}
+          columns={columns}
+          pageSizeOptions={[100]}
           rowHeight={30}
           onRowClick={handleRowClick}
-
-          localeText={{}}
 
           initialState={{
             columns: {
               columnVisibilityModel: {
               },
+            },
+            pagination: {
+              paginationModel: { pageSize: 100 },
             },
           }}
 
@@ -198,11 +230,12 @@ export default function DomainsListTable({ virtualServerID }) {
 
           slots={{
             toolbar: QuickSearchToolbar,
-            LoadingOverlay: LinearProgress,
-            Pagination: CustomPagination,
+            loadingOverlay: LinearProgress,
+            pagination: CustomPagination,
           }}
           slotProps={{
             toolbar: {
+              insertNewLabel: t("DOMAINS_TABLE.insert_new"),
               triggerAddNew: triggerAddNew
             }
           }}
@@ -214,6 +247,7 @@ export default function DomainsListTable({ virtualServerID }) {
           rowData={domainLineData}
           setOpen={handleDialogOpen}
           getData={getData}
+          sourceRect={modalSourceRect}
         />
       :
         <></>

@@ -17,6 +17,7 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from "axios";
 
+import { useTranslations } from "@/i18n";
 import Widget from "./components/Widget/Widget";
 import QuickRegistrationWidget from "./components/QuickRegistrationWidget/QuickRegistrationWidget";
 import SystemOverviewWidget from "./components/SystemOverviewWidget/SystemOverviewWidget";
@@ -40,6 +41,8 @@ import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 // -----------------------------------------------------------
 
 export default function Home() {
+
+  const t = useTranslations("PAGES.home");
 
   // Hosting system counts, polled every 2 seconds
   const { data: hostingStats = {
@@ -79,14 +82,14 @@ export default function Home() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
 
         <Widget
-          text="Users"
+          text={t("WIDGETS.users")}
           count={formatValue(hostingStats.users)}
           icon={getIcon(PeopleOutlinedIcon, "crimson", "rgba(255, 0, 0, 0.2)")}
           link="/admin/users"
         />
 
         <Widget
-          text="Virtual Servers"
+          text={t("WIDGETS.virtual_servers")}
           count={formatValue(hostingStats.virtualservers_running)}
           countSecondary={formatValue(hostingStats.virtualservers_total)}
           icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")}
@@ -94,7 +97,7 @@ export default function Home() {
         />
 
         <Widget
-          text="Domain Names"
+          text={t("WIDGETS.domain_names")}
           count={formatValue(hostingStats.domains)}
           icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")}
         />

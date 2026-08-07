@@ -1,0 +1,37 @@
+{
+  "WIDGETS": {
+    "users": "Naudotojai",
+    "virtual_servers": "Virtualūs serveriai",
+    "domain_names": "Domenų vardai"
+  },
+  "QUICK_REGISTRATION": {
+    "title": "Greita registracija",
+    "off": "IŠJUNGTA",
+    "turn_on": "Įjungti",
+    "turn_off": "Išjungti",
+    "expired": "Greita registracija baigė galioti",
+    "create_failed": "Nepavyko sukurti registracijos kodo",
+    "delete_failed": "Nepavyko išjungti registracijos kodo",
+    "MODAL": {
+      "title": "Greitos registracijos kodas",
+      "subtitle": "Pasidalinkite šiuo kodu su studentais",
+      "remaining": "liko",
+      "copy": "Kopijuoti kodą",
+      "close": "Uždaryti",
+      "copied": "Kodas nukopijuotas!"
+    }
+  },
+  "SYSTEM_OVERVIEW": {
+    "title": "Sistemos apžvalga",
+    "cpu": "CPU",
+    "cores": "branduolių",
+    "ram": "RAM",
+    "disk": "Diskas",
+    "dockerhub": "Docker Hub"
+  },
+  "RECENT_ACTIVITY": {
+    "title": "Paskutiniai veiksmai",
+    "system": "Sistema",
+    "none": "Veiksmų nėra"
+  }
+}

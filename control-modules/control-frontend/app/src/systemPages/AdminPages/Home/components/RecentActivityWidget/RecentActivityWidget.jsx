@@ -19,6 +19,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from "@mui/material";
 import axios from "axios";
 
+import { useTranslations } from "@/i18n";
+
 
 
 
@@ -30,13 +32,14 @@ import axios from "axios";
 // -----------------------------------------------------------
 //
 // Timestamps arrive absolute; the list shows them relative
-// ("5 mins ago").
+// ("5 mins ago"). Takes the "COMPONENTS.timeago" translator
+// as an argument — a plain function cannot call hooks itself.
 //
 // Used by:
 //   - RecentActivityWidget (below) — every activity row
 // -----------------------------------------------------------
 
-const formatTimeAgo = (timestamp) => {
+const formatTimeAgo = (timestamp, tt) => {
   const now = new Date();
   const time = new Date(timestamp);
   const diffMs = now - time;
@@ -44,10 +47,10 @@ const formatTimeAgo = (timestamp) => {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  if (diffMins < 1) return tt("justNow");
+  if (diffMins < 60) return tt(diffMins > 1 ? "minsAgo" : "minAgo", { n: diffMins });
+  if (diffHours < 24) return tt(diffHours > 1 ? "hoursAgo" : "hourAgo", { n: diffHours });
+  return tt(diffDays > 1 ? "daysAgo" : "dayAgo", { n: diffDays });
 };
 
 
@@ -66,6 +69,9 @@ const formatTimeAgo = (timestamp) => {
 
 export default function RecentActivityWidget() {
 
+  const t = useTranslations("PAGES.home");
+  const tt = useTranslations("COMPONENTS.timeago");
+
   // System-wide activity, polled every 2 seconds
   const { data: activities = [], isPending } = useQuery({
     queryKey: ['dashboard-recentactivity'],
@@ -76,7 +82,7 @@ export default function RecentActivityWidget() {
 
   return (
     <div className="grow basis-0 shadow-md p-5 rounded-xl bg-white h-128">
-      <h3 className="text-gray-500 mb-4 text-base font-medium">Recent Activity</h3>
+      <h3 className="text-gray-500 mb-4 text-base font-medium">{t("RECENT_ACTIVITY.title")}</h3>
       <ul className="list-none p-0 text-gray-600 text-sm">
         {isPending ? (
           [...Array(4)].map((_, i) => (
@@ -89,12 +95,12 @@ export default function RecentActivityWidget() {
         ) : activities.length > 0 ? (
           activities.map((activity) => (
             <li key={activity.log_id} className="mb-2 pb-2 border-b border-gray-100">
-              <span className="font-bold text-gray-700">{activity.email || 'System'}:</span> <br/> {activity.message} <br/>
-              <span className="text-gray-400 text-xs">{formatTimeAgo(activity.time)}</span>
+              <span className="font-bold text-gray-700">{activity.email || t("RECENT_ACTIVITY.system")}:</span> <br/> {activity.message} <br/>
+              <span className="text-gray-400 text-xs">{formatTimeAgo(activity.time, tt)}</span>
             </li>
           ))
         ) : (
-          <li className="text-gray-400 italic">No recent activity</li>
+          <li className="text-gray-400 italic">{t("RECENT_ACTIVITY.none")}</li>
         )}
       </ul>
     </div>

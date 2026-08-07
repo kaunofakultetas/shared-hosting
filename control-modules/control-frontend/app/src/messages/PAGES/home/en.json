@@ -1,0 +1,37 @@
+{
+  "WIDGETS": {
+    "users": "Users",
+    "virtual_servers": "Virtual Servers",
+    "domain_names": "Domain Names"
+  },
+  "QUICK_REGISTRATION": {
+    "title": "Quick Registration",
+    "off": "OFF",
+    "turn_on": "Turn ON",
+    "turn_off": "Turn OFF",
+    "expired": "Quick Registration expired",
+    "create_failed": "Failed to create registration code",
+    "delete_failed": "Failed to delete registration code",
+    "MODAL": {
+      "title": "Quick Registration Code",
+      "subtitle": "Share this code with students to register",
+      "remaining": "remaining",
+      "copy": "Copy Code",
+      "close": "Close",
+      "copied": "Code copied to clipboard!"
+    }
+  },
+  "SYSTEM_OVERVIEW": {
+    "title": "System Overview",
+    "cpu": "CPU",
+    "cores": "cores",
+    "ram": "RAM",
+    "disk": "Disk",
+    "dockerhub": "Docker Hub"
+  },
+  "RECENT_ACTIVITY": {
+    "title": "Recent Activity",
+    "system": "System",
+    "none": "No recent activity"
+  }
+}

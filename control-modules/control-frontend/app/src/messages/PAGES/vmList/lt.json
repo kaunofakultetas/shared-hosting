@@ -1,0 +1,48 @@
+{
+  "HEADER": {
+    "title": "Virtualūs serveriai",
+    "count_one": "Iš viso serverių: {n}",
+    "count_many": "Iš viso serverių: {n}",
+    "filtered_one": "Rodoma {shown} iš {total}",
+    "filtered_many": "Rodoma {shown} iš {total}",
+    "show_other_users": "Rodyti kitų naudotojų",
+    "search_placeholder": "Ieškoti serverių...",
+    "new_server": "Naujas serveris"
+  },
+  "EMPTY": {
+    "none_title": "Virtualių serverių nerasta",
+    "none_subtitle": "Sukurkite pirmąjį serverį",
+    "no_match_title": "Atitikmenų nerasta",
+    "no_match_subtitle": "Pabandykite kitą paieškos frazę"
+  },
+  "CARD": {
+    "running": "Veikia",
+    "stopped": "Sustabdytas",
+    "stop_server": "Stabdyti serverį",
+    "start_server": "Paleisti serverį",
+    "stop_first": "Pirmiausia sustabdykite serverį",
+    "hold_to_delete": "Laikykite, kad ištrintumėte",
+    "unnamed": "Serveris be pavadinimo",
+    "domain_names": "Domenų vardai",
+    "open_new_tab": "Atidaryti naujame skirtuke",
+    "docker_containers": "Docker konteineriai",
+    "hold_toast": "Laikykite 3 sekundes, kad ištrintumėte"
+  },
+  "TOASTS": {
+    "stopping": "Stabdomas serveris: #{id}",
+    "starting": "Paleidžiamas serveris: #{id}",
+    "deleting": "Trinamas serveris: #{id}"
+  },
+  "ADD_MODAL": {
+    "title": "Naujas virtualus serveris",
+    "name": "Serverio pavadinimas",
+    "image": "Serverio atvaizdas",
+    "creating": "Kuriama...",
+    "create": "Sukurti",
+    "save": "Išsaugoti",
+    "delete": "Ištrinti serverį",
+    "hold_to_delete": "Laikykite 3 sekundes, kad ištrintumėte",
+    "created": "Serveris kuriamas. Palaukite 1 minutę...",
+    "failed": "Nepavyko sukurti serverio. Bandykite dar kartą."
+  }
+}

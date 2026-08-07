@@ -38,6 +38,7 @@ import axios from "axios";
 
 import { Button, Stack, TextField, MenuItem, Box, Checkbox, Typography } from "@mui/material";
 
+import { useTranslations } from "@/i18n";
 import { UniversalModal } from "@/components/UniversalModal";
 import { LongPressDeleteButton } from "@/components/LongPressButton";
 
@@ -69,7 +70,7 @@ const FACULTY_DOMAINS = ['.knf-hosting.lt'];
 //   - AddEditDomain (below) — the modal's `actions` slot
 // -----------------------------------------------------------
 
-function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
+function ModalActions({ isEditing, disableSave, onSave, onDelete, t }) {
   return (
     <div style={{ display: 'flex', gap: '8px' }}>
       <Button
@@ -81,9 +82,9 @@ function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
         disabled={disableSave}
       >
         {isEditing ? (
-          <><SaveIcon style={{ marginRight: 8 }} />Save</>
+          <><SaveIcon style={{ marginRight: 8 }} />{t("DOMAIN_MODAL.save")}</>
         ) : (
-          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />{t("DOMAIN_MODAL.create")}</>
         )}
       </Button>
 
@@ -92,10 +93,10 @@ function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
           fullWidth
           sx={{ flex: 1 }}
           onComplete={onDelete}
-          uncompletedToastMessage="Hold for 3 seconds to delete"
+          uncompletedToastMessage={t("DOMAIN_MODAL.hold_to_delete")}
         >
           <DeleteIcon sx={{ mr: 1 }} />
-          Delete
+          {t("DOMAIN_MODAL.delete")}
         </LongPressDeleteButton>
       }
     </div>
@@ -134,6 +135,7 @@ function DomainFields({
   domainNameValid,
   advancedOptions,
   setAdvancedOptions,
+  t,
 }) {
   return (
     <Stack spacing={3}>
@@ -151,7 +153,7 @@ function DomainFields({
             fontSize: '0.7em',
             marginRight: '8px'
           }}>
-            Use faculty supplied domain name
+            {t("DOMAIN_MODAL.use_faculty")}
           </Typography>
           <Checkbox
             checked={isFacultyDomain}
@@ -169,14 +171,14 @@ function DomainFields({
             <TextField
               type="text"
               required
-              label="Subdomain"
+              label={t("DOMAIN_MODAL.subdomain")}
               value={form.domainname}
               onChange={(e) => onDomainNameChange(e)}
               sx={{ flex: 1 }}
             />
             <TextField
               select
-              label="Domain"
+              label={t("DOMAIN_MODAL.domain")}
               value={facultyDomain}
               onChange={(e) => setFacultyDomain(e.target.value)}
               sx={{ minWidth: '200px' }}
@@ -191,7 +193,7 @@ function DomainFields({
             type="text"
             required
             fullWidth
-            label="Domain name"
+            label={t("DOMAIN_MODAL.domain_name")}
             value={form.domainname}
             onChange={(e) => onDomainNameChange(e)}
           />
@@ -205,9 +207,9 @@ function DomainFields({
         </Typography>
       </Box>
 
-      <TextField select fullWidth label="HTTP or HTTPS ?" value={form.ssl} onChange={updateField('ssl')}>
-        <MenuItem value={1}>HTTPS</MenuItem>
-        <MenuItem value={0}>HTTP</MenuItem>
+      <TextField select fullWidth label={t("DOMAIN_MODAL.protocol")} value={form.ssl} onChange={updateField('ssl')}>
+        <MenuItem value={1}>{t("DOMAIN_MODAL.https")}</MenuItem>
+        <MenuItem value={0}>{t("DOMAIN_MODAL.http")}</MenuItem>
       </TextField>
 
       {/* Advanced options fold — just Cloudflare for now */}
@@ -217,19 +219,19 @@ function DomainFields({
           onClick={() => setAdvancedOptions(!advancedOptions)}
           style={{ width: '100%', color: 'black' }}
         >
-          {advancedOptions ? 'Hide advanced options' : 'Show advanced options'}
+          {advancedOptions ? t("DOMAIN_MODAL.hide_advanced") : t("DOMAIN_MODAL.show_advanced")}
         </Button>
         {advancedOptions && (
           <TextField
             select
             fullWidth
-            label="Cloudflare?"
+            label={t("DOMAIN_MODAL.cloudflare")}
             value={form.iscloudflare}
             onChange={updateField('iscloudflare')}
             sx={{ marginTop: '20px' }}
           >
-            <MenuItem value={1}>Yes</MenuItem>
-            <MenuItem value={0}>No</MenuItem>
+            <MenuItem value={1}>{t("DOMAIN_MODAL.yes")}</MenuItem>
+            <MenuItem value={0}>{t("DOMAIN_MODAL.no")}</MenuItem>
           </TextField>
         )}
       </Box>
@@ -259,7 +261,9 @@ function DomainFields({
 //     (create)
 // -----------------------------------------------------------
 
-export default function AddEditDomain({ virtualServerID, rowData, setOpen, getData }) {
+export default function AddEditDomain({ virtualServerID, rowData, setOpen, getData, sourceRect }) {
+
+  const t = useTranslations("PAGES.vmDetail");
 
   // Animated close — the modal flies back before the parent
   // unmounts it (see UniversalModal's closeRef)
@@ -332,7 +336,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
     if (response.data.message === 'ok') {
       toast.success(<b>{successText}</b>, { duration: 3000 });
     } else {
-      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
+      toast.error(<b>{t("DOMAIN_MODAL.error", { message: response.data.message })}</b>, { duration: 8000 });
     }
 
     getData();
@@ -345,7 +349,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
       iscloudflare: form.iscloudflare,
       ssl: form.ssl,
     }, { withCredentials: true });
-    finishRequest(response, 'Domain created');
+    finishRequest(response, t("DOMAIN_MODAL.created"));
   }
 
   async function handleSaveButton() {
@@ -355,12 +359,12 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
       iscloudflare: form.iscloudflare,
       ssl: form.ssl,
     }, { withCredentials: true });
-    finishRequest(response, 'Domain updated');
+    finishRequest(response, t("DOMAIN_MODAL.updated"));
   }
 
   async function handleDeleteButton() {
     const response = await axios.delete(endpointUrl + "/" + form.id, { withCredentials: true });
-    finishRequest(response, 'Domain deleted');
+    finishRequest(response, t("DOMAIN_MODAL.deleted"));
   }
 
 
@@ -372,7 +376,8 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
       open={true}
       onClose={() => setOpen(false)}
       closeRef={modalCloseRef}
-      title="Domain Name"
+      title={t("DOMAIN_MODAL.title")}
+      sourceRect={sourceRect}
       maxWidth={500}
       fullWidth
       showCancel={false}
@@ -383,6 +388,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
           disableSave={disableSave}
           onSave={isEditing ? handleSaveButton : handleCreateButton}
           onDelete={handleDeleteButton}
+          t={t}
         />
       }
     >
@@ -398,6 +404,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
         domainNameValid={domainNameValid}
         advancedOptions={advancedOptions}
         setAdvancedOptions={setAdvancedOptions}
+        t={t}
       />
     </UniversalModal>
   );

@@ -37,6 +37,8 @@ import {
 import toast from "react-hot-toast";
 import axios from "axios";
 
+import { useTranslations } from "@/i18n";
+
 import LockIcon from "@mui/icons-material/Lock";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
@@ -54,13 +56,15 @@ import HistoryIcon from "@mui/icons-material/History";
 // -----------------------------------------------------------
 //
 // Timestamps arrive absolute; the activity list shows them
-// relative ("5 mins ago").
+// relative ("5 mins ago"). Takes the "COMPONENTS.timeago"
+// translator as an argument — a plain function cannot call
+// hooks itself.
 //
 // Used by:
 //   - RecentActivityCard (below) — every activity row
 // -----------------------------------------------------------
 
-const formatTimeAgo = (timestamp) => {
+const formatTimeAgo = (timestamp, tt) => {
   const now = new Date();
   const time = new Date(timestamp);
   const diffMs = now - time;
@@ -68,10 +72,10 @@ const formatTimeAgo = (timestamp) => {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  if (diffMins < 1) return tt("justNow");
+  if (diffMins < 60) return tt(diffMins > 1 ? "minsAgo" : "minAgo", { n: diffMins });
+  if (diffHours < 24) return tt(diffHours > 1 ? "hoursAgo" : "hourAgo", { n: diffHours });
+  return tt(diffDays > 1 ? "daysAgo" : "dayAgo", { n: diffDays });
 };
 
 
@@ -130,6 +134,8 @@ function PasswordField({ label, value, onChange, show, onToggleShow, error, help
 // -----------------------------------------------------------
 
 function AccountInfoCard({ authdata }) {
+  const t = useTranslations("PAGES.account");
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 p-6">
       <div className="flex items-center gap-4">
@@ -138,10 +144,10 @@ function AccountInfoCard({ authdata }) {
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
-            {authdata?.email || "User"}
+            {authdata?.email || t("INFO.user")}
           </h2>
           <span className="text-sm text-gray-500">
-            {authdata?.admin === 1 ? "Administrator" : "User"}
+            {authdata?.admin === 1 ? t("INFO.administrator") : t("INFO.user")}
           </span>
         </div>
       </div>
@@ -169,6 +175,8 @@ function AccountInfoCard({ authdata }) {
 
 function ChangePasswordCard() {
 
+  const t = useTranslations("PAGES.account");
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -183,19 +191,19 @@ function ChangePasswordCard() {
 
     // Validation
     if (!currentPassword) {
-      toast.error(<b>Please enter your current password</b>);
+      toast.error(<b>{t("PASSWORD.TOASTS.enter_current")}</b>);
       return;
     }
     if (!newPassword) {
-      toast.error(<b>Please enter a new password</b>);
+      toast.error(<b>{t("PASSWORD.TOASTS.enter_new")}</b>);
       return;
     }
     if (newPassword.length < 8) {
-      toast.error(<b>New password must be at least 8 characters</b>);
+      toast.error(<b>{t("PASSWORD.TOASTS.min_length")}</b>);
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error(<b>New passwords do not match</b>);
+      toast.error(<b>{t("PASSWORD.TOASTS.mismatch")}</b>);
       return;
     }
 
@@ -205,7 +213,7 @@ function ChangePasswordCard() {
         currentPassword,
         newPassword,
       });
-      toast.success(<b>Password changed successfully</b>);
+      toast.success(<b>{t("PASSWORD.TOASTS.success")}</b>);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -214,7 +222,7 @@ function ChangePasswordCard() {
         error.response?.data?.message ||
         error.response?.data?.error ||
         error.message ||
-        "Failed to change password";
+        t("PASSWORD.TOASTS.failed");
       toast.error(<b>{errorMessage}</b>);
     } finally {
       setIsSubmitting(false);
@@ -230,17 +238,17 @@ function ChangePasswordCard() {
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
-            Change Password
+            {t("PASSWORD.title")}
           </h2>
           <p className="text-sm text-gray-500">
-            Update your account password
+            {t("PASSWORD.subtitle")}
           </p>
         </div>
       </div>
 
       <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
         <PasswordField
-          label="Current Password"
+          label={t("PASSWORD.current")}
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           show={showCurrentPassword}
@@ -248,7 +256,7 @@ function ChangePasswordCard() {
         />
 
         <PasswordField
-          label="New Password"
+          label={t("PASSWORD.new")}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           show={showNewPassword}
@@ -256,7 +264,7 @@ function ChangePasswordCard() {
         />
 
         <PasswordField
-          label="Confirm New Password"
+          label={t("PASSWORD.confirm")}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           show={showConfirmPassword}
@@ -264,7 +272,7 @@ function ChangePasswordCard() {
           error={confirmPassword !== "" && newPassword !== confirmPassword}
           helperText={
             confirmPassword !== "" && newPassword !== confirmPassword
-              ? "Passwords do not match"
+              ? t("PASSWORD.mismatch")
               : ""
           }
         />
@@ -286,7 +294,7 @@ function ChangePasswordCard() {
             },
           }}
         >
-          {isSubmitting ? "Changing Password..." : "Change Password"}
+          {isSubmitting ? t("PASSWORD.submitting") : t("PASSWORD.submit")}
         </Button>
       </form>
     </div>
@@ -313,6 +321,9 @@ function ChangePasswordCard() {
 
 function RecentActivityCard() {
 
+  const t = useTranslations("PAGES.account");
+  const tt = useTranslations("COMPONENTS.timeago");
+
   const { data: activities = [], isPending } = useQuery({
     queryKey: ['account-activity'],
     queryFn: async () => (await axios.get('/api/account/recentactivity', { withCredentials: true })).data,
@@ -328,10 +339,10 @@ function RecentActivityCard() {
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
-            Recent Activity
+            {t("ACTIVITY.title")}
           </h2>
           <p className="text-sm text-gray-500">
-            Your account activity log
+            {t("ACTIVITY.subtitle")}
           </p>
         </div>
       </div>
@@ -350,7 +361,7 @@ function RecentActivityCard() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-700 truncate">
-                    {activity.email || 'System'}
+                    {activity.email || t("ACTIVITY.system")}
                   </p>
                   <p className="text-sm text-gray-600 mt-1">
                     {activity.message}
@@ -358,12 +369,12 @@ function RecentActivityCard() {
                 </div>
               </div>
               <p className="text-xs text-gray-400 mt-2">
-                {formatTimeAgo(activity.time)}
+                {formatTimeAgo(activity.time, tt)}
               </p>
             </div>
           ))
         ) : (
-          <p className="text-gray-400 italic text-sm">No recent activity</p>
+          <p className="text-gray-400 italic text-sm">{t("ACTIVITY.none")}</p>
         )}
       </div>
     </div>
@@ -385,13 +396,15 @@ function RecentActivityCard() {
 // -----------------------------------------------------------
 
 export default function AccountPage({ authdata }) {
+  const t = useTranslations("PAGES.account");
+
   return (
     <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-105px)] bg-gray-100">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Account Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage your account preferences
+          {t("HEADER.subtitle")}
         </p>
       </div>
 

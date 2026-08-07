@@ -1,0 +1,9 @@
+{
+  "justNow": "just now",
+  "minAgo": "{n} min ago",
+  "minsAgo": "{n} mins ago",
+  "hourAgo": "{n} hour ago",
+  "hoursAgo": "{n} hours ago",
+  "dayAgo": "{n} day ago",
+  "daysAgo": "{n} days ago"
+}

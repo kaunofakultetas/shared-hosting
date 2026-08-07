@@ -1,0 +1,27 @@
+{
+  "CONTROL": {
+    "TITLE": "CONTROL",
+    "dashboard": "Dashboard",
+    "virtual_servers": "Virtual Servers"
+  },
+  "INFORMATION": {
+    "TITLE": "INFORMATION",
+    "documentation": "Documentation",
+    "examples": "Examples"
+  },
+  "ADMIN": {
+    "TITLE": "ADMIN",
+    "users": "Users",
+    "database": "Database",
+    "api_documentation": "API Documentation"
+  },
+  "ACCOUNT": {
+    "TITLE": "ACCOUNT",
+    "account": "Account",
+    "logout": "Logout"
+  },
+  "PIN": {
+    "pin": "Pin sidebar open",
+    "unpin": "Unpin sidebar"
+  }
+}

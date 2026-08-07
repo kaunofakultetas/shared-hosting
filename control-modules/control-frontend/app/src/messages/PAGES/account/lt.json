@@ -1,0 +1,34 @@
+{
+  "HEADER": {
+    "title": "Paskyros nustatymai",
+    "subtitle": "Tvarkykite savo paskyros nustatymus"
+  },
+  "INFO": {
+    "user": "Naudotojas",
+    "administrator": "Administratorius"
+  },
+  "PASSWORD": {
+    "title": "Keisti slaptažodį",
+    "subtitle": "Atnaujinkite paskyros slaptažodį",
+    "current": "Dabartinis slaptažodis",
+    "new": "Naujas slaptažodis",
+    "confirm": "Pakartokite naują slaptažodį",
+    "mismatch": "Slaptažodžiai nesutampa",
+    "submit": "Keisti slaptažodį",
+    "submitting": "Keičiama...",
+    "TOASTS": {
+      "enter_current": "Įveskite dabartinį slaptažodį",
+      "enter_new": "Įveskite naują slaptažodį",
+      "min_length": "Naujas slaptažodis turi būti bent 8 simbolių",
+      "mismatch": "Nauji slaptažodžiai nesutampa",
+      "success": "Slaptažodis pakeistas",
+      "failed": "Nepavyko pakeisti slaptažodžio"
+    }
+  },
+  "ACTIVITY": {
+    "title": "Paskutiniai veiksmai",
+    "subtitle": "Jūsų paskyros veiksmų žurnalas",
+    "system": "Sistema",
+    "none": "Veiksmų nėra"
+  }
+}

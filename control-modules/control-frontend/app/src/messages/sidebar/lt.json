@@ -1,0 +1,27 @@
+{
+  "CONTROL": {
+    "TITLE": "VALDYMAS",
+    "dashboard": "Skydelis",
+    "virtual_servers": "Virtualūs serveriai"
+  },
+  "INFORMATION": {
+    "TITLE": "INFORMACIJA",
+    "documentation": "Dokumentacija",
+    "examples": "Pavyzdžiai"
+  },
+  "ADMIN": {
+    "TITLE": "ADMINISTRAVIMAS",
+    "users": "Naudotojai",
+    "database": "Duomenų bazė",
+    "api_documentation": "API dokumentacija"
+  },
+  "ACCOUNT": {
+    "TITLE": "PASKYRA",
+    "account": "Paskyra",
+    "logout": "Atsijungti"
+  },
+  "PIN": {
+    "pin": "Prisegti šoninį meniu",
+    "unpin": "Atsegti šoninį meniu"
+  }
+}

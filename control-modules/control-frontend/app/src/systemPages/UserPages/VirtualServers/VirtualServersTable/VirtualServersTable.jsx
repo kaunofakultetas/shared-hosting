@@ -24,6 +24,7 @@
 // -----------------------------------------------------------
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -38,6 +39,7 @@ import {
   Skeleton,
 } from "@mui/material";
 
+import { useTranslations } from "@/i18n";
 import IOSSwitch from "@/components/Other/IOSSwitch/IOSSwitch";
 import { LongPressIconButton } from "@/components/LongPressButton";
 import AddNewVM from "./AddNewVM/AddNewVM";
@@ -88,6 +90,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 function useVirtualServers(showOtherUsers) {
 
+  const t = useTranslations("PAGES.vmList");
   const queryClient = useQueryClient();
 
   const { data: vms = [], isPending } = useQuery({
@@ -115,9 +118,7 @@ function useVirtualServers(showOtherUsers) {
     const action = vm.state === "running" ? "stop" : "start";
     axios.post("/api/vm/control", { virtualServerID: vm.id, action }).then(refreshVms);
     toast.success(
-      <b>
-        {action === "stop" ? "Stopping" : "Starting"} server: #{vm.id}
-      </b>,
+      <b>{t(action === "stop" ? "TOASTS.stopping" : "TOASTS.starting", { id: vm.id })}</b>,
       { duration: 10000 }
     );
   };
@@ -125,7 +126,7 @@ function useVirtualServers(showOtherUsers) {
   const remove = (vm) => {
     if (vm.state !== "running") {
       axios.post("/api/vm/control", { virtualServerID: vm.id, action: "delete" }).then(refreshVms);
-      toast.success(<b>Deleting server: #{vm.id}</b>, { duration: 10000 });
+      toast.success(<b>{t("TOASTS.deleting", { id: vm.id })}</b>, { duration: 10000 });
     }
   };
 
@@ -155,6 +156,7 @@ function useVirtualServers(showOtherUsers) {
 // -----------------------------------------------------------
 
 function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
+  const t = useTranslations("PAGES.vmList");
   const isRunning = vm.state === "running";
 
   return (
@@ -188,7 +190,7 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
                 #{vm.id}
               </span>
               <Chip
-                label={isRunning ? "Running" : "Stopped"}
+                label={isRunning ? t("CARD.running") : t("CARD.stopped")}
                 size="small"
                 sx={{
                   fontWeight: 600,
@@ -200,7 +202,7 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
               />
             </div>
             <h3 className="text-2xl font-semibold text-gray-800 truncate mt-6">
-              {vm.name || "Unnamed Server"}
+              {vm.name || t("CARD.unnamed")}
             </h3>
           </div>
 
@@ -209,7 +211,7 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
             className="flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <Tooltip title={isRunning ? "Stop Server" : "Start Server"}>
+            <Tooltip title={isRunning ? t("CARD.stop_server") : t("CARD.start_server")}>
               <IconButton
                 onClick={(e) => onStartStop(e, vm)}
                 sx={{
@@ -224,12 +226,12 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
                 {isRunning ? <StopIcon /> : <PlayArrowIcon />}
               </IconButton>
             </Tooltip>
-            <Tooltip title={isRunning ? "Stop server first" : "Hold to delete"}>
+            <Tooltip title={isRunning ? t("CARD.stop_first") : t("CARD.hold_to_delete")}>
               <span>
                 <LongPressIconButton
                   disabled={isRunning}
                   onComplete={() => onDelete(vm)}
-                  uncompletedToastMessage="Hold for 3 seconds to delete"
+                  uncompletedToastMessage={t("CARD.hold_toast")}
                   progressColor="error.main"
                   progressBgColor="error.light"
                   className="select-none"
@@ -270,7 +272,7 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
             <div className="flex items-center gap-2 mb-2">
               <DomainIcon sx={{ fontSize: 16, color: "gray" }} />
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Domain Names
+                {t("CARD.domain_names")}
               </span>
             </div>
             <div className="space-y-1.5">
@@ -279,7 +281,7 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
                   <span className="text-sm text-gray-700 font-medium">
                     {domain.domainname || "Unknown"}
                   </span>
-                  <Tooltip title="Open in new tab">
+                  <Tooltip title={t("CARD.open_new_tab")}>
                     <IconButton
                       size="small"
                       onClick={(e) => {
@@ -334,7 +336,7 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
           <div className="flex items-center gap-2 mb-2">
             <ViewInArIcon sx={{ fontSize: 16, color: "gray" }} />
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Docker Containers
+              {t("CARD.docker_containers")}
             </span>
           </div>
           {vm.stacks && vm.stacks.length > 0 && (
@@ -398,9 +400,13 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
 
 export default function VirtualServersTable({ authdata }) {
 
+  const t = useTranslations("PAGES.vmList");
+  const navigate = useNavigate();
+
   const [openBackdrop, setOpenBackdrop] = useState(false);
   const [showOtherUsers, setShowOtherUsers] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [modalSourceRect, setModalSourceRect] = useState(null);
 
   const { vms: data, isPending: loadingData, refreshVms, startStop, remove } = useVirtualServers(showOtherUsers);
 
@@ -439,8 +445,10 @@ export default function VirtualServersTable({ authdata }) {
   });
 
 
+  // Client-side navigation — the detail page's data is often
+  // already in the query cache, so it opens instantly
   const handleNavigate = (vm) => {
-    window.location.href = `/vm/${vm.id}`;
+    navigate(`/vm/${vm.id}`);
   };
 
 
@@ -469,13 +477,11 @@ export default function VirtualServersTable({ authdata }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Virtual Servers</h1>
+          <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {searchQuery ? (
-              <>{filteredData.length} of {data.length} server{data.length !== 1 ? "s" : ""}</>
-            ) : (
-              <>{data.length} server{data.length !== 1 ? "s" : ""} total</>
-            )}
+            {searchQuery
+              ? t(data.length !== 1 ? "HEADER.filtered_many" : "HEADER.filtered_one", { shown: filteredData.length, total: data.length })
+              : t(data.length !== 1 ? "HEADER.count_many" : "HEADER.count_one", { n: data.length })}
           </p>
         </div>
 
@@ -492,7 +498,7 @@ export default function VirtualServersTable({ authdata }) {
                 />
               }
               label={
-                <span className="text-sm text-gray-600">Show other users</span>
+                <span className="text-sm text-gray-600">{t("HEADER.show_other_users")}</span>
               }
             />
           )}
@@ -502,7 +508,7 @@ export default function VirtualServersTable({ authdata }) {
               only the burgundy hover border stays local */}
           <TextField
             size="small"
-            placeholder="Search VMs..."
+            placeholder={t("HEADER.search_placeholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             sx={{
@@ -536,11 +542,15 @@ export default function VirtualServersTable({ authdata }) {
           />
 
 
-          {/* New Server — contained-primary from the theme */}
+          {/* New Server — contained-primary from the theme;
+              the dialog flies out of this button */}
           <Button
             variant="contained"
             startIcon={<AddCircleOutlinedIcon />}
-            onClick={() => handleDialogOpen(true)}
+            onClick={(event) => {
+              setModalSourceRect(event.currentTarget.getBoundingClientRect());
+              handleDialogOpen(true);
+            }}
             sx={{
               textTransform: "none",
               fontWeight: 600,
@@ -549,7 +559,7 @@ export default function VirtualServersTable({ authdata }) {
               "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
             }}
           >
-            New Server
+            {t("HEADER.new_server")}
           </Button>
         </div>
       </div>
@@ -568,8 +578,8 @@ export default function VirtualServersTable({ authdata }) {
       {!loadingData && data.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
           <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
-          <p className="mt-4 text-lg">No virtual servers found</p>
-          <p className="text-sm">Create your first server to get started</p>
+          <p className="mt-4 text-lg">{t("EMPTY.none_title")}</p>
+          <p className="text-sm">{t("EMPTY.none_subtitle")}</p>
         </div>
       )}
 
@@ -577,8 +587,8 @@ export default function VirtualServersTable({ authdata }) {
       {!loadingData && data.length > 0 && filteredData.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
           <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
-          <p className="mt-4 text-lg">No matches found</p>
-          <p className="text-sm">Try a different search term</p>
+          <p className="mt-4 text-lg">{t("EMPTY.no_match_title")}</p>
+          <p className="text-sm">{t("EMPTY.no_match_subtitle")}</p>
         </div>
       )}
 
@@ -599,7 +609,7 @@ export default function VirtualServersTable({ authdata }) {
 
       {/* Add New VM Dialog */}
       {openBackdrop && (
-        <AddNewVM setOpen={handleDialogOpen} getData={refreshVms} />
+        <AddNewVM setOpen={handleDialogOpen} getData={refreshVms} sourceRect={modalSourceRect} />
       )}
     </div>
   );

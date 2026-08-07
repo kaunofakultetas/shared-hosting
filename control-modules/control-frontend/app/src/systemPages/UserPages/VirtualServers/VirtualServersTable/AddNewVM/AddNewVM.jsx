@@ -30,6 +30,7 @@ import axios from "axios";
 
 import { Button, Stack, TextField, MenuItem } from "@mui/material";
 
+import { useTranslations } from "@/i18n";
 import { UniversalModal } from "@/components/UniversalModal";
 import { LongPressDeleteButton } from "@/components/LongPressButton";
 
@@ -57,7 +58,7 @@ import toast from 'react-hot-toast';
 //   - AddNewVM (below) — the modal's `actions` slot
 // -----------------------------------------------------------
 
-function ModalActions({ isEditing, isSubmitting, disableSave, onSave, onDelete }) {
+function ModalActions({ isEditing, isSubmitting, disableSave, onSave, onDelete, t }) {
   return (
     <div style={{ display: 'flex', gap: '8px' }}>
       <Button
@@ -69,11 +70,11 @@ function ModalActions({ isEditing, isSubmitting, disableSave, onSave, onDelete }
         disabled={disableSave}
       >
         {isSubmitting ? (
-          'Creating...'
+          t("ADD_MODAL.creating")
         ) : isEditing ? (
-          <><SaveIcon style={{ marginRight: 8 }} />Save</>
+          <><SaveIcon style={{ marginRight: 8 }} />{t("ADD_MODAL.save")}</>
         ) : (
-          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />{t("ADD_MODAL.create")}</>
         )}
       </Button>
 
@@ -82,10 +83,10 @@ function ModalActions({ isEditing, isSubmitting, disableSave, onSave, onDelete }
           fullWidth
           sx={{ flex: 1 }}
           onComplete={onDelete}
-          uncompletedToastMessage="Hold for 3 seconds to delete"
+          uncompletedToastMessage={t("ADD_MODAL.hold_to_delete")}
         >
           <DeleteIcon sx={{ mr: 1 }} />
-          Delete VM
+          {t("ADD_MODAL.delete")}
         </LongPressDeleteButton>
       }
     </div>
@@ -109,7 +110,7 @@ function ModalActions({ isEditing, isSubmitting, disableSave, onSave, onDelete }
 //   - AddNewVM (below) — the modal's children
 // -----------------------------------------------------------
 
-function FormFields({ form, updateField, nameInputRef, onKeyDown }) {
+function FormFields({ form, updateField, nameInputRef, onKeyDown, t }) {
   return (
     <Stack spacing={3}>
 
@@ -117,7 +118,7 @@ function FormFields({ form, updateField, nameInputRef, onKeyDown }) {
         required
         fullWidth
         inputRef={nameInputRef}
-        label="Virtual Server Name"
+        label={t("ADD_MODAL.name")}
         value={form.name}
         onChange={updateField('name')}
         onKeyDown={onKeyDown}
@@ -126,7 +127,7 @@ function FormFields({ form, updateField, nameInputRef, onKeyDown }) {
       <TextField
         select
         fullWidth
-        label="Virtual Server Image"
+        label={t("ADD_MODAL.image")}
         value={form.os}
         onChange={updateField('os')}
         onKeyDown={onKeyDown}
@@ -158,7 +159,9 @@ function FormFields({ form, updateField, nameInputRef, onKeyDown }) {
 //   - VirtualServersTable — opened by the New Server button
 // -----------------------------------------------------------
 
-export default function AddNewVM({ vmData, setOpen, getData }) {
+export default function AddNewVM({ vmData, setOpen, getData, sourceRect }) {
+
+  const t = useTranslations("PAGES.vmList");
 
   // Animated close — the modal flies back before the parent
   // unmounts it (see UniversalModal's closeRef)
@@ -198,12 +201,12 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
 
     try {
       await axios.post("/api/vm/control", postData, { withCredentials: true });
-      toast.success(<b>Server is being created. Please wait 1 minute...</b>, { duration: 30000 });
+      toast.success(<b>{t("ADD_MODAL.created")}</b>, { duration: 30000 });
 
       getData();
       modalCloseRef.current?.();
     } catch {
-      toast.error(<b>Failed to create server. Please try again.</b>);
+      toast.error(<b>{t("ADD_MODAL.failed")}</b>);
       setIsSubmitting(false);
     }
   }
@@ -239,7 +242,8 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
       open={true}
       onClose={() => setOpen(false)}
       closeRef={modalCloseRef}
-      title="New Virtual Server"
+      title={t("ADD_MODAL.title")}
+      sourceRect={sourceRect}
       maxWidth={500}
       fullWidth
       showCancel={false}
@@ -251,6 +255,7 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
           disableSave={disableSave}
           onSave={handleSaveButton}
           onDelete={handleDeleteButton}
+          t={t}
         />
       }
     >
@@ -259,6 +264,7 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
         updateField={updateField}
         nameInputRef={nameInputRef}
         onKeyDown={handleKeyDown}
+        t={t}
       />
     </UniversalModal>
   );

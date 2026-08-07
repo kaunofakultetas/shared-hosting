@@ -1,0 +1,34 @@
+{
+  "HEADER": {
+    "title": "Account Settings",
+    "subtitle": "Manage your account preferences"
+  },
+  "INFO": {
+    "user": "User",
+    "administrator": "Administrator"
+  },
+  "PASSWORD": {
+    "title": "Change Password",
+    "subtitle": "Update your account password",
+    "current": "Current Password",
+    "new": "New Password",
+    "confirm": "Confirm New Password",
+    "mismatch": "Passwords do not match",
+    "submit": "Change Password",
+    "submitting": "Changing Password...",
+    "TOASTS": {
+      "enter_current": "Please enter your current password",
+      "enter_new": "Please enter a new password",
+      "min_length": "New password must be at least 8 characters",
+      "mismatch": "New passwords do not match",
+      "success": "Password changed successfully",
+      "failed": "Failed to change password"
+    }
+  },
+  "ACTIVITY": {
+    "title": "Recent Activity",
+    "subtitle": "Your account activity log",
+    "system": "System",
+    "none": "No recent activity"
+  }
+}
