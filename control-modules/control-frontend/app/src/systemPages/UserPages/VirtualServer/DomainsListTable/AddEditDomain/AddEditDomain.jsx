@@ -1,35 +1,242 @@
 // -----------------------------------------------------------
 //  [*] AddEditDomain — the domain name dialog
 //
-//  Joy UI modal for one domain of a VM, in two modes decided
-//  by rowData: prefilled edit (Save + Delete buttons) or
-//  empty create (Create button). All three actions talk to
+//  The create/edit dialog for one domain of a VM, built on
+//  UniversalModal with custom action buttons (the stock
+//  Confirm/Cancel pair is hidden). All three actions talk to
 //  /api/vm/dns/<vm id> (POST create / PUT update / DELETE).
 //
-//  The "faculty supplied domain name" checkbox (default on)
-//  splits the input into subdomain + a fixed-suffix dropdown
-//  (.knf-hosting.lt is the only entry today); when editing,
-//  a name ending in a faculty suffix is split back apart.
-//  Every keystroke revalidates the full name against
-//  /api/vm/dns/isvalid — the backend's message shows under
-//  the field, green when valid, and Save/Create stays
-//  disabled until the backend says valid.
+//  Behavior worth knowing:
+//    - the "faculty supplied domain name" checkbox (default
+//      on) splits the input into subdomain + a fixed-suffix
+//      dropdown (.knf-hosting.lt is the only entry today);
+//      when editing, a name ending in a faculty suffix is
+//      split back apart
+//    - every keystroke revalidates the full name against
+//      /api/vm/dns/isvalid — the backend's message shows
+//      under the field, green when valid, and Save/Create
+//      stays disabled until the backend says valid
+//    - Cloudflare yes/no hides behind "Show advanced options"
+//    - delete is a long-press button so it can't be hit by
+//      accident; the dialog closes (animated) and the grid
+//      refreshes after every backend answer
 //
-//  Cloudflare yes/no hides behind "Show advanced options".
+//  Split into (root component last):
+//
+//    FACULTY_DOMAINS — the offered faculty suffixes
+//    ModalActions    — Save/Create + long-press Delete bar
+//    DomainFields    — name/validation/ssl/advanced inputs
+//    AddEditDomain   — state + API calls (default export)
 //
 //  Used by:
 //    - DomainsListTable — row click (edit) and Insert New
 //      (create)
 // -----------------------------------------------------------
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-import { Button, Modal, ModalDialog, Stack, Typography } from "@mui/joy";
-import { TextField, Box, FormControl, Grid, MenuItem, Checkbox } from "@mui/material";
+import { Button, Stack, TextField, MenuItem, Box, Checkbox, Typography } from "@mui/material";
 
-import CancelIcon from '@mui/icons-material/Cancel';
+import { UniversalModal } from "@/components/UniversalModal";
+import { LongPressDeleteButton } from "@/components/LongPressButton";
+
+import SaveIcon from '@mui/icons-material/Save';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast';
+
+
+// The faculty-supplied suffixes offered in the dropdown
+const FACULTY_DOMAINS = ['.knf-hosting.lt'];
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// ModalActions
+// -----------------------------------------------------------
+//
+// The modal's custom action bar: the contained Save (edit) /
+// Create (new) button — disabled until the backend validated
+// the name — and, only when editing, the long-press Delete
+// button next to it.
+//
+// Used by:
+//   - AddEditDomain (below) — the modal's `actions` slot
+// -----------------------------------------------------------
+
+function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
+  return (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <Button
+        variant="contained"
+        fullWidth
+        color="primary"
+        sx={{ flex: 1 }}
+        onClick={() => onSave()}
+        disabled={disableSave}
+      >
+        {isEditing ? (
+          <><SaveIcon style={{ marginRight: 8 }} />Save</>
+        ) : (
+          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+        )}
+      </Button>
+
+      {isEditing &&
+        <LongPressDeleteButton
+          fullWidth
+          sx={{ flex: 1 }}
+          onComplete={onDelete}
+          uncompletedToastMessage="Hold for 3 seconds to delete"
+        >
+          <DeleteIcon sx={{ mr: 1 }} />
+          Delete
+        </LongPressDeleteButton>
+      }
+    </div>
+  );
+}
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// DomainFields
+// -----------------------------------------------------------
+//
+// The form body: the faculty checkbox, the name input (split
+// subdomain + suffix dropdown in faculty mode, one full-name
+// field otherwise) with the backend's validation message
+// underneath, the HTTP/HTTPS select and the advanced-options
+// fold with the Cloudflare select.
+//
+// Used by:
+//   - AddEditDomain (below) — the modal's children
+// -----------------------------------------------------------
+
+function DomainFields({
+  form,
+  updateField,
+  onDomainNameChange,
+  isFacultyDomain,
+  setIsFacultyDomain,
+  facultyDomain,
+  setFacultyDomain,
+  domainNameError,
+  domainNameValid,
+  advancedOptions,
+  setAdvancedOptions,
+}) {
+  return (
+    <Stack spacing={3}>
+
+      <Box>
+        {/* Checkbox for choosing a faculty supplied domain
+            name subdomain */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          width: '100%',
+        }}>
+          <Typography sx={{
+            fontSize: '0.7em',
+            marginRight: '8px'
+          }}>
+            Use faculty supplied domain name
+          </Typography>
+          <Checkbox
+            checked={isFacultyDomain}
+            onChange={(e) => {
+              setIsFacultyDomain(e.target.checked);
+            }}
+          />
+        </Box>
+
+        {/* Faculty mode: subdomain + suffix dropdown; own
+            domain mode: one full-name field. The backend's
+            validation message sits underneath either way. */}
+        {isFacultyDomain ?
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              type="text"
+              required
+              label="Subdomain"
+              value={form.domainname}
+              onChange={(e) => onDomainNameChange(e)}
+              sx={{ flex: 1 }}
+            />
+            <TextField
+              select
+              label="Domain"
+              value={facultyDomain}
+              onChange={(e) => setFacultyDomain(e.target.value)}
+              sx={{ minWidth: '200px' }}
+            >
+              {FACULTY_DOMAINS.map((domain, index) => (
+                <MenuItem key={index} value={domain}>{domain}</MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          :
+          <TextField
+            type="text"
+            required
+            fullWidth
+            label="Domain name"
+            value={form.domainname}
+            onChange={(e) => onDomainNameChange(e)}
+          />
+        }
+        <Typography style={{
+          color: domainNameValid ? 'green' : 'red',
+          fontSize: '0.8em',
+          fontWeight: 'bold'
+        }}>
+          {domainNameError}
+        </Typography>
+      </Box>
+
+      <TextField select fullWidth label="HTTP or HTTPS ?" value={form.ssl} onChange={updateField('ssl')}>
+        <MenuItem value={1}>HTTPS</MenuItem>
+        <MenuItem value={0}>HTTP</MenuItem>
+      </TextField>
+
+      {/* Advanced options fold — just Cloudflare for now */}
+      <Box sx={{ border: '1px solid #ccc', borderRadius: '5px', padding: '10px', flexDirection: 'column' }}>
+        <Button
+          variant="outlined"
+          onClick={() => setAdvancedOptions(!advancedOptions)}
+          style={{ width: '100%', color: 'black' }}
+        >
+          {advancedOptions ? 'Hide advanced options' : 'Show advanced options'}
+        </Button>
+        {advancedOptions && (
+          <TextField
+            select
+            fullWidth
+            label="Cloudflare?"
+            value={form.iscloudflare}
+            onChange={updateField('iscloudflare')}
+            sx={{ marginTop: '20px' }}
+          >
+            <MenuItem value={1}>Yes</MenuItem>
+            <MenuItem value={0}>No</MenuItem>
+          </TextField>
+        )}
+      </Box>
+
+    </Stack>
+  );
+}
 
 
 
@@ -41,6 +248,12 @@ import toast from 'react-hot-toast';
 // AddEditDomain (default export)
 // -----------------------------------------------------------
 //
+// Owns the form state, the per-keystroke backend validation
+// and the create/update/delete calls. The backend answers
+// { message: 'ok' | reason } — either way the result is
+// toasted, the grid refreshes via getData() and the dialog
+// closes (animated, via UniversalModal's closeRef).
+//
 // Used by:
 //   - DomainsListTable — row click (edit) and Insert New
 //     (create)
@@ -48,57 +261,36 @@ import toast from 'react-hot-toast';
 
 export default function AddEditDomain({ virtualServerID, rowData, setOpen, getData }) {
 
-  const [data, setData] = useState(undefined);
+  // Animated close — the modal flies back before the parent
+  // unmounts it (see UniversalModal's closeRef)
+  const modalCloseRef = useRef(null);
+
+
+  const isEditing = rowData !== undefined;
+
+  // An edited name ending in a faculty suffix is split back
+  // into its subdomain + suffix parts
+  const matchedSuffix = isEditing
+    ? FACULTY_DOMAINS.find((domain) => rowData.row.domainname.endsWith(domain))
+    : undefined;
+
+  const [isFacultyDomain, setIsFacultyDomain] = useState(isEditing ? Boolean(matchedSuffix) : true);
+  const [facultyDomain, setFacultyDomain] = useState(matchedSuffix || FACULTY_DOMAINS[0]);
   const [advancedOptions, setAdvancedOptions] = useState(false);
 
-  const facultyDomains = ['.knf-hosting.lt'];
-  const [isFacultyDomain, setIsFacultyDomain] = useState(true);
-  const [facultyDomain, setFacultyDomain] = useState(facultyDomains[0]);
+  const [form, setForm] = useState({
+    id:           isEditing ? rowData.row.id : '',
+    domainname:   isEditing
+      ? (matchedSuffix ? rowData.row.domainname.replace(matchedSuffix, '') : rowData.row.domainname)
+      : '',
+    iscloudflare: isEditing ? rowData.row.iscloudflare : 0,
+    ssl:          isEditing ? (rowData.row.ssl || 0) : 0,
+  });
+
+  const updateField = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
 
-  const endpointUrl = "/api/vm/dns/"+virtualServerID;
-
-
-  // Prefill for edit mode — a faculty-suffixed name is split
-  // into its subdomain + suffix parts first
-  useEffect(() => {
-    if (rowData !== undefined) {
-
-      for (const domain of facultyDomains) {
-        if(rowData.row.domainname.endsWith(domain)) {
-          setIsFacultyDomain(true);
-          setFacultyDomain(domain);
-
-          setData({
-            id: rowData.row.id,
-            domainname: rowData.row.domainname.replace(domain, ''),
-            iscloudflare: rowData.row.iscloudflare,
-            ssl: rowData.row.ssl || 0,
-          });
-          return;
-        }
-      }
-
-      // Not a faculty domain — keep the full name in the field
-      setData({
-        id: rowData.row.id,
-        domainname: rowData.row.domainname,
-        iscloudflare: rowData.row.iscloudflare,
-        ssl: rowData.row.ssl || 0,
-      });
-      setIsFacultyDomain(false);
-
-
-    } else {
-      // Creating a new domain
-      setData({
-        id: '',
-        domainname: '',
-        iscloudflare: 0,
-        ssl: 0,
-      });
-    }
-  }, [rowData]);
+  const endpointUrl = "/api/vm/dns/" + virtualServerID;
 
 
   // The backend validates the FULL name (suffix included) and
@@ -107,7 +299,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
   const [domainNameError, setDomainNameError] = useState('');
   const [domainNameValid, setDomainNameValid] = useState(false);
   async function isDomainNameValid(domainname) {
-    if(isFacultyDomain) {
+    if (isFacultyDomain) {
       domainname = domainname + facultyDomain;
     }
     const domainname_encoded = encodeURIComponent(domainname);
@@ -116,284 +308,97 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
     setDomainNameValid(response.data.isvalid);
   }
 
-
   async function handleDomainNameChange(e) {
     let domainname = e.target.value;
-    setData(prevData => ({ ...prevData, domainname: domainname }))
+    setForm(prev => ({ ...prev, domainname: domainname }));
     isDomainNameValid(domainname);
   }
 
-  // Revalidate when the prefill lands or the faculty checkbox
-  // flips (the suffix changes the full name)
+  // Revalidate on mount (prefill / empty name) and when the
+  // faculty checkbox flips (the suffix changes the full name)
   useEffect(() => {
-    if (data !== undefined) {
-      isDomainNameValid(data.domainname);
-    } else {
-      isDomainNameValid('');
-    }
-  }, [data, isFacultyDomain]);
+    isDomainNameValid(form.domainname);
+  }, [form, isFacultyDomain]);
 
+
+  // The full name the backend stores — subdomain + suffix in
+  // faculty mode
+  const fullDomainName = () =>
+    isFacultyDomain ? form.domainname + facultyDomain : form.domainname;
+
+
+  // Shared answer handling: toast, refresh the grid, close
+  function finishRequest(response, successText) {
+    if (response.data.message === 'ok') {
+      toast.success(<b>{successText}</b>, { duration: 3000 });
+    } else {
+      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
+    }
+
+    getData();
+    modalCloseRef.current?.();
+  }
 
   async function handleCreateButton() {
-    let fullDomainName = data.domainname;
-    if(isFacultyDomain) {
-      fullDomainName = fullDomainName + facultyDomain;
-    }
-    const requestData = {
-      domainname: fullDomainName,
-      iscloudflare: data.iscloudflare,
-      ssl: data.ssl,
-    }
-
-    const response = await axios.post(endpointUrl, requestData, { withCredentials: true });
-    if (response.data.message === 'ok') {
-      toast.success(<b>Domain created</b>, { duration: 3000 });
-    } else {
-      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
-    }
-
-    getData();
-    setOpen(false);
+    const response = await axios.post(endpointUrl, {
+      domainname: fullDomainName(),
+      iscloudflare: form.iscloudflare,
+      ssl: form.ssl,
+    }, { withCredentials: true });
+    finishRequest(response, 'Domain created');
   }
-
 
   async function handleSaveButton() {
-    let fullDomainName = data.domainname;
-    if(isFacultyDomain) {
-      fullDomainName = fullDomainName + facultyDomain;
-    }
-    const requestData = {
-      domainid: data.id,
-      domainname: fullDomainName,
-      iscloudflare: data.iscloudflare,
-      ssl: data.ssl,
-    };
-
-    const response = await axios.put(endpointUrl, requestData, { withCredentials: true });
-    if (response.data.message === 'ok') {
-      toast.success(<b>Domain updated</b>, { duration: 3000 });
-    } else {
-      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
-    }
-
-    getData();
-    setOpen(false);
+    const response = await axios.put(endpointUrl, {
+      domainid: form.id,
+      domainname: fullDomainName(),
+      iscloudflare: form.iscloudflare,
+      ssl: form.ssl,
+    }, { withCredentials: true });
+    finishRequest(response, 'Domain updated');
   }
-
 
   async function handleDeleteButton() {
-    const response = await axios.delete(endpointUrl+"/"+data.id, { withCredentials: true });
-    if (response.data.message === 'ok') {
-      toast.success(<b>Domain deleted</b>, { duration: 3000 });
-    } else {
-      toast.error(<b>Error:<br/>Error message: {response.data.message}</b>, { duration: 8000 });
-    }
-
-    getData();
-    setOpen(false);
+    const response = await axios.delete(endpointUrl + "/" + form.id, { withCredentials: true });
+    finishRequest(response, 'Domain deleted');
   }
 
 
-  // Nothing to render until the prefill effect has run
-  if (data === undefined) {
-    return null;
-  }
-
-
-  const disableSave = data.domainname.trim() === '';
+  const disableSave = form.domainname.trim() === '' || !domainNameValid;
 
 
   return (
-    <Modal open={true} onClose={() => setOpen(false)}>
-      <ModalDialog sx={{ width: '500px', borderRadius: 'md', boxShadow: 'lg', backgroundColor: 'white' }} >
-        {/* Title row with the red close cross */}
-        <Box>
-          <Grid container direction="row">
-            <Grid item xs={10} align="left">
-              <Typography component="h2" fontSize="1.25em" mb="0.25em" style={{ marginBottom: '10px' }}>
-                Domain Name
-              </Typography>
-            </Grid>
-
-            <Grid item xs={2} align="right">
-              <Button
-                onClick={() => setOpen(false)}
-                style={{ padding: 0, borderRadius: '50%', backgroundColor: 'transparent', outline: 'transparent' }}
-              >
-                <CancelIcon style={{ color: 'red' }} />
-              </Button>
-            </Grid>
-          </Grid>
-        </Box>
-
-        <Stack spacing={3}>
-
-          <FormControl size="lg" color="primary">
-            {/* Checkbox for choosing a faculty supplied domain
-                name subdomain */}
-            <Box sx={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              alignItems: 'center',
-              width: '100%',
-            }}>
-              <Typography sx={{
-                fontSize: '0.7em',
-                marginRight: '8px'
-              }}>
-                Use faculty supplied domain name
-              </Typography>
-              <Checkbox
-                style={{ color: 'var(--mui-palette-primary-main)' }}
-                checked={isFacultyDomain}
-                onChange={(e) => {
-                  setIsFacultyDomain(e.target.checked);
-                }}
-              />
-            </Box>
-
-            {/* Faculty mode: subdomain + suffix dropdown; own
-                domain mode: one full-name field. The backend's
-                validation message sits underneath either way. */}
-            {isFacultyDomain ?
-              <>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TextField
-                    type="text"
-                    required
-                    label="Subdomain"
-                    value={data.domainname}
-                    onChange={(e) => handleDomainNameChange(e)}
-                    sx={{ flex: 1 }}
-                  />
-                  <TextField
-                    select
-                    label="Domain"
-                    value={facultyDomain}
-                    onChange={(e) => setFacultyDomain(e.target.value)}
-                    sx={{ minWidth: '200px' }}
-                  >
-                    {facultyDomains.map((domain, index) => (
-                      <MenuItem key={index} value={domain}>{domain}</MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
-                <Typography style={{
-                  color: domainNameValid ? 'green' : 'red',
-                  fontSize: '0.8em',
-                  fontWeight: 'bold'
-                }}>
-                  {domainNameError}
-                </Typography>
-              </>
-              :
-              <>
-                <TextField
-                  type="text"
-                  required
-                  label="Domain name"
-                  value={data.domainname}
-                  onChange={(e) => handleDomainNameChange(e)}
-                />
-                <Typography style={{ color: domainNameValid ? 'green' : 'red', fontSize: '0.8em', fontWeight: 'bold' }}>{domainNameError}</Typography>
-              </>
-            }
-
-
-          </FormControl>
-
-          <FormControl size="lg" color="primary">
-            <TextField
-              select
-              label="HTTP or HTTPS ?"
-              value={data.ssl}
-              onChange={(e) => setData(prevData => ({ ...prevData, ssl: e.target.value }))}
-            >
-              <MenuItem value={1}>HTTPS</MenuItem>
-              <MenuItem value={0}>HTTP</MenuItem>
-            </TextField>
-          </FormControl>
-
-
-          {/* Advanced options fold — just Cloudflare for now */}
-          <Box sx={{ border: '1px solid #ccc', borderRadius: '5px', padding: '10px', flexDirection: 'column' }}>
-            <Box>
-              <Button
-                variant="outlined"
-                onClick={() => setAdvancedOptions(!advancedOptions)}
-                style={{ width: '100%', color: 'black' }}
-              >
-                {advancedOptions ? 'Hide advanced options' : 'Show advanced options'}
-              </Button>
-            </Box>
-            {advancedOptions && (
-              <>
-                <FormControl size="lg" color="primary" sx={{ width: '100%', marginTop: '20px' }}>
-                  <TextField
-                    select
-                    label="Cloudflare?"
-                    value={data.iscloudflare}
-                    onChange={(e) => setData(prevData => ({ ...prevData, iscloudflare: e.target.value }))}
-                  >
-                    <MenuItem value={1}>Yes</MenuItem>
-                    <MenuItem value={0}>No</MenuItem>
-                  </TextField>
-                </FormControl>
-              </>
-            )}
-          </Box>
-
-
-          <div style={{ marginTop: '100px' }}></div>
-
-          {/* Bottom buttons — Create alone, or Save + Delete
-              when editing; both gated on backend validity */}
-          <Box>
-            <Grid container spacing={1} align="center" direction="row">
-              <Grid item xs={rowData !== undefined ? 6 : 12}>
-                {/* Joy button — the MUI theme doesn't reach it,
-                    but its emitted CSS variables do */}
-                <Button
-                  type="submit"
-                  style={{
-                    backgroundColor: disableSave || !domainNameValid ? 'grey' : 'var(--mui-palette-primary-main)',
-                    color: 'white',
-                    boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                    width: '100%',
-                  }}
-                  onClick={() => {
-                    if (rowData !== undefined && domainNameValid) {
-                      handleSaveButton();
-                    } else if (rowData === undefined && domainNameValid) {
-                      handleCreateButton();
-                    }
-                  }}
-                  disabled={disableSave || !domainNameValid}
-                >
-                  {rowData !== undefined ? 'Save' : 'Create'}
-                </Button>
-              </Grid>
-
-              {rowData !== undefined && (
-                <Grid item xs={6}>
-                  <Button
-                    style={{
-                      backgroundColor: 'blue',
-                      color: 'white',
-                      boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                      width: '100%',
-                    }}
-                    onClick={() => handleDeleteButton()}
-                  >
-                    Delete
-                  </Button>
-                </Grid>
-              )}
-
-            </Grid>
-          </Box>
-        </Stack>
-      </ModalDialog>
-    </Modal>
+    <UniversalModal
+      open={true}
+      onClose={() => setOpen(false)}
+      closeRef={modalCloseRef}
+      title="Domain Name"
+      maxWidth={500}
+      fullWidth
+      showCancel={false}
+      showConfirm={false}
+      actions={
+        <ModalActions
+          isEditing={isEditing}
+          disableSave={disableSave}
+          onSave={isEditing ? handleSaveButton : handleCreateButton}
+          onDelete={handleDeleteButton}
+        />
+      }
+    >
+      <DomainFields
+        form={form}
+        updateField={updateField}
+        onDomainNameChange={handleDomainNameChange}
+        isFacultyDomain={isFacultyDomain}
+        setIsFacultyDomain={setIsFacultyDomain}
+        facultyDomain={facultyDomain}
+        setFacultyDomain={setFacultyDomain}
+        domainNameError={domainNameError}
+        domainNameValid={domainNameValid}
+        advancedOptions={advancedOptions}
+        setAdvancedOptions={setAdvancedOptions}
+      />
+    </UniversalModal>
   );
 }

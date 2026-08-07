@@ -1,38 +1,172 @@
 // -----------------------------------------------------------
 //  [*] AddEditUser — the user account dialog
 //
-//  Joy UI modal for one account, in two modes decided by
-//  rowData: prefilled edit (Save + hold-to-delete buttons,
-//  password fields hidden behind a "Change Password" button)
-//  or empty create (password fields always shown). Everything
-//  goes to POST /api/admin/users — action "insertupdate" with
-//  the fields (password empty = keep the current one) or
-//  action "delete" with the id.
+//  The create/edit dialog for platform accounts, built on
+//  UniversalModal with custom action buttons (the stock
+//  Confirm/Cancel pair is hidden).
 //
-//  Save stays disabled until the email is filled and — when
-//  the password fields are visible — both are non-empty and
-//  matching. Delete is the shared hold-to-confirm
-//  LongPressButton, dressed to match the dialog's Joy
-//  buttons.
+//  Behavior worth knowing:
+//    - rowData present → edit mode: the form is pre-filled
+//      and the password fields stay hidden behind a "Change
+//      Password" button; rowData undefined → create mode
+//      with the password fields shown from the start
+//    - Save stays disabled until the email is filled and,
+//      when the password fields are visible, both are
+//      non-empty and matching
+//    - one POST endpoint (/api/admin/users) handles both
+//      insertupdate (empty password = keep the current one)
+//      and delete via the `action` field
+//    - delete is a long-press button so it can't be hit by
+//      accident; the dialog closes (animated) and the grid
+//      refreshes after every backend answer
+//
+//  Split into (root component last):
+//
+//    ModalActions — Save/Create + long-press Delete bar
+//    FormFields   — email/admin/enabled/password inputs
+//    AddEditUser  — state + API calls (default export)
 //
 //  Used by:
 //    - UsersListTable — row click (edit) and Insert New
 //      (create)
 // -----------------------------------------------------------
 
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import axios from "axios";
 
-import { Button, Modal, ModalDialog, Stack, Typography } from "@mui/joy";
-import { TextField, Box, FormControl, Grid, MenuItem } from "@mui/material";
+import { Button, Stack, TextField, MenuItem } from "@mui/material";
 
-import { LongPressButton } from "@/components/LongPressButton";
+import { UniversalModal } from "@/components/UniversalModal";
+import { LongPressDeleteButton } from "@/components/LongPressButton";
 
-import CancelIcon from '@mui/icons-material/Cancel';
-import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast';
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// ModalActions
+// -----------------------------------------------------------
+//
+// The modal's custom action bar: the contained Save (edit) /
+// Create (new) button, and — only when editing — the
+// long-press Delete button next to it.
+//
+// Used by:
+//   - AddEditUser (below) — the modal's `actions` slot
+// -----------------------------------------------------------
+
+function ModalActions({ isEditing, disableSave, onSave, onDelete }) {
+  return (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <Button
+        variant="contained"
+        fullWidth
+        color="primary"
+        sx={{ flex: 1 }}
+        onClick={() => onSave()}
+        disabled={disableSave}
+      >
+        {isEditing ? (
+          <><SaveIcon style={{ marginRight: 8 }} />Save</>
+        ) : (
+          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+        )}
+      </Button>
+
+      {isEditing &&
+        <LongPressDeleteButton
+          fullWidth
+          sx={{ flex: 1 }}
+          onComplete={onDelete}
+          uncompletedToastMessage="Hold for 3 seconds to delete"
+        >
+          <DeleteIcon sx={{ mr: 1 }} />
+          Delete
+        </LongPressDeleteButton>
+      }
+    </div>
+  );
+}
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// FormFields
+// -----------------------------------------------------------
+//
+// The form body: email, the Admin?/Enabled? selects, then —
+// while the password is not being changed in edit mode — the
+// "Change Password" reveal button, or the password/confirm
+// pair (with the mismatch error on the confirm field).
+//
+// Used by:
+//   - AddEditUser (below) — the modal's children
+// -----------------------------------------------------------
+
+function FormFields({ form, updateField, isEditing, changePassword, setChangePassword, passwordsMatch }) {
+  return (
+    <Stack spacing={3}>
+
+      <TextField required fullWidth type="email" label="Email" value={form.email} onChange={updateField('email')} />
+
+      <TextField select fullWidth label="Admin?" value={form.admin} onChange={updateField('admin')}>
+        <MenuItem value={1}>Yes</MenuItem>
+        <MenuItem value={0}>No</MenuItem>
+      </TextField>
+
+      <TextField select fullWidth label="Enabled?" value={form.enabled} onChange={updateField('enabled')}>
+        <MenuItem value={1}>Yes</MenuItem>
+        <MenuItem value={0}>No</MenuItem>
+      </TextField>
+
+      {isEditing && !changePassword && (
+        <Button
+          variant="outlined"
+          fullWidth
+          sx={{ color: 'black', borderColor: 'black' }}
+          onClick={() => setChangePassword(true)}
+        >
+          Change Password
+        </Button>
+      )}
+
+      {changePassword && (
+        <>
+          <TextField
+            required
+            fullWidth
+            type="password"
+            label="Password"
+            value={form.password}
+            onChange={updateField('password')}
+          />
+          <TextField
+            required
+            fullWidth
+            type="password"
+            label="Repeat Password"
+            value={form.confirmPassword}
+            error={!passwordsMatch && form.confirmPassword !== ''}
+            helperText={!passwordsMatch && form.confirmPassword !== '' ? 'Passwords do not match' : ''}
+            onChange={updateField('confirmPassword')}
+          />
+        </>
+      )}
+
+    </Stack>
+  );
+}
 
 
 
@@ -44,6 +178,11 @@ import toast from 'react-hot-toast';
 // AddEditUser (default export)
 // -----------------------------------------------------------
 //
+// Owns the form state and the API calls. The backend answers
+// { type: 'ok' | 'error' } — either way the result is
+// toasted, the grid refreshes via getData() and the dialog
+// closes (animated, via UniversalModal's closeRef).
+//
 // Used by:
 //   - UsersListTable — row click (edit) and Insert New
 //     (create)
@@ -51,35 +190,27 @@ import toast from 'react-hot-toast';
 
 export default function AddEditUser({ rowData, setOpen, getData }) {
 
-  const [data, setData] = useState(undefined);
-  const [changePassword, setChangePassword] = useState(false);
+  // Animated close — the modal flies back before the parent
+  // unmounts it (see UniversalModal's closeRef)
+  const modalCloseRef = useRef(null);
 
 
-  useEffect(() => {
-    if (rowData !== undefined) {
-      // Editing an existing user: start with no password change
-      setData({
-        id: rowData.row.id,
-        email: rowData.row.email,
-        admin: rowData.row.admin,
-        enabled: rowData.row.enabled,
-        password: '',
-        confirmPassword: ''
-      });
-      setChangePassword(false);
-    } else {
-      // Creating a new user: password fields always required
-      setData({
-        id: '',
-        email: '',
-        admin: 0,
-        enabled: 1,
-        password: '',
-        confirmPassword: ''
-      });
-      setChangePassword(true);
-    }
-  }, [rowData]);
+  const isEditing = rowData !== undefined;
+
+  const [form, setForm] = useState({
+    id:              isEditing ? rowData.row.id      : '',
+    email:           isEditing ? rowData.row.email   : '',
+    admin:           isEditing ? rowData.row.admin   : 0,
+    enabled:         isEditing ? rowData.row.enabled : 1,
+    password:        '',
+    confirmPassword: '',
+  });
+
+
+  // When editing, the password fields are opt-in
+  const [changePassword, setChangePassword] = useState(!isEditing);
+
+  const updateField = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
 
   async function sendData(postData) {
@@ -93,204 +224,62 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
       toast.error(<b>Error: Unknown error.</b>, { duration: 8000 });
     }
     getData();
-    setOpen(false);
+    modalCloseRef.current?.();
   }
-
 
   function handleSaveButton() {
-    const postData = {
+    sendData({
       action: 'insertupdate',
-      id: data.id,
-      email: data.email,
-      admin: data.admin,
-      enabled: data.enabled,
-      password: data.password // Empty when editing without a password change
-    };
-    sendData(postData);
+      id: form.id,
+      email: form.email,
+      admin: form.admin,
+      enabled: form.enabled,
+      password: form.password // Empty when editing without a password change
+    });
   }
 
-
-  async function handleDeleteButton() {
-    const postData = {
-      action: 'delete',
-      id: data.id
-    };
-    sendData(postData);
+  function handleDeleteButton() {
+    sendData({ action: 'delete', id: form.id });
   }
 
-
-  // Nothing to render until the prefill effect has run
-  if (data === undefined) {
-    return null;
-  }
-
-
-  const passwordsMatch = data.password === data.confirmPassword;
 
   // Inserting a new user or changing the password on edit:
   // require matching non-empty passwords. Editing without a
   // password change: empty fields are fine.
+  const passwordsMatch = form.password === form.confirmPassword;
+
   const disableSave =
-    (changePassword && (!passwordsMatch || data.password === '' || data.confirmPassword === '')) ||
-    (data.email.trim() === '');
+    (changePassword && (!passwordsMatch || form.password === '' || form.confirmPassword === '')) ||
+    (form.email.trim() === '');
 
 
   return (
-    <Modal open={true} onClose={() => setOpen(false)}>
-      <ModalDialog sx={{ width: '500px', borderRadius: 'md', boxShadow: 'lg', backgroundColor: 'white' }} >
-        {/* Title row with the red close cross */}
-        <Box style={{ marginBottom: 20 }}>
-          <Grid container direction="row">
-            <Grid item xs={10} align="left">
-              <Typography component="h2" fontSize="1.25em" mb="0.25em" style={{ marginBottom: '30px' }}>
-                User
-              </Typography>
-            </Grid>
-
-            <Grid item xs={2} align="right">
-              <Button
-                onClick={() => setOpen(false)}
-                style={{ padding: 0, borderRadius: '50%', backgroundColor: 'transparent', outline: 'transparent' }}
-              >
-                <CancelIcon style={{ color: 'red' }} />
-              </Button>
-            </Grid>
-          </Grid>
-        </Box>
-
-        <Stack spacing={3}>
-          <FormControl size="lg" color="primary">
-            <TextField
-              type="email"
-              required
-              label="Email"
-              value={data.email}
-              onChange={(e) => setData(prevData => ({ ...prevData, email: e.target.value }))}
-            />
-          </FormControl>
-
-          <FormControl size="lg" color="primary">
-            <TextField
-              select
-              label="Admin?"
-              value={data.admin}
-              onChange={(e) => setData(prevData => ({ ...prevData, admin: e.target.value }))}
-            >
-              <MenuItem value={1}>Yes</MenuItem>
-              <MenuItem value={0}>No</MenuItem>
-            </TextField>
-          </FormControl>
-
-          <FormControl size="lg" color="primary">
-            <TextField
-              select
-              label="Enabled?"
-              value={data.enabled}
-              onChange={(e) => setData(prevData => ({ ...prevData, enabled: e.target.value }))}
-            >
-              <MenuItem value={1}>Yes</MenuItem>
-              <MenuItem value={0}>No</MenuItem>
-            </TextField>
-          </FormControl>
-
-          {/* Edit mode hides the password fields behind this
-              button until a change is wanted */}
-          {rowData !== undefined && !changePassword && (
-            <Box>
-              <Button
-                variant="outlined"
-                onClick={() => setChangePassword(true)}
-                style={{ width: '100%', color: 'black', marginBottom: '10px' }}
-              >
-                Change Password
-              </Button>
-            </Box>
-          )}
-
-          {(changePassword || rowData === undefined) && (
-            <>
-              <FormControl size="lg" color="primary">
-                <TextField
-                  required
-                  type="password"
-                  label="Password"
-                  value={data.password}
-                  onChange={(e) => setData(prevData => ({ ...prevData, password: e.target.value }))}
-                />
-              </FormControl>
-
-              <FormControl size="lg" color="primary">
-                <TextField
-                  required
-                  type="password"
-                  label="Repeat Password"
-                  value={data.confirmPassword}
-                  error={!passwordsMatch && data.confirmPassword !== ''}
-                  helperText={!passwordsMatch && data.confirmPassword !== '' ? 'Passwords do not match' : ''}
-                  onChange={(e) => setData(prevData => ({ ...prevData, confirmPassword: e.target.value }))}
-                />
-              </FormControl>
-            </>
-          )}
-
-          <div style={{ marginTop: '100px' }}></div>
-
-          {/* Bottom buttons — Create alone, or Save + the
-              hold-to-delete button when editing */}
-          <Box>
-            <Grid container spacing={1} align="center" direction="row">
-              <Grid item xs={rowData !== undefined ? 6 : 12}>
-                {/* Joy button — the MUI theme doesn't reach it,
-                    but its emitted CSS variables do */}
-                <Button
-                  type="submit"
-                  style={{
-                    backgroundColor: disableSave ? 'grey' : 'var(--mui-palette-primary-main)',
-                    color: 'white',
-                    boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                    width: '100%',
-                  }}
-                  onClick={() => handleSaveButton()}
-                  disabled={disableSave}
-                >
-                  {rowData !== undefined ? (
-                    <><SaveIcon style={{ marginRight: 8 }} />Save</>
-                  ) : (
-                    <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
-                  )}
-                </Button>
-              </Grid>
-
-              {rowData !== undefined && (
-                <Grid item xs={6}>
-                  {/* MUI-based shared button — sx matches the
-                      Joy siblings (radius 8, no uppercase) */}
-                  <LongPressButton
-                    onComplete={handleDeleteButton}
-                    uncompletedToastMessage="Hold for 3 seconds to delete"
-                    style={{
-                      backgroundColor: 'blue',
-                      color: 'white',
-                      boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                      width: '100%',
-                      userSelect: 'none',
-                    }}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderRadius: '8px',
-                    }}
-                  >
-                    <DeleteIcon style={{ marginRight: 8 }} />
-                    Delete
-                  </LongPressButton>
-                </Grid>
-              )}
-
-            </Grid>
-          </Box>
-        </Stack>
-      </ModalDialog>
-    </Modal>
+    <UniversalModal
+      open={true}
+      onClose={() => setOpen(false)}
+      closeRef={modalCloseRef}
+      title="User"
+      maxWidth={500}
+      fullWidth
+      showCancel={false}
+      showConfirm={false}
+      actions={
+        <ModalActions
+          isEditing={isEditing}
+          disableSave={disableSave}
+          onSave={handleSaveButton}
+          onDelete={handleDeleteButton}
+        />
+      }
+    >
+      <FormFields
+        form={form}
+        updateField={updateField}
+        isEditing={isEditing}
+        changePassword={changePassword}
+        setChangePassword={setChangePassword}
+        passwordsMatch={passwordsMatch}
+      />
+    </UniversalModal>
   );
 }

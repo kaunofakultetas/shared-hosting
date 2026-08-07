@@ -1,15 +1,24 @@
 // -----------------------------------------------------------
 //  [*] AddNewVM — the "New Virtual Server" dialog
 //
-//  Joy UI modal with the server name and an image dropdown
-//  (Ubuntu 24.04 is the only choice). Create POSTs
-//  action="create" to /api/vm/control, shows the "wait 1
-//  minute" toast, refreshes the parent list and closes.
+//  Create dialog for virtual servers, built on UniversalModal
+//  with custom action buttons (the stock Confirm/Cancel pair
+//  is hidden): the server name (focused on open, Enter
+//  submits) and an image dropdown (Ubuntu 24.04 is the only
+//  choice). Create POSTs action="create" to /api/vm/control,
+//  shows the "wait 1 minute" toast, refreshes the parent list
+//  and closes (animated).
 //
 //  The vmData prop switches the dialog into an edit mode
 //  (prefill + Save/Delete buttons) — but the only caller
 //  never passes it, so that whole path is currently dormant,
-//  including handleDeleteButton and its blue Delete button.
+//  including the long-press Delete button.
+//
+//  Split into (root component last):
+//
+//    ModalActions — Create/Save + dormant Delete bar
+//    FormFields   — name + image inputs
+//    AddNewVM     — state + API call (default export)
 //
 //  Used by:
 //    - VirtualServersTable — opened by the New Server button
@@ -18,10 +27,116 @@
 
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { Button, Modal, ModalDialog, Stack, Typography } from "@mui/joy";
-import { TextField, Box, FormControl, Grid, MenuItem } from "@mui/material";
-import CancelIcon from '@mui/icons-material/Cancel';
+
+import { Button, Stack, TextField, MenuItem } from "@mui/material";
+
+import { UniversalModal } from "@/components/UniversalModal";
+import { LongPressDeleteButton } from "@/components/LongPressButton";
+
+import SaveIcon from '@mui/icons-material/Save';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast';
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// ModalActions
+// -----------------------------------------------------------
+//
+// The modal's custom action bar: the contained Create button
+// ("Creating..." while the request runs, "Save" in the
+// dormant edit mode), and — edit mode only — the long-press
+// Delete button next to it.
+//
+// Used by:
+//   - AddNewVM (below) — the modal's `actions` slot
+// -----------------------------------------------------------
+
+function ModalActions({ isEditing, isSubmitting, disableSave, onSave, onDelete }) {
+  return (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <Button
+        variant="contained"
+        fullWidth
+        color="primary"
+        sx={{ flex: 1 }}
+        onClick={() => onSave()}
+        disabled={disableSave}
+      >
+        {isSubmitting ? (
+          'Creating...'
+        ) : isEditing ? (
+          <><SaveIcon style={{ marginRight: 8 }} />Save</>
+        ) : (
+          <><AddCircleOutlinedIcon style={{ marginRight: 8 }} />Create</>
+        )}
+      </Button>
+
+      {isEditing &&
+        <LongPressDeleteButton
+          fullWidth
+          sx={{ flex: 1 }}
+          onComplete={onDelete}
+          uncompletedToastMessage="Hold for 3 seconds to delete"
+        >
+          <DeleteIcon sx={{ mr: 1 }} />
+          Delete VM
+        </LongPressDeleteButton>
+      }
+    </div>
+  );
+}
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// FormFields
+// -----------------------------------------------------------
+//
+// The form body: the server name (autofocused by the root)
+// and the image dropdown. Enter in either field submits.
+//
+// Used by:
+//   - AddNewVM (below) — the modal's children
+// -----------------------------------------------------------
+
+function FormFields({ form, updateField, nameInputRef, onKeyDown }) {
+  return (
+    <Stack spacing={3}>
+
+      <TextField
+        required
+        fullWidth
+        inputRef={nameInputRef}
+        label="Virtual Server Name"
+        value={form.name}
+        onChange={updateField('name')}
+        onKeyDown={onKeyDown}
+      />
+
+      <TextField
+        select
+        fullWidth
+        label="Virtual Server Image"
+        value={form.os}
+        onChange={updateField('os')}
+        onKeyDown={onKeyDown}
+      >
+        <MenuItem value="linux">Ubuntu Server 24.04</MenuItem>
+      </TextField>
+
+    </Stack>
+  );
+}
 
 
 
@@ -33,23 +148,39 @@ import toast from 'react-hot-toast';
 // AddNewVM (default export)
 // -----------------------------------------------------------
 //
+// Owns the form state and the create call. On success the
+// "being created" toast shows, the parent list refreshes via
+// getData() and the dialog closes (animated, via
+// UniversalModal's closeRef); on failure it stays open for
+// another try.
+//
 // Used by:
 //   - VirtualServersTable — opened by the New Server button
 // -----------------------------------------------------------
 
 export default function AddNewVM({ vmData, setOpen, getData }) {
 
+  // Animated close — the modal flies back before the parent
+  // unmounts it (see UniversalModal's closeRef)
+  const modalCloseRef = useRef(null);
+
+
+  const isEditing = Boolean(vmData);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [data, setData] = useState({
-    id: '',
-    name: '',
-    os: '',
+  const [form, setForm] = useState({
+    id:   isEditing ? vmData.id : '',
+    name: isEditing ? vmData.name : '',
+    os:   isEditing ? (vmData.os ?? 'linux') : 'linux',
   });
+
   const nameInputRef = useRef(null);
 
+  const updateField = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
-  // Focus the name input when modal opens — delayed a tick so
-  // the modal is in the DOM first
+
+  // Focus the name input when the modal opens — delayed a tick
+  // so the portal-mounted dialog is in the DOM first
   useEffect(() => {
     const timer = setTimeout(() => {
       if (nameInputRef.current) {
@@ -58,25 +189,6 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
     }, 100);
     return () => clearTimeout(timer);
   }, []);
-
-
-  // Prefill for edit mode, defaults for create mode (see the
-  // file header — only create mode is reachable today)
-  useEffect(() => {
-    if (vmData) {
-      setData({
-        id: vmData.id,
-        name: vmData.name,
-        os: vmData.os ?? 'linux', // default if not specified
-      });
-    } else {
-      setData({
-        id: '',
-        name: '',
-        os: 'linux',
-      });
-    }
-  }, [vmData]);
 
 
   async function sendData(postData) {
@@ -88,44 +200,30 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
       await axios.post("/api/vm/control", postData, { withCredentials: true });
       toast.success(<b>Server is being created. Please wait 1 minute...</b>, { duration: 30000 });
 
-      // Refresh data in parent
       getData();
-      // Close modal
-      setOpen(false);
+      modalCloseRef.current?.();
     } catch {
       toast.error(<b>Failed to create server. Please try again.</b>);
       setIsSubmitting(false);
     }
   }
 
-
   function handleSaveButton() {
-    const action = vmData ? 'updatevm' : 'create';
-    const postData = {
-      action,
-      name: data.name,
-      os: data.os,
-    };
-
-    sendData(postData);
+    sendData({
+      action: isEditing ? 'updatevm' : 'create',
+      name: form.name,
+      os: form.os,
+    });
   }
-
 
   // Edit mode only — currently unreachable (no caller passes
   // vmData)
-  async function handleDeleteButton() {
-    if (!vmData) return;
-
-    const postData = {
-      action: 'deletevm',
-      id: data.id,
-    };
-    sendData(postData);
+  function handleDeleteButton() {
+    sendData({ action: 'deletevm', id: form.id });
   }
 
 
-  const disableSave = data.name.trim() === '' || isSubmitting;
-
+  const disableSave = form.name.trim() === '' || isSubmitting;
 
   // Enter submits the form
   function handleKeyDown(e) {
@@ -136,118 +234,32 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
   }
 
 
-  if (!data) {
-    return null;
-  }
-
-
   return (
-    <Modal open={true} onClose={() => setOpen(false)}>
-      <ModalDialog
-        sx={{
-          width: '500px',
-          borderRadius: 'md',
-          boxShadow: 'lg',
-          backgroundColor: 'white'
-        }}
-      >
-        {/* Title row with the red close cross */}
-        <Box style={{ marginBottom: 20 }}>
-          <Grid container direction="row" alignItems="center">
-            <Grid item xs={10} align="left">
-              <Typography component="h2" fontSize="1.25em" mb="0.25em" style={{ marginBottom: '30px' }}>
-                New Virtual Server
-              </Typography>
-            </Grid>
-            <Grid item xs={2} align="right">
-              <Button
-                onClick={() => setOpen(false)}
-                style={{
-                  padding: 0,
-                  borderRadius: '50%',
-                  backgroundColor: 'transparent',
-                  outline: 'transparent'
-                }}
-              >
-                <CancelIcon style={{ color: 'red' }} />
-              </Button>
-            </Grid>
-          </Grid>
-        </Box>
-
-        <Stack spacing={3}>
-
-          {/* VM Name */}
-          <FormControl size="lg" color="primary">
-            <TextField
-              required
-              inputRef={nameInputRef}
-              label="Virtual Server Name"
-              value={data.name}
-              onChange={(e) => setData(prev => ({ ...prev, name: e.target.value }))}
-              onKeyDown={handleKeyDown}
-            />
-          </FormControl>
-
-          {/* OS selection */}
-          <FormControl size="lg" color="primary">
-            <TextField
-              select
-              label="Virtual Server Image"
-              value={data.os}
-              onChange={(e) => setData(prev => ({ ...prev, os: e.target.value }))}
-              onKeyDown={handleKeyDown}
-            >
-              <MenuItem value="linux">Ubuntu Server 24.04</MenuItem>
-            </TextField>
-          </FormControl>
-
-          <Box sx={{ marginTop: '40px' }} />
-
-          {/* Bottom Buttons */}
-          <Box>
-            <Grid container spacing={1} align="center" direction="row">
-              <Grid item xs={vmData ? 6 : 12}>
-                {/* Joy button — the MUI theme doesn't reach it,
-                    but its emitted CSS variables do */}
-                <Button
-                  type="submit"
-                  variant="contained"
-                  sx={{
-                    backgroundColor: disableSave ? 'grey' : 'var(--mui-palette-primary-main)',
-                    color: 'white',
-                    boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                    width: '100%',
-                    transition: 'all 0.2s ease',
-                    "&:hover": disableSave ? 'none' : { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "var(--mui-palette-primary-dark)" },
-                  }}
-                  onClick={handleSaveButton}
-                  disabled={disableSave}
-                >
-                  {isSubmitting ? 'Creating...' : (vmData ? 'Save' : 'Create')}
-                </Button>
-              </Grid>
-
-              {/* Edit mode only — see the file header */}
-              {vmData && (
-                <Grid item xs={6}>
-                  <Button
-                    style={{
-                      backgroundColor: 'blue',
-                      color: 'white',
-                      boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-                      width: '100%',
-                    }}
-                    onClick={handleDeleteButton}
-                  >
-                    Delete VM
-                  </Button>
-                </Grid>
-              )}
-            </Grid>
-          </Box>
-        </Stack>
-      </ModalDialog>
-    </Modal>
+    <UniversalModal
+      open={true}
+      onClose={() => setOpen(false)}
+      closeRef={modalCloseRef}
+      title="New Virtual Server"
+      maxWidth={500}
+      fullWidth
+      showCancel={false}
+      showConfirm={false}
+      actions={
+        <ModalActions
+          isEditing={isEditing}
+          isSubmitting={isSubmitting}
+          disableSave={disableSave}
+          onSave={handleSaveButton}
+          onDelete={handleDeleteButton}
+        />
+      }
+    >
+      <FormFields
+        form={form}
+        updateField={updateField}
+        nameInputRef={nameInputRef}
+        onKeyDown={handleKeyDown}
+      />
+    </UniversalModal>
   );
 }

@@ -234,7 +234,6 @@ function ButtonTooltip({ tooltip, fullWidth, children }) {
 //
 // Used by:
 //   - LongPressDeleteButton (below)
-//   - AddEditUser — the dialog's full-width Delete button
 // -----------------------------------------------------------
 
 export default function LongPressButton({
@@ -327,9 +326,9 @@ export default function LongPressButton({
 //
 // Preset: red hold-to-delete button.
 //
-// Nothing calls this preset here at the moment — our delete
-// buttons are custom-colored (grey icon corner, blue dialog
-// button). Kept for parity with the tracer copy.
+// Used by:
+//   - the delete buttons of the add/edit dialogs — AddNewVM
+//     (dormant edit mode), AddEditDomain, AddEditUser
 // -----------------------------------------------------------
 
 export function LongPressDeleteButton({

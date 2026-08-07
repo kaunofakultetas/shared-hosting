@@ -23,10 +23,12 @@
 // -----------------------------------------------------------
 
 import { useState, useEffect } from "react";
-import { Modal, ModalDialog, Button } from "@mui/joy";
+import { Button } from "@mui/material";
 import axios from "axios";
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import toast from 'react-hot-toast';
+
+import { UniversalModal } from "@/components/UniversalModal";
 
 
 
@@ -40,7 +42,8 @@ import toast from 'react-hot-toast';
 //
 // The dark share view: the code huge on a purple gradient
 // (click or button to copy), the remaining time and a close
-// button.
+// button. A headerless UniversalModal with the dark sx
+// override — the empty header block reads as top padding.
 //
 // Used by:
 //   - QuickRegistrationWidget (below)
@@ -48,62 +51,61 @@ import toast from 'react-hot-toast';
 
 function CodeShareModal({ open, onClose, code, remainingTime, copyCode }) {
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog
-        sx={{
-          width: '90vw',
-          maxWidth: '600px',
-          borderRadius: '16px',
-          padding: '40px',
-          textAlign: 'center',
-          backgroundColor: '#1a1a2e',
-        }}
+    <UniversalModal
+      open={open}
+      onClose={onClose}
+      maxWidth={600}
+      fullWidth
+      showCloseButton={false}
+      showConfirm={false}
+      showCancel={false}
+      sx={{ backgroundColor: '#1a1a2e', borderRadius: '16px', textAlign: 'center' }}
+      contentSx={{ px: '40px', pb: '40px' }}
+    >
+      <h2 className="text-white text-xl font-medium mb-2">Quick Registration Code</h2>
+      <p className="text-gray-400 text-sm mb-6">Share this code with students to register</p>
+
+      <div
+        className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-mono font-bold py-6 px-8 rounded-2xl mb-6 tracking-[0.3em] select-all cursor-pointer hover:scale-105 transition-transform"
+        style={{ fontSize: 'clamp(2rem, 8vw, 4rem)' }}
+        onClick={copyCode}
       >
-        <h2 className="text-white text-xl font-medium mb-2">Quick Registration Code</h2>
-        <p className="text-gray-400 text-sm mb-6">Share this code with students to register</p>
+        {code}
+      </div>
 
-        <div
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-mono font-bold py-6 px-8 rounded-2xl mb-6 tracking-[0.3em] select-all cursor-pointer hover:scale-105 transition-transform"
-          style={{ fontSize: 'clamp(2rem, 8vw, 4rem)' }}
+      <div className="flex items-center justify-center gap-2 text-orange-400 mb-6">
+        <span className="text-lg">⏱</span>
+        <span className="font-mono text-xl">{remainingTime}</span>
+        <span className="text-gray-400 text-sm">remaining</span>
+      </div>
+
+      <div className="flex gap-3 justify-center">
+        <Button
+          variant="contained"
           onClick={copyCode}
+          startIcon={<ContentCopyIcon fontSize="small" />}
+          sx={{
+            textTransform: 'none',
+            backgroundColor: '#6366f1',
+            '&:hover': { backgroundColor: '#4f46e5' },
+          }}
         >
-          {code}
-        </div>
-
-        <div className="flex items-center justify-center gap-2 text-orange-400 mb-6">
-          <span className="text-lg">⏱</span>
-          <span className="font-mono text-xl">{remainingTime}</span>
-          <span className="text-gray-400 text-sm">remaining</span>
-        </div>
-
-        <div className="flex gap-3 justify-center">
-          <Button
-            onClick={copyCode}
-            sx={{
-              backgroundColor: '#6366f1',
-              '&:hover': { backgroundColor: '#4f46e5' },
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <ContentCopyIcon fontSize="small" />
-            Copy Code
-          </Button>
-          <Button
-            onClick={onClose}
-            variant="outlined"
-            sx={{
-              color: '#9ca3af',
-              borderColor: '#4b5563',
-              '&:hover': { backgroundColor: '#374151', borderColor: '#6b7280' },
-            }}
-          >
-            Close
-          </Button>
-        </div>
-      </ModalDialog>
-    </Modal>
+          Copy Code
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={onClose}
+          sx={{
+            textTransform: 'none',
+            color: '#9ca3af',
+            borderColor: '#4b5563',
+            '&:hover': { backgroundColor: '#374151', borderColor: '#6b7280' },
+          }}
+        >
+          Close
+        </Button>
+      </div>
+    </UniversalModal>
   );
 }
 
