@@ -13,6 +13,11 @@
 //  Logging out is just a hard navigation to /login — the
 //  login page drops the session cookie on mount.
 //
+//  Split into (root component last):
+//
+//    LanguageSwitcher — the en/lt switch button
+//    Navbar           — the bar itself (default export)
+//
 //  Used by:
 //    - AppShell — mounted once above every signed-in page
 // -----------------------------------------------------------
@@ -21,8 +26,46 @@ import { Link } from "react-router-dom";
 import { Button } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 
-import { useTranslations, useLocale } from "@/i18n";
-import LanguageSwitcher from './components/LanguageSwitcher';
+import { useTranslations, useLocale, useSetLocale } from "@/i18n";
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// LanguageSwitcher
+// -----------------------------------------------------------
+//
+// Button that switches the UI locale via the i18n context's
+// setLocale — that writes the choice to the `locale` cookie
+// (so later visits keep it) and re-renders the app in the
+// new language, no page reload. Styled like the Logout button
+// next to it (contained primary with a white border), unlike
+// the tracer original's Tahoma look.
+//
+// Used by:
+//   - Navbar (below) — one switcher for the "other" language
+// -----------------------------------------------------------
+
+function LanguageSwitcher({ targetLocale, label }) {
+
+  const setLocale = useSetLocale();
+
+  return (
+    <Button
+      variant="contained"
+      onClick={() => setLocale(targetLocale)}
+      style={{ marginRight: '15px', border: '1px solid rgba(255, 255, 255, 1)' }}
+      sx={{ textTransform: 'none' }}
+    >
+      {label}
+    </Button>
+  );
+}
+
 
 
 

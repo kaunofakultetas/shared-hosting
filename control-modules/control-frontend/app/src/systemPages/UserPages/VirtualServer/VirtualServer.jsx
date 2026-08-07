@@ -6,7 +6,8 @@
 //  (pencil → text field with Enter/Escape), owner + uptime
 //  and the start/stop button, then the container chips and
 //  two tabs: management tool cards (Controls) and the domain
-//  table (Domain Names). The data lives in useVirtualServer
+//  table (Domain Names) — the open tab lives in the URL
+//  (?tab=domains). The data lives in useVirtualServer
 //  (5-second poll; 401 bounces to "/"); until it arrives the
 //  page renders as a skeleton.
 //
@@ -30,7 +31,7 @@
 // -----------------------------------------------------------
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
 import {
@@ -314,7 +315,13 @@ export default function VirtualServerPage({ virtualServerID }) {
 
   const { vmData, startStop, rename } = useVirtualServer(virtualServerID);
 
-  const [currentTab, setCurrentTab] = useState(0);
+  // The open tab lives in the URL (?tab=domains) — it
+  // survives leaving the page and the link is shareable
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') === 'domains' ? 1 : 0;
+  const setCurrentTab = (val) =>
+    setSearchParams(val === 1 ? { tab: 'domains' } : {}, { replace: true });
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
 

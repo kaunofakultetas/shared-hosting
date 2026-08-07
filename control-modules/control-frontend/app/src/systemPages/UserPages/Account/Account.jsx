@@ -38,6 +38,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 
 import { useTranslations } from "@/i18n";
+import PageTitle from "@/components/PageTitle/PageTitle";
 
 import LockIcon from "@mui/icons-material/Lock";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -401,12 +402,14 @@ export default function AccountPage({ authdata }) {
   return (
     <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-105px)] bg-gray-100">
       {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {t("HEADER.subtitle")}
-        </p>
-      </div>
+      <PageTitle>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {t("HEADER.subtitle")}
+          </p>
+        </div>
+      </PageTitle>
 
       <div className="flex gap-6 items-start">
         {/* Left Column - Account Settings */}

@@ -9,9 +9,11 @@
 //  first load renders skeleton cards.
 //
 //  Search matches VM name, owner email, VM id, domain names
-//  and container/stack names. Delete additionally requires
-//  the VM to be stopped and a 3-second hold on the shared
-//  LongPressIconButton.
+//  and container/stack names; the search text and the
+//  other-users switch live in the URL (?q=...&all=1), so they
+//  survive opening a VM and coming back. Delete additionally
+//  requires the VM to be stopped and a 3-second hold on the
+//  shared LongPressIconButton.
 //
 //  Split into (root component last):
 //
@@ -24,7 +26,7 @@
 // -----------------------------------------------------------
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -40,8 +42,9 @@ import {
 } from "@mui/material";
 
 import { useTranslations } from "@/i18n";
-import IOSSwitch from "@/components/Other/IOSSwitch/IOSSwitch";
+import IOSSwitch from "@/components/IOSSwitch/IOSSwitch";
 import { LongPressIconButton } from "@/components/LongPressButton";
+import PageTitle from "@/components/PageTitle/PageTitle";
 import AddNewVM from "./AddNewVM/AddNewVM";
 
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
@@ -404,9 +407,22 @@ export default function VirtualServersTable({ authdata }) {
   const navigate = useNavigate();
 
   const [openBackdrop, setOpenBackdrop] = useState(false);
-  const [showOtherUsers, setShowOtherUsers] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [modalSourceRect, setModalSourceRect] = useState(null);
+
+  // The search text and the other-users switch live in the
+  // URL (?q=...&all=1) — they survive going into a VM and
+  // back, and a filtered list is shareable as a link
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') ?? '';
+  const showOtherUsers = searchParams.get('all') === '1';
+
+  const updateParam = (key, value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) next.set(key, value); else next.delete(key);
+      return next;
+    }, { replace: true });
+  };
 
   const { vms: data, isPending: loadingData, refreshVms, startStop, remove } = useVirtualServers(showOtherUsers);
 
@@ -474,8 +490,9 @@ export default function VirtualServersTable({ authdata }) {
 
   return (
     <div className="h-[calc(100vh-105px)] w-full overflow-y-auto bg-gray-50 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header — PageTitle's justify-between puts the
+          controls on the right edge */}
+      <PageTitle>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -493,7 +510,7 @@ export default function VirtualServersTable({ authdata }) {
               control={
                 <IOSSwitch
                   checked={showOtherUsers}
-                  onChange={(e) => setShowOtherUsers(e.target.checked)}
+                  onChange={(e) => updateParam('all', e.target.checked ? '1' : '')}
                   sx={{ marginRight: '10px' }}
                 />
               }
@@ -510,7 +527,7 @@ export default function VirtualServersTable({ authdata }) {
             size="small"
             placeholder={t("HEADER.search_placeholder")}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => updateParam('q', e.target.value)}
             sx={{
               width: 280,
               "& .MuiOutlinedInput-root": {
@@ -531,7 +548,7 @@ export default function VirtualServersTable({ authdata }) {
                 <InputAdornment position="end">
                   <IconButton
                     size="small"
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => updateParam('q', '')}
                     sx={{ p: 0.5 }}
                   >
                     <ClearIcon sx={{ fontSize: 18 }} />
@@ -562,7 +579,7 @@ export default function VirtualServersTable({ authdata }) {
             {t("HEADER.new_server")}
           </Button>
         </div>
-      </div>
+      </PageTitle>
 
       {/* Loading State — skeleton cards in the real grid, so
           the layout doesn't jump when the list arrives */}

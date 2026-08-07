@@ -10,13 +10,14 @@
 //  401 bounces to /login.
 //
 //  Column headers and the toolbar label come from the
-//  "PAGES.vmDetail" namespace; the grid's built-in texts are
+//  "PAGES.vmDetail" namespace; the toolbar is the shared
+//  QuickSearchToolbar (this grid gained the quick search and
+//  columns button with it); the grid's built-in texts are
 //  themed through the DataGrid locale merge in providers.jsx
 //  — no localeText prop here.
 //
 //  Split into (root component last):
 //
-//    QuickSearchToolbar      — just the Insert New button
 //    DomainsListTable_Columns — column set built from t
 //    DomainsListTable        — grid + dialog state (default
 //                              export)
@@ -29,54 +30,13 @@ import { DataGrid } from "@mui/x-data-grid";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
-import { Box, Button, LinearProgress } from '@mui/material';
-import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import { Box, LinearProgress } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 
 import { useTranslations } from '@/i18n';
-import CustomPagination from '@/components/Other/ButtonsPagination/ButtonsPagination';
+import QuickSearchToolbar from '@/components/DatagridCustomComponents/QuickSearchToolbar';
+import CustomPagination from '@/components/ButtonsPagination/ButtonsPagination';
 import AddEditDomain from "./AddEditDomain/AddEditDomain";
-
-
-
-
-
-
-
-// -----------------------------------------------------------
-// QuickSearchToolbar
-// -----------------------------------------------------------
-//
-// The grid toolbar — despite the name it only holds the
-// Insert New button (no search field here, unlike the users
-// list). The click passes its event up so the dialog can fly
-// out of the button.
-//
-// Used by:
-//   - DomainsListTable (below) — the toolbar slot
-// -----------------------------------------------------------
-
-function QuickSearchToolbar({ insertNewLabel, triggerAddNew }) {
-  return (
-    <Box sx={{ p: 0.5, pb: 0 }} >
-
-      {/* Insert New — contained-primary from the theme */}
-      <Button
-        variant="contained"
-        sx={{
-          marginLeft: '10px',
-          paddingLeft: '15px',
-          paddingRight: '10px',
-          height: 30,
-        }}
-        onClick={(event) => { triggerAddNew(event) }}
-        >
-          <AddCircleOutlinedIcon style={{paddingRight: 8, fontSize: '22px'}}/>
-          {insertNewLabel}
-      </Button>
-
-    </Box>
-  );
-}
 
 
 
@@ -208,6 +168,9 @@ export default function DomainsListTable({ virtualServerID }) {
           sx={{
             minHeight: '300px',
             cursor:'pointer',
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+            },
           }}
           rows={data}
           columns={columns}
@@ -235,8 +198,8 @@ export default function DomainsListTable({ virtualServerID }) {
           }}
           slotProps={{
             toolbar: {
-              insertNewLabel: t("DOMAINS_TABLE.insert_new"),
-              triggerAddNew: triggerAddNew
+              addNewLabel: t("DOMAINS_TABLE.insert_new"),
+              onAddNew: (event) => triggerAddNew(event)
             }
           }}
         />

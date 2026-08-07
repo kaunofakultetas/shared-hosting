@@ -25,7 +25,7 @@ import Skeleton from '@mui/material/Skeleton';
 
 import { useAuth } from '@/AuthGuard';
 import Navbar from '@/components/Navbar/Navbar';
-import Sidebar from '@/components/Admin/Sidebar/Sidebar';
+import Sidebar from '@/components/Sidebar/Sidebar';
 
 
 

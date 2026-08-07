@@ -12,14 +12,14 @@
 //  /login.
 //
 //  Column headers and toolbar labels come from the
-//  "PAGES.usersList" namespace; the grid's built-in texts
-//  (column menu, filter panel, ...) are themed through the
-//  DataGrid locale merge in providers.jsx — no localeText
-//  prop here.
+//  "PAGES.usersList" namespace; the toolbar is the shared
+//  QuickSearchToolbar, configured through slotProps.toolbar;
+//  the grid's built-in texts (column menu, filter panel, ...)
+//  are themed through the DataGrid locale merge in
+//  providers.jsx — no localeText prop here.
 //
 //  Split into (root component last):
 //
-//    QuickSearchToolbar    — search + columns + Insert New
 //    StatusPill            — colored Yes/No, Enabled/Disabled
 //    UsersListTable_Columns — column set built from t
 //    UsersListTable        — grid + dialog state (default
@@ -29,92 +29,18 @@
 //    - UsersList.jsx — the /admin/users page body
 // -----------------------------------------------------------
 
-import { DataGrid, GridToolbarQuickFilter, GridToolbarColumnsButton } from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
-import { Box, Button, LinearProgress, Paper } from '@mui/material';
-import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import { Box, LinearProgress, Paper } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 
 import { useTranslations } from '@/i18n';
-import CustomPagination from '@/components/Other/ButtonsPagination/ButtonsPagination';
+import QuickSearchToolbar from '@/components/DatagridCustomComponents/QuickSearchToolbar';
+import CustomPagination from '@/components/ButtonsPagination/ButtonsPagination';
+import PageTitle from '@/components/PageTitle/PageTitle';
 import AddEditUser from "./AddEditUser/AddEditUser";
-
-
-
-
-
-
-
-// -----------------------------------------------------------
-// QuickSearchToolbar
-// -----------------------------------------------------------
-//
-// The grid toolbar: quick search (splitting the input on
-// commas into separate terms), the burgundy columns button
-// and the Insert New button. Labels arrive through
-// slotProps.toolbar; the add-new click passes its event up so
-// the dialog can fly out of the button.
-//
-// Used by:
-//   - UsersListTable (below) — the toolbar slot
-// -----------------------------------------------------------
-
-function QuickSearchToolbar({ placeholder, insertNewLabel, triggerAddNew }) {
-  return (
-    <Box
-      sx={{
-        p: 0.5,
-        pb: 0,
-      }}
-    >
-      <GridToolbarQuickFilter
-        quickFilterParser={(searchInput) =>
-          searchInput
-            .split(',')
-            .map((value) => value.trim())
-            .filter((value) => value !== '')
-        }
-        placeholder={placeholder}
-      />
-      {/* The columns button is a text button by default — this
-          sx dresses it up as a contained-primary one; its
-          label comes from the grid's locale texts */}
-      <GridToolbarColumnsButton
-        slotProps={{
-          button:{
-            sx: {
-              marginLeft: '10px',
-              paddingLeft: '15px',
-              paddingRight: '10px',
-              color: 'white',
-              backgroundColor: 'primary.main',
-              "&:hover": {
-                backgroundColor: 'primary.dark',
-              },
-            }
-          }
-        }}
-      />
-
-      {/* Insert New — contained-primary from the theme */}
-      <Button
-        variant="contained"
-        sx={{
-          marginLeft: '10px',
-          paddingLeft: '15px',
-          paddingRight: '10px',
-          height: 30,
-        }}
-        onClick={(event) => { triggerAddNew(event) }}
-        >
-          <AddCircleOutlinedIcon style={{paddingRight: 8, fontSize: '22px'}}/>
-          {insertNewLabel}
-      </Button>
-
-    </Box>
-  );
-}
 
 
 
@@ -296,17 +222,18 @@ export default function UsersListTable() {
     <Paper sx={{ height: 'calc(100vh - 105px)', width: '100%', paddingRight: 4, overflow: 'hidden' }}>
       <Box
         sx={{
-          fontSize: '24px',
-          color: 'gray',
           margin: 2,
           width: '100%',
         }}
       >
-        {t("HEADER.title")}
+        <PageTitle>{t("HEADER.title")}</PageTitle>
         <DataGrid
           sx={{
             height: 'calc(100vh - 160px)',
             cursor:'pointer',
+            '& .MuiDataGrid-row:hover': {
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+            },
           }}
           rows={data}
           columns={columns}
@@ -335,8 +262,8 @@ export default function UsersListTable() {
           slotProps={{
             toolbar: {
               placeholder: t("HEADER.search_placeholder"),
-              insertNewLabel: t("HEADER.insert_new"),
-              triggerAddNew: triggerAddNew
+              addNewLabel: t("HEADER.insert_new"),
+              onAddNew: (event) => triggerAddNew(event)
             }
           }}
         />
