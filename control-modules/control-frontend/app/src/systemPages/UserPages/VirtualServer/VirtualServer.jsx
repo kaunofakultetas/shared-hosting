@@ -22,8 +22,12 @@
 //    useVirtualServer  — VM query + start/stop + rename
 //    ControlCard       — one management tool card
 //    ContainerChip     — one docker container chip
+//    ContainerStacks   — the containers grouped by stack
+//    VmNameEditor      — name with the inline rename flow
+//    VmHeaderCard      — icon/status/name/actions card
+//    ControlsTab       — the four management tool cards
 //    DetailSkeleton    — the page as grey bones
-//    VirtualServerPage — layout + edit state (default export)
+//    VirtualServerPage — tabs + wiring (default export)
 //
 //  Used by:
 //    - router.jsx — route /vm/:virtualServerID (via
@@ -246,6 +250,362 @@ function ContainerChip({ container, vmRunning }) {
 
 
 // -----------------------------------------------------------
+// ContainerStacks
+// -----------------------------------------------------------
+//
+// The docker containers of the VM, grouped by stack — one
+// labelled chip row per stack under the section heading.
+//
+// Used by:
+//   - VmHeaderCard (below) — bottom of the header card
+// -----------------------------------------------------------
+
+function ContainerStacks({ stacks, vmRunning }) {
+  const t = useTranslations("PAGES.vmDetail");
+
+  return (
+    <div className="mt-6 pt-5 border-t border-gray-100">
+      <div className="flex items-center gap-2 mb-3">
+        <ViewInArIcon sx={{ fontSize: 18, color: "gray" }} />
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          {t("HEADER.docker_containers")}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {stacks.map((stack, sidx) => (
+          <div key={sidx}>
+            <span className="text-xs font-semibold text-gray-600 mb-1 block">
+              {stack.stackname || "Stack"}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {stack.containers?.map((container, cidx) => (
+                <ContainerChip key={cidx} container={container} vmRunning={vmRunning} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// VmNameEditor
+// -----------------------------------------------------------
+//
+// The VM name with the whole inline rename flow: normally the
+// bold name plus the pencil; the pencil swaps in a text field
+// (Enter saves, Escape cancels) with save/cancel buttons. The
+// editing state lives here — the page only supplies the name
+// and the rename action, and the field closes only when the
+// rename actually succeeded.
+//
+// Used by:
+//   - VmHeaderCard (below)
+// -----------------------------------------------------------
+
+function VmNameEditor({ name, rename }) {
+  const t = useTranslations("PAGES.vmDetail");
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState("");
+
+
+  const startEditing = () => {
+    setEditedName(name || "");
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditedName("");
+  };
+
+  const saveName = async () => {
+    if (!editedName.trim()) {
+      toast.error(<b>{t("TOASTS.name_empty")}</b>);
+      return;
+    }
+    if (await rename(editedName.trim())) {
+      setIsEditing(false);
+    }
+  };
+
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2 mb-3">
+        <TextField
+          value={editedName}
+          onChange={(e) => setEditedName(e.target.value)}
+          size="small"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveName();
+            if (e.key === "Escape") cancelEditing();
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              fontSize: "1.5rem",
+              fontWeight: 700,
+            },
+          }}
+        />
+        <Tooltip title={t("HEADER.save")}>
+          <IconButton
+            onClick={saveName}
+            sx={{
+              color: "green",
+              bgcolor: "#dcfce7",
+              "&:hover": { bgcolor: "#bbf7d0" },
+            }}
+          >
+            <CheckIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={t("HEADER.cancel")}>
+          <IconButton
+            onClick={cancelEditing}
+            sx={{
+              color: "red",
+              bgcolor: "#fee2e2",
+              "&:hover": { bgcolor: "#fecaca" },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Tooltip>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mb-3 mt-5">
+      <h1 className="text-2xl font-bold text-gray-800">
+        {name || t("HEADER.unnamed")}
+      </h1>
+      <Tooltip title={t("HEADER.rename")}>
+        <IconButton
+          onClick={startEditing}
+          size="small"
+          sx={{
+            color: "gray",
+            p: 0.5,
+            mt: "-6px",
+            "&:hover": { color: "primary.main", bgcolor: "#f3f4f6" },
+          }}
+        >
+          <EditIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+      </Tooltip>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// VmHeaderCard
+// -----------------------------------------------------------
+//
+// The big white card at the top of the page: green/red glow
+// and status bar by VM state, the VM icon, id + status chip,
+// the name (with the inline rename), owner + uptime, the
+// start/stop button on the right and the container chips
+// underneath.
+//
+// Used by:
+//   - VirtualServerPage (below)
+// -----------------------------------------------------------
+
+function VmHeaderCard({ vmData, virtualServerID, startStop, rename }) {
+  const t = useTranslations("PAGES.vmDetail");
+  const isRunning = vmData.state === "running";
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden relative">
+      {/* Ambient Glow */}
+      <div
+        className="absolute top-0 left-0 right-0 h-32 opacity-20 pointer-events-none"
+        style={{
+          background: isRunning
+            ? "linear-gradient(to bottom, #22c55e 0%, transparent 100%)"
+            : "linear-gradient(to bottom, #ef4444 0%, transparent 100%)",
+        }}
+      />
+      {/* Status Bar */}
+      <div className={`h-1.5 ${isRunning ? "bg-green-500" : "bg-red-500"} relative z-10`} />
+
+      <div className="p-6">
+        <div className="flex items-start justify-between">
+          {/* Left: VM Info */}
+          <div className="flex items-start gap-5">
+            {/* VM Icon */}
+            <div className="w-32 h-32 bg-gray-200 rounded-xl flex items-center justify-center p-3">
+              <img
+                src="/img/virtual-machine-icon.png"
+                alt="Virtual Server"
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            {/* VM Details */}
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-md font-mono bg-gray-300 px-2 py-0.5 rounded-full">
+                  #{virtualServerID}
+                </span>
+                <Chip
+                  label={isRunning ? t("HEADER.running") : t("HEADER.stopped")}
+                  size="small"
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: "1rem",
+                    height: 28,
+                    backgroundColor: isRunning ? "green" : "red",
+                    color: "white",
+                  }}
+                />
+              </div>
+
+              <VmNameEditor name={vmData.name} rename={rename} />
+
+              <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <PersonOutlineIcon sx={{ fontSize: 18, color: "gray" }} />
+                  <span>{vmData.owneremail || "N/A"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AccessTimeIcon sx={{ fontSize: 18, color: "gray" }} />
+                  <span>{vmData.status || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="contained"
+              onClick={startStop}
+              startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
+              sx={{
+                textTransform: "none",
+                fontWeight: 600,
+                bgcolor: isRunning ? "red" : "green",
+                "&:hover": {
+                  bgcolor: isRunning ? "#dc2626" : "#16a34a",
+                },
+              }}
+            >
+              {isRunning ? t("HEADER.stop_server") : t("HEADER.start_server")}
+            </Button>
+          </div>
+        </div>
+
+        {vmData.stacks && vmData.stacks.length > 0 && (
+          <ContainerStacks stacks={vmData.stacks} vmRunning={isRunning} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// ControlsTab
+// -----------------------------------------------------------
+//
+// The Controls tab body: the intro line and the four
+// management tool cards. The per-VM tools live behind port
+// 8443 — a virtual-server-id cookie is set first so the
+// endpoint Caddy routes the new tab to the right VM's
+// containers; the VS Code card just opens a docs page.
+//
+// Used by:
+//   - VirtualServerPage (below) — the first tab
+// -----------------------------------------------------------
+
+function ControlsTab({ vmId }) {
+  const t = useTranslations("PAGES.vmDetail");
+
+
+  const openTool = (path) => {
+    document.cookie = `virtual-server-id=${vmId}; path=/;`;
+    const url = `${window.location.protocol}//${window.location.hostname}:8443${path}`;
+    window.open(url, "_blank");
+  };
+
+  const openSystemPage = (path) => {
+    window.open(path, "_blank");
+  };
+
+
+  return (
+    <div>
+      <p className="text-gray-600 mb-6">
+        {t("CONTROLS.intro")}
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+        <ControlCard
+          icon={ViewInArIcon}
+          title="Dockge"
+          description={t("CONTROLS.dockge_desc")}
+          onClick={() => openTool("/")}
+          color="#2563eb"
+        />
+        <ControlCard
+          icon={FolderIcon}
+          title={t("CONTROLS.filebrowser")}
+          description={t("CONTROLS.filebrowser_desc")}
+          onClick={() => openTool("/filebrowser")}
+          color="#16a34a"
+        />
+        <ControlCard
+          icon={TerminalIcon}
+          title={t("CONTROLS.ssh")}
+          description={t("CONTROLS.ssh_desc")}
+          onClick={() => openTool("/ssh/host/172.18.0.1")}
+          color="#9333ea"
+        />
+        <ControlCard
+          icon={CodeIcon}
+          title="Visual Studio Code"
+          description={t("CONTROLS.vscode_desc")}
+          onClick={() => openSystemPage("/docs/books/visual-studio-code/page/connect-vscode-with-your-server")}
+          color="#2563eb"
+        />
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
 // DetailSkeleton
 // -----------------------------------------------------------
 //
@@ -299,9 +659,9 @@ function DetailSkeleton() {
 // VirtualServerPage (default export)
 // -----------------------------------------------------------
 //
-// Layout plus the page-local UI state (rename editing, tab
-// selection); the data and actions come from
-// useVirtualServer.
+// The page frame: back button, the header card and the two
+// tabs — everything with real content lives in the pieces
+// above; the data and actions come from useVirtualServer.
 //
 // Used by:
 //   - router.jsx — route /vm/:virtualServerID (via
@@ -321,49 +681,6 @@ export default function VirtualServerPage({ virtualServerID }) {
   const currentTab = searchParams.get('tab') === 'domains' ? 1 : 0;
   const setCurrentTab = (val) =>
     setSearchParams(val === 1 ? { tab: 'domains' } : {}, { replace: true });
-
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editedName, setEditedName] = useState("");
-
-
-  const handleStartEditing = () => {
-    setEditedName(vmData.name || "");
-    setIsEditingName(true);
-  };
-
-
-  const handleCancelEditing = () => {
-    setIsEditingName(false);
-    setEditedName("");
-  };
-
-
-  const handleSaveName = async () => {
-    if (!editedName.trim()) {
-      toast.error(<b>{t("TOASTS.name_empty")}</b>);
-      return;
-    }
-    if (await rename(editedName.trim())) {
-      setIsEditingName(false);
-    }
-  };
-
-
-  // The per-VM tools live behind port 8443 — the cookie tells
-  // the endpoint Caddy which VM's containers to route to
-  const openTool = (path) => {
-    document.cookie = `virtual-server-id=${vmData.id}; path=/;`;
-    const url = `${window.location.protocol}//${window.location.hostname}:8443${path}`;
-    window.open(url, "_blank");
-  };
-
-
-  const openSystemPage = (path) => {
-    window.open(path, "_blank");
-  };
-
-
-  const isRunning = vmData?.state === "running";
 
 
   // Nothing to show yet (or the id answered empty)
@@ -389,179 +706,12 @@ export default function VirtualServerPage({ virtualServerID }) {
         {t("HEADER.back")}
       </Button>
 
-      {/* Header Card */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden relative">
-        {/* Ambient Glow */}
-        <div
-          className="absolute top-0 left-0 right-0 h-32 opacity-20 pointer-events-none"
-          style={{
-            background: isRunning
-              ? "linear-gradient(to bottom, #22c55e 0%, transparent 100%)"
-              : "linear-gradient(to bottom, #ef4444 0%, transparent 100%)",
-          }}
-        />
-        {/* Status Bar */}
-        <div className={`h-1.5 ${isRunning ? "bg-green-500" : "bg-red-500"} relative z-10`} />
-
-        <div className="p-6">
-          <div className="flex items-start justify-between">
-            {/* Left: VM Info */}
-            <div className="flex items-start gap-5">
-              {/* VM Icon */}
-              <div className="w-32 h-32 bg-gray-200 rounded-xl flex items-center justify-center p-3">
-                <img
-                  src="/img/virtual-machine-icon.png"
-                  alt="Virtual Server"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-
-              {/* VM Details */}
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-md font-mono bg-gray-300 px-2 py-0.5 rounded-full">
-                    #{virtualServerID}
-                  </span>
-                  <Chip
-                    label={isRunning ? t("HEADER.running") : t("HEADER.stopped")}
-                    size="small"
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: "1rem",
-                      height: 28,
-                      backgroundColor: isRunning ? "green" : "red",
-                      color: "white",
-                    }}
-                  />
-                </div>
-
-                {/* Name — plain with the rename pencil, or
-                    the edit field with save/cancel */}
-                {isEditingName ? (
-                  <div className="flex items-center gap-2 mb-3">
-                    <TextField
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      size="small"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveName();
-                        if (e.key === "Escape") handleCancelEditing();
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          fontSize: "1.5rem",
-                          fontWeight: 700,
-                        },
-                      }}
-                    />
-                    <Tooltip title={t("HEADER.save")}>
-                      <IconButton
-                        onClick={handleSaveName}
-                        sx={{
-                          color: "green",
-                          bgcolor: "#dcfce7",
-                          "&:hover": { bgcolor: "#bbf7d0" },
-                        }}
-                      >
-                        <CheckIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={t("HEADER.cancel")}>
-                      <IconButton
-                        onClick={handleCancelEditing}
-                        sx={{
-                          color: "red",
-                          bgcolor: "#fee2e2",
-                          "&:hover": { bgcolor: "#fecaca" },
-                        }}
-                      >
-                        <CloseIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mb-3 mt-5">
-                    <h1 className="text-2xl font-bold text-gray-800">
-                      {vmData.name || t("HEADER.unnamed")}
-                    </h1>
-                    <Tooltip title={t("HEADER.rename")}>
-                      <IconButton
-                        onClick={handleStartEditing}
-                        size="small"
-                        sx={{
-                          color: "gray",
-                          p: 0.5,
-                          mt: "-6px",
-                          "&:hover": { color: "primary.main", bgcolor: "#f3f4f6" },
-                        }}
-                      >
-                        <EditIcon sx={{ fontSize: 20 }} />
-                      </IconButton>
-                    </Tooltip>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <PersonOutlineIcon sx={{ fontSize: 18, color: "gray" }} />
-                    <span>{vmData.owneremail || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <AccessTimeIcon sx={{ fontSize: 18, color: "gray" }} />
-                    <span>{vmData.status || "N/A"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Actions */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="contained"
-                onClick={startStop}
-                startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  bgcolor: isRunning ? "red" : "green",
-                  "&:hover": {
-                    bgcolor: isRunning ? "#dc2626" : "#16a34a",
-                  },
-                }}
-              >
-                {isRunning ? t("HEADER.stop_server") : t("HEADER.start_server")}
-              </Button>
-            </div>
-          </div>
-
-          {/* Containers Section */}
-          {vmData.stacks && vmData.stacks.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-gray-100">
-              <div className="flex items-center gap-2 mb-3">
-                <ViewInArIcon sx={{ fontSize: 18, color: "gray" }} />
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  {t("HEADER.docker_containers")}
-                </span>
-              </div>
-              <div className="space-y-3">
-                {vmData.stacks.map((stack, sidx) => (
-                  <div key={sidx}>
-                    <span className="text-xs font-semibold text-gray-600 mb-1 block">
-                      {stack.stackname || "Stack"}
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {stack.containers?.map((container, cidx) => (
-                        <ContainerChip key={cidx} container={container} vmRunning={isRunning} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <VmHeaderCard
+        vmData={vmData}
+        virtualServerID={virtualServerID}
+        startStop={startStop}
+        rename={rename}
+      />
 
       {/* Tabs */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -594,46 +744,10 @@ export default function VirtualServerPage({ virtualServerID }) {
 
         {/* Tab Content */}
         <div className="p-6">
-          {/* Controls Tab */}
           {currentTab === 0 && (
-            <div>
-              <p className="text-gray-600 mb-6">
-                {t("CONTROLS.intro")}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                <ControlCard
-                  icon={ViewInArIcon}
-                  title="Dockge"
-                  description={t("CONTROLS.dockge_desc")}
-                  onClick={() => openTool("/")}
-                  color="#2563eb"
-                />
-                <ControlCard
-                  icon={FolderIcon}
-                  title={t("CONTROLS.filebrowser")}
-                  description={t("CONTROLS.filebrowser_desc")}
-                  onClick={() => openTool("/filebrowser")}
-                  color="#16a34a"
-                />
-                <ControlCard
-                  icon={TerminalIcon}
-                  title={t("CONTROLS.ssh")}
-                  description={t("CONTROLS.ssh_desc")}
-                  onClick={() => openTool("/ssh/host/172.18.0.1")}
-                  color="#9333ea"
-                />
-                <ControlCard
-                  icon={CodeIcon}
-                  title="Visual Studio Code"
-                  description={t("CONTROLS.vscode_desc")}
-                  onClick={() => openSystemPage("/docs/books/visual-studio-code/page/connect-vscode-with-your-server")}
-                  color="#2563eb"
-                />
-              </div>
-            </div>
+            <ControlsTab vmId={vmData.id} />
           )}
 
-          {/* DNS Tab */}
           {currentTab === 1 && (
             <DomainsListTable virtualServerID={virtualServerID} />
           )}

@@ -23,10 +23,15 @@
 //
 //  Split into (root component last):
 //
-//    FACULTY_DOMAINS — the offered faculty suffixes
-//    ModalActions    — Save/Create + long-press Delete bar
-//    DomainFields    — name/validation/ssl/advanced inputs
-//    AddEditDomain   — state + API calls (default export)
+//    FACULTY_DOMAINS         — the offered faculty suffixes
+//    useDomainNameValidation — backend name check + full name
+//    useDomainActions        — create/update/delete calls
+//    ModalActions            — Save/Create + long-press
+//                              Delete bar
+//    DomainFields            — name/validation/ssl/advanced
+//                              inputs
+//    AddEditDomain           — state + wiring (default
+//                              export)
 //
 //  Used by:
 //    - DomainsListTable — row click (edit) and Insert New
@@ -50,6 +55,136 @@ import toast from 'react-hot-toast';
 
 // The faculty-supplied suffixes offered in the dropdown
 const FACULTY_DOMAINS = ['.knf-hosting.lt'];
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// useDomainNameValidation
+// -----------------------------------------------------------
+//
+//   const { domainNameError, domainNameValid, fullDomainName }
+//     = useDomainNameValidation(virtualServerID, domainname,
+//                               isFacultyDomain, facultyDomain)
+//
+// The backend name check: fullDomainName is the name the
+// backend stores (subdomain + suffix in faculty mode), and
+// every change to it — typing, flipping the faculty checkbox,
+// picking another suffix — re-asks /api/vm/dns/isvalid. The
+// backend answers { isvalid, error_message }; the message is
+// shown in green when valid, red when not, and Save/Create
+// keys on the flag.
+//
+// Used by:
+//   - AddEditDomain (below)
+// -----------------------------------------------------------
+
+function useDomainNameValidation(virtualServerID, domainname, isFacultyDomain, facultyDomain) {
+
+  const [domainNameError, setDomainNameError] = useState('');
+  const [domainNameValid, setDomainNameValid] = useState(false);
+
+  const fullDomainName = isFacultyDomain ? domainname + facultyDomain : domainname;
+
+
+  // Latest-wins: the cleanup aborts the in-flight check when
+  // the name changes again (or the dialog closes), so a slow
+  // answer can never overwrite a newer one
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const validate = async () => {
+      try {
+        const domainname_encoded = encodeURIComponent(fullDomainName);
+        const response = await axios.get('/api/vm/dns/isvalid?domainname=' + domainname_encoded + '&virtualserverid=' + virtualServerID, { withCredentials: true, signal: controller.signal });
+        setDomainNameError(response.data.error_message);
+        setDomainNameValid(response.data.isvalid);
+      } catch (error) {
+        // Aborted = superseded by a newer keystroke — ignore
+        if (!axios.isCancel(error)) throw error;
+      }
+    };
+    validate();
+
+    return () => controller.abort();
+  }, [fullDomainName, virtualServerID]);
+
+
+  return { domainNameError, domainNameValid, fullDomainName };
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// useDomainActions
+// -----------------------------------------------------------
+//
+//   const { create, save, remove } = useDomainActions({...})
+//
+// The three backend calls of the dialog — POST create, PUT
+// update, DELETE — against /api/vm/dns/<vm id>. The backend
+// answers { message: 'ok' | reason }; either way the result
+// is toasted, the grid refreshes via getData() and the dialog
+// closes (animated, via closeModal).
+//
+// Used by:
+//   - AddEditDomain (below)
+// -----------------------------------------------------------
+
+function useDomainActions({ virtualServerID, form, fullDomainName, getData, closeModal, t }) {
+
+  const endpointUrl = "/api/vm/dns/" + virtualServerID;
+
+
+  // Shared answer handling: toast, refresh the grid, close
+  function finishRequest(response, successText) {
+    if (response.data.message === 'ok') {
+      toast.success(<b>{successText}</b>, { duration: 3000 });
+    } else {
+      toast.error(<b>{t("DOMAIN_MODAL.error", { message: response.data.message })}</b>, { duration: 8000 });
+    }
+
+    getData();
+    closeModal();
+  }
+
+
+  async function create() {
+    const response = await axios.post(endpointUrl, {
+      domainname: fullDomainName,
+      iscloudflare: form.iscloudflare,
+      ssl: form.ssl,
+    }, { withCredentials: true });
+    finishRequest(response, t("DOMAIN_MODAL.created"));
+  }
+
+  async function save() {
+    const response = await axios.put(endpointUrl, {
+      domainid: form.id,
+      domainname: fullDomainName,
+      iscloudflare: form.iscloudflare,
+      ssl: form.ssl,
+    }, { withCredentials: true });
+    finishRequest(response, t("DOMAIN_MODAL.updated"));
+  }
+
+  async function remove() {
+    const response = await axios.delete(endpointUrl + "/" + form.id, { withCredentials: true });
+    finishRequest(response, t("DOMAIN_MODAL.deleted"));
+  }
+
+
+  return { create, save, remove };
+}
 
 
 
@@ -250,11 +385,9 @@ function DomainFields({
 // AddEditDomain (default export)
 // -----------------------------------------------------------
 //
-// Owns the form state, the per-keystroke backend validation
-// and the create/update/delete calls. The backend answers
-// { message: 'ok' | reason } — either way the result is
-// toasted, the grid refreshes via getData() and the dialog
-// closes (animated, via UniversalModal's closeRef).
+// Owns the form state and wires the validation and action
+// hooks into the modal — the backend traffic itself lives in
+// useDomainNameValidation and useDomainActions above.
 //
 // Used by:
 //   - DomainsListTable — row click (edit) and Insert New
@@ -294,78 +427,17 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
   const updateField = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
 
-  const endpointUrl = "/api/vm/dns/" + virtualServerID;
+  const { domainNameError, domainNameValid, fullDomainName } =
+    useDomainNameValidation(virtualServerID, form.domainname, isFacultyDomain, facultyDomain);
 
-
-  // The backend validates the FULL name (suffix included) and
-  // answers { isvalid, error_message } — the message is shown
-  // in green when valid, red when not
-  const [domainNameError, setDomainNameError] = useState('');
-  const [domainNameValid, setDomainNameValid] = useState(false);
-  async function isDomainNameValid(domainname) {
-    if (isFacultyDomain) {
-      domainname = domainname + facultyDomain;
-    }
-    const domainname_encoded = encodeURIComponent(domainname);
-    const response = await axios.get('/api/vm/dns/isvalid?domainname=' + domainname_encoded + '&virtualserverid=' + virtualServerID, { withCredentials: true });
-    setDomainNameError(response.data.error_message);
-    setDomainNameValid(response.data.isvalid);
-  }
-
-  async function handleDomainNameChange(e) {
-    let domainname = e.target.value;
-    setForm(prev => ({ ...prev, domainname: domainname }));
-    isDomainNameValid(domainname);
-  }
-
-  // Revalidate on mount (prefill / empty name) and when the
-  // faculty checkbox flips (the suffix changes the full name)
-  useEffect(() => {
-    isDomainNameValid(form.domainname);
-  }, [form, isFacultyDomain]);
-
-
-  // The full name the backend stores — subdomain + suffix in
-  // faculty mode
-  const fullDomainName = () =>
-    isFacultyDomain ? form.domainname + facultyDomain : form.domainname;
-
-
-  // Shared answer handling: toast, refresh the grid, close
-  function finishRequest(response, successText) {
-    if (response.data.message === 'ok') {
-      toast.success(<b>{successText}</b>, { duration: 3000 });
-    } else {
-      toast.error(<b>{t("DOMAIN_MODAL.error", { message: response.data.message })}</b>, { duration: 8000 });
-    }
-
-    getData();
-    modalCloseRef.current?.();
-  }
-
-  async function handleCreateButton() {
-    const response = await axios.post(endpointUrl, {
-      domainname: fullDomainName(),
-      iscloudflare: form.iscloudflare,
-      ssl: form.ssl,
-    }, { withCredentials: true });
-    finishRequest(response, t("DOMAIN_MODAL.created"));
-  }
-
-  async function handleSaveButton() {
-    const response = await axios.put(endpointUrl, {
-      domainid: form.id,
-      domainname: fullDomainName(),
-      iscloudflare: form.iscloudflare,
-      ssl: form.ssl,
-    }, { withCredentials: true });
-    finishRequest(response, t("DOMAIN_MODAL.updated"));
-  }
-
-  async function handleDeleteButton() {
-    const response = await axios.delete(endpointUrl + "/" + form.id, { withCredentials: true });
-    finishRequest(response, t("DOMAIN_MODAL.deleted"));
-  }
+  const { create, save, remove } = useDomainActions({
+    virtualServerID,
+    form,
+    fullDomainName,
+    getData,
+    closeModal: () => modalCloseRef.current?.(),
+    t,
+  });
 
 
   const disableSave = form.domainname.trim() === '' || !domainNameValid;
@@ -386,8 +458,8 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
         <ModalActions
           isEditing={isEditing}
           disableSave={disableSave}
-          onSave={isEditing ? handleSaveButton : handleCreateButton}
-          onDelete={handleDeleteButton}
+          onSave={isEditing ? save : create}
+          onDelete={remove}
           t={t}
         />
       }
@@ -395,7 +467,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
       <DomainFields
         form={form}
         updateField={updateField}
-        onDomainNameChange={handleDomainNameChange}
+        onDomainNameChange={updateField('domainname')}
         isFacultyDomain={isFacultyDomain}
         setIsFacultyDomain={setIsFacultyDomain}
         facultyDomain={facultyDomain}

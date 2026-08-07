@@ -18,8 +18,16 @@
 //  Split into (root component last):
 //
 //    useVirtualServers   — list query + start/stop/delete
+//    vmMatchesQuery      — the search predicate
+//    QuickActions        — start/stop + hold-to-delete corner
+//    DomainRow           — one domain with its chips
+//    DomainsSection      — the card's domain list
+//    StacksSection       — the card's containers by stack
 //    VMCard              — one server card
-//    VirtualServersTable — layout + search (default export)
+//    SearchBox           — the header search field
+//    EmptyState          — icon + two-line message
+//    ListHeader          — title/count + switch/search/new
+//    VirtualServersTable — wiring (default export)
 //
 //  Used by:
 //    - VirtualServers.jsx — the /vm page body
@@ -58,6 +66,7 @@ import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import ClearIcon from "@mui/icons-material/Clear";
 import DomainIcon from "@mui/icons-material/Domain";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+
 
 
 
@@ -143,16 +152,312 @@ function useVirtualServers(showOtherUsers) {
 
 
 
+
+// -----------------------------------------------------------
+// vmMatchesQuery
+// -----------------------------------------------------------
+//
+// The search predicate: true when the VM's name, owner email,
+// id, any domain name, or any stack/container name contains
+// the query (case-insensitive). An empty query matches
+// everything.
+//
+// Used by:
+//   - VirtualServersTable (below) — filters the card grid
+// -----------------------------------------------------------
+
+function vmMatchesQuery(vm, searchQuery) {
+  if (!searchQuery.trim()) return true;
+
+  const query = searchQuery.toLowerCase();
+
+  if (vm.name?.toLowerCase().includes(query)) return true;
+
+  if (vm.owneremail?.toLowerCase().includes(query)) return true;
+
+  if (vm.id?.toString().includes(query)) return true;
+
+  if (vm.domains) {
+    for (const domain of vm.domains) {
+      if (domain.domainname?.toLowerCase().includes(query)) return true;
+    }
+  }
+
+  if (vm.stacks) {
+    for (const stack of vm.stacks) {
+      if (stack.stackname?.toLowerCase().includes(query)) return true;
+      if (stack.containers) {
+        for (const container of stack.containers) {
+          if (container.names?.toLowerCase().includes(query)) return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// QuickActions
+// -----------------------------------------------------------
+//
+// The card's action corner: start/stop and the hold-to-delete
+// button (disabled while the VM runs). Clicks stop
+// propagating here so they never trigger the card's navigate.
+//
+// Used by:
+//   - VMCard (below) — top right of the card
+// -----------------------------------------------------------
+
+function QuickActions({ vm, isRunning, onStartStop, onDelete }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <div
+      className="flex items-center gap-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Tooltip title={isRunning ? t("CARD.stop_server") : t("CARD.start_server")}>
+        <IconButton
+          onClick={(e) => onStartStop(e, vm)}
+          sx={{
+            color: isRunning ? "red" : "green",
+            backgroundColor: "lightgray",
+            "&:hover": {
+              backgroundColor: isRunning ? "red" : "green",
+              color: "white",
+            },
+          }}
+        >
+          {isRunning ? <StopIcon /> : <PlayArrowIcon />}
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={isRunning ? t("CARD.stop_first") : t("CARD.hold_to_delete")}>
+        <span>
+          <LongPressIconButton
+            disabled={isRunning}
+            onComplete={() => onDelete(vm)}
+            uncompletedToastMessage={t("CARD.hold_toast")}
+            progressColor="error.main"
+            progressBgColor="error.light"
+            className="select-none"
+            sx={{
+              color: isRunning ? "grey.400" : "error.main",
+              backgroundColor: "lightgray",
+              "&:hover": { backgroundColor: "error.light", color: "white" },
+              transition: "all 0.2s",
+            }}
+          >
+            <DeleteIcon />
+          </LongPressIconButton>
+        </span>
+      </Tooltip>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// DomainRow
+// -----------------------------------------------------------
+//
+// One domain of the card: the name, the open-in-new-tab
+// button (http/https by the ssl flag, propagation stopped so
+// the card doesn't navigate) and the Cloudflare/HTTPS chips.
+//
+// Used by:
+//   - DomainsSection (below)
+// -----------------------------------------------------------
+
+function DomainRow({ domain }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm text-gray-700 font-medium">
+        {domain.domainname || "Unknown"}
+      </span>
+      <Tooltip title={t("CARD.open_new_tab")}>
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            const protocol = domain.ssl === 1 ? "https" : "http";
+            window.open(`${protocol}://${domain.domainname}`, "_blank");
+          }}
+          sx={{
+            p: 0.5,
+            color: "gray",
+            "&:hover": { color: "#1976d2", bgcolor: "#e3f2fd" },
+          }}
+        >
+          <OpenInNewIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+      </Tooltip>
+      {domain.iscloudflare === 1 && (
+        <Chip
+          label="Cloudflare"
+          size="small"
+          sx={{
+            fontSize: "0.6rem",
+            height: 18,
+            bgcolor: "green",
+            color: "white",
+            fontWeight: 600,
+            "& .MuiChip-label": { px: 0.75 },
+          }}
+        />
+      )}
+      <Chip
+        label={domain.ssl === 1 ? "HTTPS" : "No HTTPS"}
+        size="small"
+        sx={{
+          fontSize: "0.6rem",
+          height: 18,
+          bgcolor: domain.ssl === 1 ? "green" : "red",
+          color: "white",
+          fontWeight: 600,
+          "& .MuiChip-label": { px: 0.75 },
+        }}
+      />
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// DomainsSection
+// -----------------------------------------------------------
+//
+// The card's domain list under its section heading — one
+// DomainRow per domain.
+//
+// Used by:
+//   - VMCard (below) — rendered only when domains exist
+// -----------------------------------------------------------
+
+function DomainsSection({ domains }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <div className="border-t border-gray-100 pt-3 mb-4">
+      <div className="flex items-center gap-2 mb-2">
+        <DomainIcon sx={{ fontSize: 16, color: "gray" }} />
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          {t("CARD.domain_names")}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {domains.map((domain, didx) => (
+          <DomainRow key={didx} domain={domain} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// StacksSection
+// -----------------------------------------------------------
+//
+// The card's docker containers grouped by stack: one labelled
+// chip row per stack, chips green only while the container
+// AND the VM are both running (docker status in the tooltip).
+//
+// Used by:
+//   - VMCard (below) — bottom of the card
+// -----------------------------------------------------------
+
+function StacksSection({ stacks, vmRunning }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <div className="border-t border-gray-100 pt-3">
+      <div className="flex items-center gap-2 mb-2">
+        <ViewInArIcon sx={{ fontSize: 16, color: "gray" }} />
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          {t("CARD.docker_containers")}
+        </span>
+      </div>
+      {stacks && stacks.length > 0 && (
+        <div className="space-y-2">
+          {stacks.map((stack, sidx) => (
+            <div key={sidx}>
+              <span className="text-xs font-semibold text-gray-700">
+                {stack.stackname || "Stack"}:
+              </span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {stack.containers?.map((container, cidx) => (
+                  <Tooltip
+                    key={`${container.image}-${cidx}`}
+                    title={container.status || "N/A"}
+                  >
+                    <Chip
+                      label={container.names}
+                      size="small"
+                      sx={{
+                        fontSize: "0.65rem",
+                        height: 20,
+                        backgroundColor:
+                          container.state === "running" && vmRunning === true
+                            ? "green"
+                            : "red",
+                        color: "white",
+                        "& .MuiChip-label": { px: 1 },
+                      }}
+                    />
+                  </Tooltip>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
 // -----------------------------------------------------------
 // VMCard
 // -----------------------------------------------------------
 //
-// One server card: id + running/stopped chip, name, start/
-// stop and hold-to-delete actions, owner and uptime line,
-// then the domain list (with open-in-new-tab, Cloudflare and
-// HTTPS chips) and the docker containers grouped by stack.
-// Clicking anywhere else on the card opens the VM detail
-// page; the action corner stops that propagation.
+// One server card: id + running/stopped chip, name, the
+// QuickActions corner, owner and uptime line, then the
+// DomainsSection and StacksSection. Clicking anywhere else on
+// the card opens the VM detail page.
 //
 // Used by:
 //   - VirtualServersTable (below) — one per filtered VM
@@ -209,47 +514,12 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
             </h3>
           </div>
 
-          {/* Quick Actions */}
-          <div
-            className="flex items-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Tooltip title={isRunning ? t("CARD.stop_server") : t("CARD.start_server")}>
-              <IconButton
-                onClick={(e) => onStartStop(e, vm)}
-                sx={{
-                  color: isRunning ? "red" : "green",
-                  backgroundColor: "lightgray",
-                  "&:hover": {
-                    backgroundColor: isRunning ? "red" : "green",
-                    color: "white",
-                  },
-                }}
-              >
-                {isRunning ? <StopIcon /> : <PlayArrowIcon />}
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={isRunning ? t("CARD.stop_first") : t("CARD.hold_to_delete")}>
-              <span>
-                <LongPressIconButton
-                  disabled={isRunning}
-                  onComplete={() => onDelete(vm)}
-                  uncompletedToastMessage={t("CARD.hold_toast")}
-                  progressColor="error.main"
-                  progressBgColor="error.light"
-                  className="select-none"
-                  sx={{
-                    color: isRunning ? "grey.400" : "error.main",
-                    backgroundColor: "lightgray",
-                    "&:hover": { backgroundColor: "error.light", color: "white" },
-                    transition: "all 0.2s",
-                  }}
-                >
-                  <DeleteIcon />
-                </LongPressIconButton>
-              </span>
-            </Tooltip>
-          </div>
+          <QuickActions
+            vm={vm}
+            isRunning={isRunning}
+            onStartStop={onStartStop}
+            onDelete={onDelete}
+          />
         </div>
 
 
@@ -269,114 +539,11 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
         </div>
 
 
-        {/* Domains */}
         {vm.domains && vm.domains.length > 0 && (
-          <div className="border-t border-gray-100 pt-3 mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DomainIcon sx={{ fontSize: 16, color: "gray" }} />
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                {t("CARD.domain_names")}
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {vm.domains.map((domain, didx) => (
-                <div key={didx} className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-gray-700 font-medium">
-                    {domain.domainname || "Unknown"}
-                  </span>
-                  <Tooltip title={t("CARD.open_new_tab")}>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const protocol = domain.ssl === 1 ? "https" : "http";
-                        window.open(`${protocol}://${domain.domainname}`, "_blank");
-                      }}
-                      sx={{
-                        p: 0.5,
-                        color: "gray",
-                        "&:hover": { color: "#1976d2", bgcolor: "#e3f2fd" },
-                      }}
-                    >
-                      <OpenInNewIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Tooltip>
-                  {domain.iscloudflare === 1 && (
-                    <Chip
-                      label="Cloudflare"
-                      size="small"
-                      sx={{
-                        fontSize: "0.6rem",
-                        height: 18,
-                        bgcolor: "green",
-                        color: "white",
-                        fontWeight: 600,
-                        "& .MuiChip-label": { px: 0.75 },
-                      }}
-                    />
-                  )}
-                  <Chip
-                    label={domain.ssl === 1 ? "HTTPS" : "No HTTPS"}
-                    size="small"
-                    sx={{
-                      fontSize: "0.6rem",
-                      height: 18,
-                      bgcolor: domain.ssl === 1 ? "green" : "red",
-                      color: "white",
-                      fontWeight: 600,
-                      "& .MuiChip-label": { px: 0.75 },
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+          <DomainsSection domains={vm.domains} />
         )}
 
-
-        {/* Docker Containers */}
-        <div className="border-t border-gray-100 pt-3">
-          <div className="flex items-center gap-2 mb-2">
-            <ViewInArIcon sx={{ fontSize: 16, color: "gray" }} />
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              {t("CARD.docker_containers")}
-            </span>
-          </div>
-          {vm.stacks && vm.stacks.length > 0 && (
-            <div className="space-y-2">
-              {vm.stacks.map((stack, sidx) => (
-                <div key={sidx}>
-                  <span className="text-xs font-semibold text-gray-700">
-                    {stack.stackname || "Stack"}:
-                  </span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {stack.containers?.map((container, cidx) => (
-                      <Tooltip
-                        key={`${container.image}-${cidx}`}
-                        title={container.status || "N/A"}
-                      >
-                        <Chip
-                          label={container.names}
-                          size="small"
-                          sx={{
-                            fontSize: "0.65rem",
-                            height: 20,
-                            backgroundColor:
-                              container.state === "running" && isRunning === true
-                                ? "green"
-                                : "red",
-                            color: "white",
-                            "& .MuiChip-label": { px: 1 },
-                          }}
-                        />
-                      </Tooltip>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <StacksSection stacks={vm.stacks} vmRunning={isRunning} />
       </div>
     </div>
   );
@@ -388,14 +555,186 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
 
 
 
+
+// -----------------------------------------------------------
+// SearchBox
+// -----------------------------------------------------------
+//
+// The header search field: magnifier on the left, a clear (×)
+// button while there is text, focus color from the theme —
+// only the burgundy hover border stays local.
+//
+// Used by:
+//   - ListHeader (below)
+// -----------------------------------------------------------
+
+function SearchBox({ value, onChange, onClear }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <TextField
+      size="small"
+      placeholder={t("HEADER.search_placeholder")}
+      value={value}
+      onChange={onChange}
+      sx={{
+        width: 280,
+        "& .MuiOutlinedInput-root": {
+          borderRadius: 2,
+          backgroundColor: "white",
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: "primary.main",
+          },
+        },
+      }}
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <SearchIcon sx={{ color: "gray" }} />
+          </InputAdornment>
+        ),
+        endAdornment: value && (
+          <InputAdornment position="end">
+            <IconButton
+              size="small"
+              onClick={onClear}
+              sx={{ p: 0.5 }}
+            >
+              <ClearIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          </InputAdornment>
+        ),
+      }}
+    />
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// EmptyState
+// -----------------------------------------------------------
+//
+// The centered faded-icon message shown instead of the grid —
+// both for "no servers at all" and "no search matches"; the
+// caller passes the translated texts.
+//
+// Used by:
+//   - VirtualServersTable (below) — both empty branches
+// -----------------------------------------------------------
+
+function EmptyState({ title, subtitle }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+      <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
+      <p className="mt-4 text-lg">{title}</p>
+      <p className="text-sm">{subtitle}</p>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// ListHeader
+// -----------------------------------------------------------
+//
+// The PageTitle row of the page: title + live count on the
+// left; the admin-only other-users switch, the SearchBox and
+// the New Server button on the right. The new-server click
+// passes its event up so the dialog can fly out of the
+// button.
+//
+// Used by:
+//   - VirtualServersTable (below)
+// -----------------------------------------------------------
+
+function ListHeader({ authdata, searchQuery, showOtherUsers, updateParam, shownCount, totalCount, onNewServer }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <PageTitle>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          {searchQuery
+            ? t(totalCount !== 1 ? "HEADER.filtered_many" : "HEADER.filtered_one", { shown: shownCount, total: totalCount })
+            : t(totalCount !== 1 ? "HEADER.count_many" : "HEADER.count_one", { n: totalCount })}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4">
+
+        {/* Show other users switch */}
+        {authdata.admin === 1 && (
+          <FormControlLabel
+            control={
+              <IOSSwitch
+                checked={showOtherUsers}
+                onChange={(e) => updateParam('all', e.target.checked ? '1' : '')}
+                sx={{ marginRight: '10px' }}
+              />
+            }
+            label={
+              <span className="text-sm text-gray-600">{t("HEADER.show_other_users")}</span>
+            }
+          />
+        )}
+
+        <SearchBox
+          value={searchQuery}
+          onChange={(e) => updateParam('q', e.target.value)}
+          onClear={() => updateParam('q', '')}
+        />
+
+        {/* New Server — contained-primary from the theme;
+            the dialog flies out of this button */}
+        <Button
+          variant="contained"
+          startIcon={<AddCircleOutlinedIcon />}
+          onClick={(event) => onNewServer(event)}
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            borderRadius: 2,
+            boxShadow: "none",
+            "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
+          }}
+        >
+          {t("HEADER.new_server")}
+        </Button>
+      </div>
+    </PageTitle>
+  );
+}
+
+
+
+
+
+
+
+
 // -----------------------------------------------------------
 // VirtualServersTable (default export)
 // -----------------------------------------------------------
 //
-// Layout, search and the dialog state; the list itself and
-// the start-stop/delete actions come from useVirtualServers.
-// Navigation to a VM is a hard page load, matching the old
-// app.
+// The wiring: URL-backed search/switch state, the dialog
+// state and the grid itself — everything with real content
+// lives in the pieces above, the list and its actions in
+// useVirtualServers. Navigation to a VM is client-side; the
+// detail page's data is often already in the query cache, so
+// it opens instantly.
 //
 // Used by:
 //   - VirtualServers.jsx — the /vm page body
@@ -426,43 +765,9 @@ export default function VirtualServersTable({ authdata }) {
 
   const { vms: data, isPending: loadingData, refreshVms, startStop, remove } = useVirtualServers(showOtherUsers);
 
-
-  // Filter VMs based on search query — matches name, owner,
-  // id, domain names, stack and container names
-  const filteredData = data.filter((vm) => {
-    if (!searchQuery.trim()) return true;
-
-    const query = searchQuery.toLowerCase();
-
-    if (vm.name?.toLowerCase().includes(query)) return true;
-
-    if (vm.owneremail?.toLowerCase().includes(query)) return true;
-
-    if (vm.id?.toString().includes(query)) return true;
-
-    if (vm.domains) {
-      for (const domain of vm.domains) {
-        if (domain.domainname?.toLowerCase().includes(query)) return true;
-      }
-    }
-
-    if (vm.stacks) {
-      for (const stack of vm.stacks) {
-        if (stack.stackname?.toLowerCase().includes(query)) return true;
-        if (stack.containers) {
-          for (const container of stack.containers) {
-            if (container.names?.toLowerCase().includes(query)) return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  });
+  const filteredData = data.filter((vm) => vmMatchesQuery(vm, searchQuery));
 
 
-  // Client-side navigation — the detail page's data is often
-  // already in the query cache, so it opens instantly
   const handleNavigate = (vm) => {
     navigate(`/vm/${vm.id}`);
   };
@@ -487,99 +792,23 @@ export default function VirtualServersTable({ authdata }) {
     }
   };
 
+  const handleNewServer = (event) => {
+    setModalSourceRect(event.currentTarget.getBoundingClientRect());
+    handleDialogOpen(true);
+  };
+
 
   return (
     <div className="h-[calc(100vh-105px)] w-full overflow-y-auto bg-gray-50 p-6">
-      {/* Header — PageTitle's justify-between puts the
-          controls on the right edge */}
-      <PageTitle>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">{t("HEADER.title")}</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {searchQuery
-              ? t(data.length !== 1 ? "HEADER.filtered_many" : "HEADER.filtered_one", { shown: filteredData.length, total: data.length })
-              : t(data.length !== 1 ? "HEADER.count_many" : "HEADER.count_one", { n: data.length })}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-4">
-
-          {/* Show other users switch */}
-          {authdata.admin === 1 && (
-            <FormControlLabel
-              control={
-                <IOSSwitch
-                  checked={showOtherUsers}
-                  onChange={(e) => updateParam('all', e.target.checked ? '1' : '')}
-                  sx={{ marginRight: '10px' }}
-                />
-              }
-              label={
-                <span className="text-sm text-gray-600">{t("HEADER.show_other_users")}</span>
-              }
-            />
-          )}
-
-
-          {/* Search Box — focus color comes from the theme;
-              only the burgundy hover border stays local */}
-          <TextField
-            size="small"
-            placeholder={t("HEADER.search_placeholder")}
-            value={searchQuery}
-            onChange={(e) => updateParam('q', e.target.value)}
-            sx={{
-              width: 280,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-                backgroundColor: "white",
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "primary.main",
-                },
-              },
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ color: "gray" }} />
-                </InputAdornment>
-              ),
-              endAdornment: searchQuery && (
-                <InputAdornment position="end">
-                  <IconButton
-                    size="small"
-                    onClick={() => updateParam('q', '')}
-                    sx={{ p: 0.5 }}
-                  >
-                    <ClearIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-
-
-          {/* New Server — contained-primary from the theme;
-              the dialog flies out of this button */}
-          <Button
-            variant="contained"
-            startIcon={<AddCircleOutlinedIcon />}
-            onClick={(event) => {
-              setModalSourceRect(event.currentTarget.getBoundingClientRect());
-              handleDialogOpen(true);
-            }}
-            sx={{
-              textTransform: "none",
-              fontWeight: 600,
-              borderRadius: 2,
-              boxShadow: "none",
-              "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
-            }}
-          >
-            {t("HEADER.new_server")}
-          </Button>
-        </div>
-      </PageTitle>
+      <ListHeader
+        authdata={authdata}
+        searchQuery={searchQuery}
+        showOtherUsers={showOtherUsers}
+        updateParam={updateParam}
+        shownCount={filteredData.length}
+        totalCount={data.length}
+        onNewServer={handleNewServer}
+      />
 
       {/* Loading State — skeleton cards in the real grid, so
           the layout doesn't jump when the list arrives */}
@@ -591,22 +820,12 @@ export default function VirtualServersTable({ authdata }) {
         </div>
       )}
 
-      {/* Empty State */}
       {!loadingData && data.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-          <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
-          <p className="mt-4 text-lg">{t("EMPTY.none_title")}</p>
-          <p className="text-sm">{t("EMPTY.none_subtitle")}</p>
-        </div>
+        <EmptyState title={t("EMPTY.none_title")} subtitle={t("EMPTY.none_subtitle")} />
       )}
 
-      {/* No Search Results */}
       {!loadingData && data.length > 0 && filteredData.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-          <ViewInArIcon sx={{ fontSize: 128, color: "gray", opacity: 0.3 }} />
-          <p className="mt-4 text-lg">{t("EMPTY.no_match_title")}</p>
-          <p className="text-sm">{t("EMPTY.no_match_subtitle")}</p>
-        </div>
+        <EmptyState title={t("EMPTY.no_match_title")} subtitle={t("EMPTY.no_match_subtitle")} />
       )}
 
       {/* VM Cards Grid */}
