@@ -10,8 +10,7 @@
 //  login page drops the session cookie on mount.
 //
 //  Used by:
-//    - VirtualServers / VirtualServer / Account — user pages
-//    - Home / UsersList — admin pages
+//    - AppShell — mounted once above every signed-in page
 // -----------------------------------------------------------
 
 import { Link } from "react-router-dom";
@@ -22,7 +21,7 @@ import PersonIcon from '@mui/icons-material/Person';
 export default function Navbar({ authdata }) {
 
   return (
-    <div className="h-[75px] w-full relative flex items-center text-sm bg-[rgb(123,0,63)] border-b-[0.5px] border-b-[rgb(231,228,228)]">
+    <div className="h-[75px] w-full relative flex items-center text-sm bg-primary border-b-[0.5px] border-b-[rgb(231,228,228)]">
 
       {/* VU logo */}
       <Link to="/" className="no-underline mx-[30px]">
@@ -77,10 +76,11 @@ export default function Navbar({ authdata }) {
             </div>
           </Link>
 
-          {/* Logout */}
+          {/* Logout — background comes from the theme's
+              contained-primary default (hover turns pink) */}
           <Button
             variant="contained"
-            style={{ background: 'rgb(123, 0, 63)', width: "100%", border: '1px solid rgba(255, 255, 255, 1)' }}
+            style={{ width: "100%", border: '1px solid rgba(255, 255, 255, 1)' }}
             onClick={() => { window.location.href = "/login" }}
           >
             Logout

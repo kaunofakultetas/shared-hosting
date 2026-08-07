@@ -11,177 +11,28 @@
 //
 //  Save stays disabled until the email is filled and — when
 //  the password fields are visible — both are non-empty and
-//  matching.
-//
-//  Split into (root component last):
-//
-//    LONG_PRESS_DURATION   — hold-to-delete time (ms)
-//    LongPressDeleteButton — hold-3s delete with progress ring
-//                            (the full-width Joy variant; the
-//                            VM cards have an IconButton one)
-//    AddEditUser           — the dialog (default export)
+//  matching. Delete is the shared hold-to-confirm
+//  LongPressButton, dressed to match the dialog's Joy
+//  buttons.
 //
 //  Used by:
 //    - UsersListTable — row click (edit) and Insert New
 //      (create)
 // -----------------------------------------------------------
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 import { Button, Modal, ModalDialog, Stack, Typography } from "@mui/joy";
-import { TextField, Box, FormControl, Grid, MenuItem, CircularProgress } from "@mui/material";
+import { TextField, Box, FormControl, Grid, MenuItem } from "@mui/material";
+
+import { LongPressButton } from "@/components/LongPressButton";
 
 import CancelIcon from '@mui/icons-material/Cancel';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 import toast from 'react-hot-toast';
-
-
-// How long the delete button must be held (ms)
-const LONG_PRESS_DURATION = 3000;
-
-
-
-
-// -----------------------------------------------------------
-// LongPressDeleteButton
-// -----------------------------------------------------------
-//
-// Delete armed by holding for 3 seconds — a released press
-// short of that shows the "Hold for 3 seconds" toast instead.
-// Progress is animated with requestAnimationFrame against the
-// press start time; refs mirror the pressed state so the
-// animation loop never reads a stale closure.
-//
-// Used by:
-//   - AddEditUser (below) — bottom row in edit mode
-// -----------------------------------------------------------
-
-function LongPressDeleteButton({ onDelete, disabled }) {
-  const [progress, setProgress] = useState(0);
-  const [isPressed, setIsPressed] = useState(false);
-  const animationRef = useRef(null);
-  const startTimeRef = useRef(null);
-  const isPressedRef = useRef(false);
-
-  const animate = useCallback(() => {
-    if (!isPressedRef.current || !startTimeRef.current) return;
-
-    const elapsed = Date.now() - startTimeRef.current;
-    const newProgress = Math.min((elapsed / LONG_PRESS_DURATION) * 100, 100);
-    setProgress(newProgress);
-
-    if (elapsed >= LONG_PRESS_DURATION) {
-      setIsPressed(false);
-      isPressedRef.current = false;
-      setProgress(0);
-      onDelete();
-      return;
-    }
-
-    animationRef.current = requestAnimationFrame(animate);
-  }, [onDelete]);
-
-  const startLongPress = useCallback(
-    (e) => {
-      if (disabled) return;
-      e.stopPropagation();
-      e.preventDefault();
-
-      startTimeRef.current = Date.now();
-      isPressedRef.current = true;
-      setIsPressed(true);
-      setProgress(0);
-      animationRef.current = requestAnimationFrame(animate);
-    },
-    [disabled, animate]
-  );
-
-  const cancelLongPress = useCallback((e) => {
-    if (!isPressedRef.current) return;
-    e.stopPropagation();
-
-    const elapsed = startTimeRef.current
-      ? Date.now() - startTimeRef.current
-      : 0;
-
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
-    }
-
-    if (elapsed > 0 && elapsed < LONG_PRESS_DURATION) {
-      toast.error(<b>Hold for 3 seconds to delete</b>, { duration: 3000 });
-    }
-
-    isPressedRef.current = false;
-    setIsPressed(false);
-    setProgress(0);
-    startTimeRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    return () =>
-      animationRef.current && cancelAnimationFrame(animationRef.current);
-  }, []);
-
-  return (
-    <Button
-      disabled={disabled}
-      onMouseDown={startLongPress}
-      onMouseUp={cancelLongPress}
-      onMouseLeave={cancelLongPress}
-      onTouchStart={startLongPress}
-      onTouchEnd={cancelLongPress}
-      onContextMenu={(e) => e.preventDefault()}
-      style={{
-        backgroundColor: disabled ? 'grey' : 'blue',
-        color: 'white',
-        boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
-        width: '100%',
-        userSelect: 'none',
-      }}
-    >
-      {/* While pressed: a full faint ring with the growing
-          progress ring stacked on top */}
-      {isPressed ? (
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24 }}>
-          <CircularProgress
-            variant="determinate"
-            value={100}
-            size={24}
-            thickness={4}
-            sx={{ color: 'rgba(255,255,255,0.3)', position: 'absolute' }}
-          />
-          <CircularProgress
-            variant="determinate"
-            value={progress}
-            size={24}
-            thickness={4}
-            sx={{
-              color: 'white',
-              position: 'absolute',
-              transform: 'rotate(-90deg)',
-              '& .MuiCircularProgress-circle': {
-                strokeLinecap: 'round',
-                transition: 'none',
-              },
-            }}
-          />
-        </div>
-      ) : (
-        <>
-          <DeleteIcon style={{ marginRight: 8 }} />
-          Delete
-        </>
-      )}
-    </Button>
-  );
-}
-
-
 
 
 // -----------------------------------------------------------
@@ -384,10 +235,12 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
           <Box>
             <Grid container spacing={1} align="center" direction="row">
               <Grid item xs={rowData !== undefined ? 6 : 12}>
+                {/* Joy button — the MUI theme doesn't reach it,
+                    but its emitted CSS variables do */}
                 <Button
                   type="submit"
                   style={{
-                    backgroundColor: disableSave ? 'grey' : 'rgb(123, 0, 63)',
+                    backgroundColor: disableSave ? 'grey' : 'var(--mui-palette-primary-main)',
                     color: 'white',
                     boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
                     width: '100%',
@@ -405,7 +258,27 @@ export default function AddEditUser({ rowData, setOpen, getData }) {
 
               {rowData !== undefined && (
                 <Grid item xs={6}>
-                  <LongPressDeleteButton onDelete={handleDeleteButton} />
+                  {/* MUI-based shared button — sx matches the
+                      Joy siblings (radius 8, no uppercase) */}
+                  <LongPressButton
+                    onComplete={handleDeleteButton}
+                    uncompletedToastMessage="Hold for 3 seconds to delete"
+                    style={{
+                      backgroundColor: 'blue',
+                      color: 'white',
+                      boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
+                      width: '100%',
+                      userSelect: 'none',
+                    }}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <DeleteIcon style={{ marginRight: 8 }} />
+                    Delete
+                  </LongPressButton>
                 </Grid>
               )}
 

@@ -3,11 +3,12 @@
 //
 //  The /admin/users page body: a full-height grid of all
 //  accounts (id, email, server count, admin and enabled
-//  pills, last seen) from /api/admin/users — reloading
-//  whenever the dialog below closes. Clicking a row opens
-//  AddEditUser prefilled; the toolbar's Insert New opens it
-//  empty. The toolbar also has the comma-separated quick
-//  search and the columns button. A 401 bounces to /login.
+//  pills, last seen) — a TanStack query on /api/admin/users,
+//  invalidated on every save/delete and dialog close.
+//  Clicking a row opens AddEditUser prefilled; the toolbar's
+//  Insert New opens it empty. The toolbar also has the
+//  comma-separated quick search and the columns button. A 401
+//  bounces to /login.
 //
 //  Note: the LoadingOverlay/Pagination entries in `slots` are
 //  capitalized, but DataGrid v7 slot keys are camelCase — the
@@ -27,6 +28,7 @@
 
 import { DataGrid, GridToolbarQuickFilter, GridToolbarColumnsButton } from "@mui/x-data-grid";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
 import { Box, Button, LinearProgress, Paper } from '@mui/material';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
@@ -66,6 +68,8 @@ function QuickSearchToolbar({ triggerAddNew }) {
         }
         placeholder="Ieškoti..."
       />
+      {/* The columns button is a text button by default — this
+          sx dresses it up as a contained-primary one */}
       <GridToolbarColumnsButton
         slotProps={{
           button:{
@@ -74,15 +78,16 @@ function QuickSearchToolbar({ triggerAddNew }) {
               paddingLeft: '15px',
               paddingRight: '10px',
               color: 'white',
-              backgroundColor: 'rgb(123, 0, 63)',
+              backgroundColor: 'primary.main',
               "&:hover": {
-                backgroundColor: 'rgb(230, 65, 100)',
+                backgroundColor: 'primary.dark',
               },
             }
           }
         }}
       />
 
+      {/* Insert New — contained-primary from the theme */}
       <Button
         variant="contained"
         sx={{
@@ -90,10 +95,6 @@ function QuickSearchToolbar({ triggerAddNew }) {
           paddingLeft: '15px',
           paddingRight: '10px',
           height: 30,
-          backgroundColor: 'rgb(123, 0, 63)',
-          "&:hover": {
-            backgroundColor: 'rgb(230, 65, 100)',
-          },
         }}
         onClick={() => { triggerAddNew() }}
         >
@@ -149,9 +150,26 @@ function StatusPill({ color, text }) {
 
 export default function UsersListTable() {
 
-  const [loadingData, setLoadingData] = useState(true);
-  const [data, setData] = useState([]);
   const [openBackdrop, setOpenBackdrop] = useState(false);
+  const queryClient = useQueryClient();
+
+  // All accounts; an auth failure bounces to /login like every
+  // grid fetch did before
+  const { data = [], isPending: loadingData, error } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => (await axios.get("/api/admin/users", { withCredentials: true })).data,
+  });
+
+  useEffect(() => {
+    if (error?.response?.status === 401) {
+      window.location.href = '/login';
+    }
+  }, [error]);
+
+  // Handed to the dialog and run on every dialog close, so
+  // saves and deletes show up immediately
+  const getData = () =>
+    queryClient.invalidateQueries({ queryKey: ['admin-users'] });
 
 
   const UsersListTable_Columns = [
@@ -207,27 +225,8 @@ export default function UsersListTable() {
   ];
 
 
-  async function getData() {
-    try {
-      const response = await axios.get("/api/admin/users", { withCredentials: true });
-      setData(response.data);
-      setLoadingData(false);
-    } catch (error) {
-      if (error.response.status === 401) {
-        window.location.href = '/login';
-      }
-    }
-  }
-
-
-  // Reload when the add/edit dialog closes
-  useEffect(() => {
-    getData();
-  }, [openBackdrop]);
-
-
   // A clicked row opens the dialog prefilled; Insert New opens
-  // it empty
+  // it empty; any close refreshes the grid
   const [userLineData, setUserLineData] = useState();
 
   const handleRowClick = (params) => {
@@ -240,6 +239,13 @@ export default function UsersListTable() {
     setUserLineData(undefined);
     setOpenBackdrop(true);
   }
+
+  const handleDialogOpen = (value) => {
+    setOpenBackdrop(value);
+    if (value === false) {
+      getData();
+    }
+  };
 
 
   return (
@@ -292,7 +298,7 @@ export default function UsersListTable() {
       {openBackdrop?
         <AddEditUser
           rowData={userLineData}
-          setOpen={setOpenBackdrop}
+          setOpen={handleDialogOpen}
           getData={getData}
         />
       :

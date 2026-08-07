@@ -25,7 +25,7 @@
 //    - Home.jsx — left card of the main content row
 // -----------------------------------------------------------
 
-import { useState, useEffect } from "react";
+import { useQuery } from '@tanstack/react-query';
 import axios from "axios";
 
 import MemoryIcon from '@mui/icons-material/Memory';
@@ -108,8 +108,8 @@ function StatCell({ colors, icon: Icon, value, label, barPercent }) {
 
 export default function SystemOverviewWidget() {
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
+  // Host resource stats, polled every 2 seconds
+  const { data: stats = {
     cpu_percent: 0,
     memory_percent: 0,
     disk_percent: 0,
@@ -119,34 +119,17 @@ export default function SystemOverviewWidget() {
     disk_total_gb: 0,
     disk_used_gb: 0,
     dockerhub_pull_limits: null,
+  }, isPending } = useQuery({
+    queryKey: ['dashboard-system'],
+    queryFn: async () => (await axios.get('/api/dashboard/system', { withCredentials: true })).data,
+    refetchInterval: 2000,
   });
-
-
-  const fetchSystemData = async () => {
-    try {
-      const response = await axios.get('/api/dashboard/system', { withCredentials: true });
-      if (response.status === 200) {
-        setStats(response.data);
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error('Failed to fetch system data:', error);
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch data on mount and every 2 seconds
-  useEffect(() => {
-    fetchSystemData();
-    const interval = setInterval(fetchSystemData, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
 
   // Format value: show "—" while loading and value is 0,
   // otherwise show actual value
   const formatValue = (value) => {
-    if (isLoading && (value === 0 || value === null || value === undefined)) return '—';
+    if (isPending && (value === 0 || value === null || value === undefined)) return '—';
     return value;
   };
 
@@ -194,8 +177,8 @@ export default function SystemOverviewWidget() {
         <StatCell
           colors={dockerhubColors}
           icon={CloudDownloadIcon}
-          value={dockerhub ? dockerhub.remaining : (isLoading ? '—' : 'N/A')}
-          label={<>Docker Hub<br/>({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isLoading ? '—' : 'N/A')})</>}
+          value={dockerhub ? dockerhub.remaining : (isPending ? '—' : 'N/A')}
+          label={<>Docker Hub<br/>({dockerhub ? `${dockerhub.used}/${dockerhub.limit}` : (isPending ? '—' : 'N/A')})</>}
           barPercent={dockerhubPercent}
         />
       </div>

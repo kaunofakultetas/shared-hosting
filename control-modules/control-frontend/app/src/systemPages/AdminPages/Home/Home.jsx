@@ -5,20 +5,18 @@
 //  Virtual Servers running/total, Domain Names, Quick
 //  Registration) over the System Overview gauges and the
 //  Recent Activity feed. The counts come from
-//  /api/dashboard/hostingsystem every 2 seconds; every value
-//  shows an em-dash until the first answer arrives. The
-//  footer is fixed to the bottom of the window on this page.
+//  /api/dashboard/hostingsystem, polled every 2 seconds by
+//  TanStack Query; every value shows an em-dash until the
+//  first answer arrives. The Navbar/Sidebar/Footer frame
+//  comes from AppShell.
 //
 //  Used by:
 //    - router.jsx — route /admin (via PageWrapper, adminOnly)
 // -----------------------------------------------------------
 
-import { useState, useEffect } from "react";
+import { useQuery } from '@tanstack/react-query';
 import axios from "axios";
-import { Toaster } from "react-hot-toast";
 
-import Sidebar from "@/components/Admin/Sidebar/Sidebar";
-import Navbar from "@/components/Navbar/Navbar";
 import Widget from "./components/Widget/Widget";
 import QuickRegistrationWidget from "./components/QuickRegistrationWidget/QuickRegistrationWidget";
 import SystemOverviewWidget from "./components/SystemOverviewWidget/SystemOverviewWidget";
@@ -36,37 +34,19 @@ import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 //   - router.jsx — route /admin (via PageWrapper, adminOnly)
 // -----------------------------------------------------------
 
-export default function Home({ authdata }) {
+export default function Home() {
 
-  // Loading state for API data
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Hosting system stats from API
-  const [hostingStats, setHostingStats] = useState({
+  // Hosting system counts, polled every 2 seconds
+  const { data: hostingStats = {
     users: 0,
     virtualservers_running: 0,
     virtualservers_total: 0,
     domains: 0,
+  }, isPending } = useQuery({
+    queryKey: ['dashboard-hostingsystem'],
+    queryFn: async () => (await axios.get('/api/dashboard/hostingsystem', { withCredentials: true })).data,
+    refetchInterval: 2000,
   });
-
-
-  const fetchHostingStats = async () => {
-    try {
-      const response = await axios.get('/api/dashboard/hostingsystem', { withCredentials: true });
-      if (response.status === 200) setHostingStats(response.data);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch hosting stats:', error);
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch data on mount and every 2 seconds
-  useEffect(() => {
-    fetchHostingStats();
-    const interval = setInterval(fetchHostingStats, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
 
   // Helper for consistent icon styling
@@ -82,61 +62,49 @@ export default function Home({ authdata }) {
   // Format value: show "—" while loading and value is 0,
   // otherwise show actual value
   const formatValue = (value) => {
-    if (isLoading && (value === 0 || value === null || value === undefined)) return '—';
+    if (isPending && (value === 0 || value === null || value === undefined)) return '—';
     return value;
   };
 
 
   return (
-    <div>
-      <Navbar authdata={authdata} />
-      <div className="flex">
-        <Sidebar authdata={authdata} />
-        <Toaster />
+    <div className="grow-[6] bg-gray-100 p-5" style={{ height: "calc(100vh - 105px)", overflowY: "auto" }}>
 
-        <div className="grow-[6] bg-gray-100 p-5" style={{ height: "calc(100vh - 105px)", overflowY: "auto" }}>
+      {/* Top Widgets - 4 items */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
 
-          {/* Top Widgets - 4 items */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
+        <Widget
+          text="Users"
+          count={formatValue(hostingStats.users)}
+          icon={getIcon(PeopleOutlinedIcon, "crimson", "rgba(255, 0, 0, 0.2)")}
+          link="/admin/users"
+        />
 
-            <Widget
-              text="Users"
-              count={formatValue(hostingStats.users)}
-              icon={getIcon(PeopleOutlinedIcon, "crimson", "rgba(255, 0, 0, 0.2)")}
-              link="/admin/users"
-            />
+        <Widget
+          text="Virtual Servers"
+          count={formatValue(hostingStats.virtualservers_running)}
+          countSecondary={formatValue(hostingStats.virtualservers_total)}
+          icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")}
+          link="/vm"
+        />
 
-            <Widget
-              text="Virtual Servers"
-              count={formatValue(hostingStats.virtualservers_running)}
-              countSecondary={formatValue(hostingStats.virtualservers_total)}
-              icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")}
-              link="/vm"
-            />
+        <Widget
+          text="Domain Names"
+          count={formatValue(hostingStats.domains)}
+          icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")}
+        />
 
-            <Widget
-              text="Domain Names"
-              count={formatValue(hostingStats.domains)}
-              icon={getIcon(DnsOutlinedIcon, "goldenrod", "rgba(218, 165, 32, 0.2)")}
-            />
+        <QuickRegistrationWidget />
 
-            <QuickRegistrationWidget />
-
-          </div>
-
-          {/* Main Content Area */}
-          <div className="flex gap-5 flex-wrap">
-
-            <SystemOverviewWidget />
-            <RecentActivityWidget />
-          </div>
-
-        </div>
       </div>
 
-      <div className="bg-[#7b003f] h-[30px] flex justify-center items-center text-white text-xs fixed bottom-0 left-0 right-0">
-        Copyright © | All Rights Reserved | VUKnF
+      {/* Main Content Area */}
+      <div className="flex gap-5 flex-wrap">
+
+        <SystemOverviewWidget />
+        <RecentActivityWidget />
       </div>
+
     </div>
   );
 }

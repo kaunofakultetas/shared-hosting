@@ -23,7 +23,7 @@ export default function Widget({ text, bottomtext, count, countSecondary, icon, 
   const hasSecondaryCount = countSecondary !== undefined && countSecondary !== null && countSecondary !== '—';
 
   return (
-    <div className="flex justify-between flex-1 p-2.5 shadow-[2px_4px_10px_1px_rgba(201,201,201,0.47)] rounded-[15px] h-[100px] w-full bg-white">
+    <div className="flex justify-between flex-1 p-2.5 shadow-card rounded-[15px] h-[100px] w-full bg-white">
 
       {/* Left side */}
       <div className="flex flex-col justify-between">

@@ -40,14 +40,14 @@ export default function CustomPagination() {
         sx={{
           '& .MuiPaginationItem-root': {
             '&.Mui-selected': {
-              background: 'rgb(123, 0, 63)',
+              background: 'var(--mui-palette-primary-main)',
               color: 'white',
               "&:hover": {
-                backgroundColor: 'rgb(230, 65, 100)',
+                backgroundColor: 'primary.dark',
               },
             },
             "&:hover": {
-              backgroundColor: 'rgb(230, 65, 100)',
+              backgroundColor: 'primary.dark',
             },
           },
         }}

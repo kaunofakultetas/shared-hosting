@@ -215,15 +215,7 @@ export default function QuickRegistrationWidget() {
 
   return (
     <>
-      <div
-        className="flex justify-between bg-white"
-        style={{
-          padding: '10px',
-          boxShadow: '2px 4px 10px 1px rgba(201, 201, 201, 0.47)',
-          borderRadius: '15px',
-          height: '100px',
-        }}
-      >
+      <div className="flex justify-between bg-white p-2.5 shadow-card rounded-[15px] h-[100px]">
         {/* Left: label + the code (or OFF) */}
         <div className="flex flex-col justify-between">
           <span className="font-bold text-sm text-gray-400">Quick Registration</span>

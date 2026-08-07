@@ -1,44 +1,45 @@
 // -----------------------------------------------------------
 //  [*] VirtualServersTable — the VM card grid
 //
-//  Everything on the /vm page below the frame: the header
-//  with the count, admin-only "Show other users" switch, the
-//  search box and the New Server button, then one card per
-//  VM. The list refreshes every 3 seconds while the page is
-//  mounted.
+//  Everything on the /vm page: the header with the count,
+//  admin-only "Show other users" switch, the search box and
+//  the New Server button, then one card per VM. The data and
+//  the start/stop/delete actions live in useVirtualServers
+//  (3-second poll, invalidation after every action); the
+//  first load renders skeleton cards.
 //
 //  Search matches VM name, owner email, VM id, domain names
-//  and container/stack names. Start/stop/delete just POST the
-//  action and let the next poll show the new state; delete
-//  additionally requires the VM to be stopped and a 3-second
-//  hold on the button.
+//  and container/stack names. Delete additionally requires
+//  the VM to be stopped and a 3-second hold on the shared
+//  LongPressIconButton.
 //
 //  Split into (root component last):
 //
-//    LONG_PRESS_DURATION   — hold-to-delete time (ms)
-//    LongPressDeleteButton — hold-3s delete with progress ring
-//    VMCard                — one server card
-//    VirtualServersTable   — data + actions (default export)
+//    useVirtualServers   — list query + start/stop/delete
+//    VMCard              — one server card
+//    VirtualServersTable — layout + search (default export)
 //
 //  Used by:
 //    - VirtualServers.jsx — the /vm page body
 // -----------------------------------------------------------
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import axios from "axios";
+import toast from "react-hot-toast";
 import {
   Button,
   Chip,
   Tooltip,
   FormControlLabel,
-  CircularProgress,
   IconButton,
   TextField,
   InputAdornment,
+  Skeleton,
 } from "@mui/material";
-import axios from "axios";
-import toast from "react-hot-toast";
 
 import IOSSwitch from "@/components/Other/IOSSwitch/IOSSwitch";
+import { LongPressIconButton } from "@/components/LongPressButton";
 import AddNewVM from "./AddNewVM/AddNewVM";
 
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
@@ -54,146 +55,77 @@ import DomainIcon from "@mui/icons-material/Domain";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 
-// How long the delete button must be held (ms)
-const LONG_PRESS_DURATION = 3000;
-
-
-
-
 // -----------------------------------------------------------
-// LongPressDeleteButton
+// useVirtualServers
 // -----------------------------------------------------------
 //
-// Delete armed by holding for 3 seconds — a released press
-// short of that shows the "Hold for 3 seconds" toast instead.
-// Progress is animated with requestAnimationFrame against the
-// press start time; refs mirror the pressed state so the
-// animation loop never reads a stale closure.
+//   const { vms, isPending, refreshVms, startStop, remove } =
+//     useVirtualServers(showOtherUsers)
+//
+// The backend side of the page: the VM list as a TanStack
+// query polled every 3 seconds (sorted by id), plus the
+// start/stop and delete actions. Actions fire the POST, toast
+// immediately, and invalidate the list once the backend
+// accepts — so the state flips as soon as possible instead of
+// on the next poll.
+//
+// Flipping the admin-only showOtherUsers switch changes the
+// query key; the previous list stays on screen as placeholder
+// while the other one loads, so isPending is true only on the
+// very first load and the grid never collapses back into its
+// skeleton.
 //
 // Used by:
-//   - VMCard (below) — disabled while the VM is running
+//   - VirtualServersTable (below); refreshVms is also handed
+//     to the AddNewVM dialog so a created server shows up
+//     right away
 // -----------------------------------------------------------
 
-function LongPressDeleteButton({ row, onDelete, disabled }) {
-  const [progress, setProgress] = useState(0);
-  const [isPressed, setIsPressed] = useState(false);
-  const animationRef = useRef(null);
-  const startTimeRef = useRef(null);
-  const isPressedRef = useRef(false);
-  const eventRef = useRef(null);
+function useVirtualServers(showOtherUsers) {
 
-  const animate = useCallback(() => {
-    if (!isPressedRef.current || !startTimeRef.current) return;
+  const queryClient = useQueryClient();
 
-    const elapsed = Date.now() - startTimeRef.current;
-    const newProgress = Math.min((elapsed / LONG_PRESS_DURATION) * 100, 100);
-    setProgress(newProgress);
-
-    if (elapsed >= LONG_PRESS_DURATION) {
-      setIsPressed(false);
-      isPressedRef.current = false;
-      setProgress(0);
-      onDelete(eventRef.current, row);
-      return;
-    }
-
-    animationRef.current = requestAnimationFrame(animate);
-  }, [onDelete, row]);
-
-  const startLongPress = useCallback(
-    (e) => {
-      if (disabled) return;
-      e.stopPropagation();
-      e.preventDefault();
-
-      eventRef.current = e;
-      startTimeRef.current = Date.now();
-      isPressedRef.current = true;
-      setIsPressed(true);
-      setProgress(0);
-      animationRef.current = requestAnimationFrame(animate);
+  const { data: vms = [], isPending } = useQuery({
+    queryKey: ['vms', showOtherUsers],
+    queryFn: async () => {
+      const response = await axios.get("/api/vm", {
+        params: { showOtherUsers: showOtherUsers.toString() },
+      });
+      return response.data.sort((a, b) => a.id - b.id);
     },
-    [disabled, animate]
-  );
+    refetchInterval: 3000,
+    placeholderData: keepPreviousData,
+  });
 
-  const cancelLongPress = useCallback((e) => {
-    if (!isPressedRef.current) return;
-    e.stopPropagation();
 
-    const elapsed = startTimeRef.current
-      ? Date.now() - startTimeRef.current
-      : 0;
+  // Both showOtherUsers variants share the ['vms'] prefix, so
+  // one invalidation refreshes whichever is on screen
+  const refreshVms = () =>
+    queryClient.invalidateQueries({ queryKey: ['vms'] });
 
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
+
+  // Fire the action and toast right away; the list refreshes
+  // as soon as the backend accepts (and keeps polling anyway)
+  const startStop = (vm) => {
+    const action = vm.state === "running" ? "stop" : "start";
+    axios.post("/api/vm/control", { virtualServerID: vm.id, action }).then(refreshVms);
+    toast.success(
+      <b>
+        {action === "stop" ? "Stopping" : "Starting"} server: #{vm.id}
+      </b>,
+      { duration: 10000 }
+    );
+  };
+
+  const remove = (vm) => {
+    if (vm.state !== "running") {
+      axios.post("/api/vm/control", { virtualServerID: vm.id, action: "delete" }).then(refreshVms);
+      toast.success(<b>Deleting server: #{vm.id}</b>, { duration: 10000 });
     }
-
-    if (elapsed > 0 && elapsed < LONG_PRESS_DURATION) {
-      toast.error(<b>Hold for 3 seconds to delete</b>, { duration: 3000 });
-    }
-
-    isPressedRef.current = false;
-    setIsPressed(false);
-    setProgress(0);
-    startTimeRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    return () =>
-      animationRef.current && cancelAnimationFrame(animationRef.current);
-  }, []);
+  };
 
 
-  return (
-    <IconButton
-      disabled={disabled}
-      onMouseDown={startLongPress}
-      onMouseUp={cancelLongPress}
-      onMouseLeave={cancelLongPress}
-      onTouchStart={startLongPress}
-      onTouchEnd={cancelLongPress}
-      onContextMenu={(e) => e.preventDefault()}
-      className="select-none"
-      sx={{
-        color: disabled ? "grey.400" : "error.main",
-        backgroundColor: "lightgray",
-        "&:hover": { backgroundColor: "error.light", color: "white" },
-        transition: "all 0.2s",
-      }}
-    >
-      {/* While pressed: a full faint ring with the growing
-          progress ring stacked on top */}
-      {isPressed ? (
-        <div className="relative flex items-center justify-center w-6 h-6">
-          <CircularProgress
-            variant="determinate"
-            value={100}
-            size={24}
-            thickness={4}
-            sx={{ color: "error.light", position: "absolute" }}
-          />
-          <CircularProgress
-            variant="determinate"
-            value={progress}
-            size={24}
-            thickness={4}
-            sx={{
-              color: "error.main",
-              position: "absolute",
-              transform: "rotate(-90deg)",
-              "& .MuiCircularProgress-circle": {
-                strokeLinecap: "round",
-                transition: "none",
-              },
-            }}
-          />
-        </div>
-      ) : (
-        <DeleteIcon />
-      )}
-    </IconButton>
-  );
+  return { vms, isPending, refreshVms, startStop, remove };
 }
 
 
@@ -286,11 +218,22 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
             </Tooltip>
             <Tooltip title={isRunning ? "Stop server first" : "Hold to delete"}>
               <span>
-                <LongPressDeleteButton
-                  row={vm}
-                  onDelete={onDelete}
+                <LongPressIconButton
                   disabled={isRunning}
-                />
+                  onComplete={() => onDelete(vm)}
+                  uncompletedToastMessage="Hold for 3 seconds to delete"
+                  progressColor="error.main"
+                  progressBgColor="error.light"
+                  className="select-none"
+                  sx={{
+                    color: isRunning ? "grey.400" : "error.main",
+                    backgroundColor: "lightgray",
+                    "&:hover": { backgroundColor: "error.light", color: "white" },
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <DeleteIcon />
+                </LongPressIconButton>
               </span>
             </Tooltip>
           </div>
@@ -433,12 +376,10 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
 // VirtualServersTable (default export)
 // -----------------------------------------------------------
 //
-// Owns the VM list: fetches /api/vm on mount and every 3
-// seconds (restarting the interval when the create dialog
-// closes or the other-users switch flips), filters it by the
-// search text, and provides the navigate / start-stop /
-// delete handlers to the cards. Navigation to a VM is a hard
-// page load, matching the old app.
+// Layout, search and the dialog state; the list itself and
+// the start-stop/delete actions come from useVirtualServers.
+// Navigation to a VM is a hard page load, matching the old
+// app.
 //
 // Used by:
 //   - VirtualServers.jsx — the /vm page body
@@ -446,11 +387,11 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
 
 export default function VirtualServersTable({ authdata }) {
 
-  const [loadingData, setLoadingData] = useState(true);
-  const [data, setData] = useState([]);
   const [openBackdrop, setOpenBackdrop] = useState(false);
   const [showOtherUsers, setShowOtherUsers] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { vms: data, isPending: loadingData, refreshVms, startStop, remove } = useVirtualServers(showOtherUsers);
 
 
   // Filter VMs based on search query — matches name, owner,
@@ -487,51 +428,27 @@ export default function VirtualServersTable({ authdata }) {
   });
 
 
-  const fetchData = async () => {
-    try {
-      const response = await axios.get("/api/vm", {
-        params: { showOtherUsers: showOtherUsers.toString() },
-      });
-      const sortedData = response.data.sort((a, b) => a.id - b.id);
-      setData(sortedData);
-      setLoadingData(false);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setLoadingData(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    const intervalId = setInterval(fetchData, 3000);
-    return () => clearInterval(intervalId);
-  }, [openBackdrop, showOtherUsers]);
-
-
   const handleNavigate = (vm) => {
     window.location.href = `/vm/${vm.id}`;
   };
 
 
-  // Start/stop/delete just fire the action — the 3s poll picks
-  // up the state change
+  // The card's click event stops propagation here (a card
+  // click navigates); the action itself lives in the hook.
+  // Delete needs no wrapper — the long-press button stops its
+  // own events.
   const handleStartStop = (e, vm) => {
     e.stopPropagation();
-    const action = vm.state === "running" ? "stop" : "start";
-    axios.post("/api/vm/control", { virtualServerID: vm.id, action });
-    toast.success(
-      <b>
-        {action === "stop" ? "Stopping" : "Starting"} server: #{vm.id}
-      </b>,
-      { duration: 10000 }
-    );
+    startStop(vm);
   };
 
-  const handleDelete = (e, vm) => {
-    e.stopPropagation();
-    if (vm.state !== "running") {
-      axios.post("/api/vm/control", { virtualServerID: vm.id, action: "delete" });
-      toast.success(<b>Deleting server: #{vm.id}</b>, { duration: 10000 });
+
+  // Closing the create dialog refreshes the list, whether a
+  // server was created or the dialog was just dismissed
+  const handleDialogOpen = (value) => {
+    setOpenBackdrop(value);
+    if (value === false) {
+      refreshVms();
     }
   };
 
@@ -570,7 +487,8 @@ export default function VirtualServersTable({ authdata }) {
           )}
 
 
-          {/* Search Box */}
+          {/* Search Box — focus color comes from the theme;
+              only the burgundy hover border stays local */}
           <TextField
             size="small"
             placeholder="Search VMs..."
@@ -582,10 +500,7 @@ export default function VirtualServersTable({ authdata }) {
                 borderRadius: 2,
                 backgroundColor: "white",
                 "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgb(123, 0, 63)",
-                },
-                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgb(123, 0, 63)",
+                  borderColor: "primary.main",
                 },
               },
             }}
@@ -610,17 +525,17 @@ export default function VirtualServersTable({ authdata }) {
           />
 
 
+          {/* New Server — contained-primary from the theme */}
           <Button
             variant="contained"
             startIcon={<AddCircleOutlinedIcon />}
-            onClick={() => setOpenBackdrop(true)}
+            onClick={() => handleDialogOpen(true)}
             sx={{
               textTransform: "none",
               fontWeight: 600,
               borderRadius: 2,
               boxShadow: "none",
-              backgroundColor: "rgb(123, 0, 63)",
-              "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "#E64164" },
+              "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.15)" },
             }}
           >
             New Server
@@ -628,10 +543,13 @@ export default function VirtualServersTable({ authdata }) {
         </div>
       </div>
 
-      {/* Loading State */}
+      {/* Loading State — skeleton cards in the real grid, so
+          the layout doesn't jump when the list arrives */}
       {loadingData && (
-        <div className="flex items-center justify-center h-64">
-          <CircularProgress />
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} variant="rounded" height={260} sx={{ borderRadius: '12px' }} />
+          ))}
         </div>
       )}
 
@@ -662,7 +580,7 @@ export default function VirtualServersTable({ authdata }) {
               vm={vm}
               onNavigate={handleNavigate}
               onStartStop={handleStartStop}
-              onDelete={handleDelete}
+              onDelete={remove}
             />
           ))}
         </div>
@@ -670,7 +588,7 @@ export default function VirtualServersTable({ authdata }) {
 
       {/* Add New VM Dialog */}
       {openBackdrop && (
-        <AddNewVM setOpen={setOpenBackdrop} getData={fetchData} />
+        <AddNewVM setOpen={handleDialogOpen} getData={refreshVms} />
       )}
     </div>
   );

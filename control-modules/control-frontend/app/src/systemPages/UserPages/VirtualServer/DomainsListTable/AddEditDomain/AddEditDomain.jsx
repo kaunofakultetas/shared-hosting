@@ -230,7 +230,7 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
                 Use faculty supplied domain name
               </Typography>
               <Checkbox
-                style={{ color: 'rgb(123, 0, 63)' }}
+                style={{ color: 'var(--mui-palette-primary-main)' }}
                 checked={isFacultyDomain}
                 onChange={(e) => {
                   setIsFacultyDomain(e.target.checked);
@@ -337,10 +337,12 @@ export default function AddEditDomain({ virtualServerID, rowData, setOpen, getDa
           <Box>
             <Grid container spacing={1} align="center" direction="row">
               <Grid item xs={rowData !== undefined ? 6 : 12}>
+                {/* Joy button — the MUI theme doesn't reach it,
+                    but its emitted CSS variables do */}
                 <Button
                   type="submit"
                   style={{
-                    backgroundColor: disableSave || !domainNameValid ? 'grey' : 'rgb(123, 0, 63)',
+                    backgroundColor: disableSave || !domainNameValid ? 'grey' : 'var(--mui-palette-primary-main)',
                     color: 'white',
                     boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
                     width: '100%',

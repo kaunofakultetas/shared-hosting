@@ -10,7 +10,8 @@
 //    - Home.jsx — right card of the main content row
 // -----------------------------------------------------------
 
-import { useState, useEffect } from "react";
+import { useQuery } from '@tanstack/react-query';
+import { Skeleton } from "@mui/material";
 import axios from "axios";
 
 
@@ -41,37 +42,26 @@ const formatTimeAgo = (timestamp) => {
 
 export default function RecentActivityWidget() {
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [activities, setActivities] = useState([]);
-
-
-  const fetchRecentActivity = async () => {
-    try {
-      const response = await axios.get('/api/dashboard/recentactivity', { withCredentials: true });
-      if (response.status === 200) {
-        setActivities(response.data);
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error('Failed to fetch recent activity:', error);
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch data on mount and every 2 seconds
-  useEffect(() => {
-    fetchRecentActivity();
-    const interval = setInterval(fetchRecentActivity, 2000);
-    return () => clearInterval(interval);
-  }, []);
+  // System-wide activity, polled every 2 seconds
+  const { data: activities = [], isPending } = useQuery({
+    queryKey: ['dashboard-recentactivity'],
+    queryFn: async () => (await axios.get('/api/dashboard/recentactivity', { withCredentials: true })).data,
+    refetchInterval: 2000,
+  });
 
 
   return (
     <div className="grow basis-0 shadow-md p-5 rounded-xl bg-white h-128">
       <h3 className="text-gray-500 mb-4 text-base font-medium">Recent Activity</h3>
       <ul className="list-none p-0 text-gray-600 text-sm">
-        {isLoading ? (
-          <li className="text-gray-400 italic">Loading...</li>
+        {isPending ? (
+          [...Array(4)].map((_, i) => (
+            <li key={i} className="mb-2 pb-2 border-b border-gray-100">
+              <Skeleton variant="text" width="40%" />
+              <Skeleton variant="text" width="90%" />
+              <Skeleton variant="text" width="25%" height={14} />
+            </li>
+          ))
         ) : activities.length > 0 ? (
           activities.map((activity) => (
             <li key={activity.log_id} className="mb-2 pb-2 border-b border-gray-100">

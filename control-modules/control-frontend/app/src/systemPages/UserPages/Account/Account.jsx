@@ -1,40 +1,41 @@
 // -----------------------------------------------------------
 //  [*] Account — account settings page
 //
-//  Two columns under the navbar/sidebar frame: on the left
-//  the account info card (email + role) above the password
-//  change form, on the right the account activity log,
-//  refreshed every 2 seconds.
+//  Two columns inside the AppShell frame: on the left the
+//  account info card (email + role) above the password change
+//  form, on the right the account activity log, polled every
+//  2 seconds by TanStack Query (skeleton rows until the first
+//  answer).
 //
 //  Password rules are checked client-side first (min 8 chars,
-//  both fields matching); the backend result lands in a toast.
+//  both fields matching); the backend result lands in a
+//  toast. The fields focus in the brand burgundy via the MUI
+//  theme — no per-field sx needed.
 //
 //  Split into (root component last):
 //
-//    BRAND_FIELD_SX     — burgundy focus styling for fields
 //    formatTimeAgo      — "5 mins ago" style timestamps
 //    PasswordField      — outlined field with the eye toggle
 //    AccountInfoCard    — avatar circle, email, role
 //    ChangePasswordCard — the three fields + submit
 //    RecentActivityCard — polled activity list
-//    AccountPage        — page frame (default export)
+//    AccountPage        — the two columns (default export)
 //
 //  Used by:
 //    - router.jsx — route /account (via PageWrapper)
 // -----------------------------------------------------------
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from '@tanstack/react-query';
 import {
   TextField,
   Button,
   IconButton,
   InputAdornment,
+  Skeleton,
 } from "@mui/material";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import axios from "axios";
-
-import Sidebar from "@/components/Admin/Sidebar/Sidebar";
-import Navbar from "@/components/Navbar/Navbar";
 
 import LockIcon from "@mui/icons-material/Lock";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -42,17 +43,6 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import PersonIcon from "@mui/icons-material/Person";
 import HistoryIcon from "@mui/icons-material/History";
 
-
-// The default MUI focus ring is blue — this pins the outline
-// and label of the password fields to the brand burgundy
-const BRAND_FIELD_SX = {
-  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
-    borderColor: "rgb(123, 0, 63)",
-  },
-  "& .MuiInputLabel-root.Mui-focused": {
-    color: "rgb(123, 0, 63)",
-  },
-};
 
 // Timestamps arrive absolute; the activity list shows them
 // relative ("5 mins ago")
@@ -104,7 +94,6 @@ function PasswordField({ label, value, onChange, show, onToggleShow, error, help
           </InputAdornment>
         ),
       }}
-      sx={BRAND_FIELD_SX}
     />
   );
 }
@@ -125,7 +114,7 @@ function AccountInfoCard({ authdata }) {
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 p-6">
       <div className="flex items-center gap-4">
         <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-          <PersonIcon sx={{ fontSize: 32, color: "rgb(123, 0, 63)" }} />
+          <PersonIcon sx={{ fontSize: 32, color: "primary.main" }} />
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
@@ -214,7 +203,7 @@ function ChangePasswordCard() {
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 bg-red-50 rounded-lg">
-          <LockIcon sx={{ color: "rgb(123, 0, 63)" }} />
+          <LockIcon sx={{ color: "primary.main" }} />
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
@@ -257,6 +246,8 @@ function ChangePasswordCard() {
           }
         />
 
+        {/* Submit — contained-primary from the theme; only the
+            disabled grey stays a local override */}
         <Button
           type="submit"
           variant="contained"
@@ -267,10 +258,6 @@ function ChangePasswordCard() {
             py: 1.5,
             textTransform: "none",
             fontWeight: 600,
-            backgroundColor: "rgb(123, 0, 63)",
-            "&:hover": {
-              backgroundColor: "#E64164",
-            },
             "&:disabled": {
               backgroundColor: "#ccc",
             },
@@ -290,8 +277,9 @@ function ChangePasswordCard() {
 // RecentActivityCard
 // -----------------------------------------------------------
 //
-// The account activity log — fetched on mount and then every
-// 2 seconds for as long as the page is open.
+// The account activity log — polled every 2 seconds for as
+// long as the page is open; skeleton rows until the first
+// answer arrives.
 //
 // Used by:
 //   - AccountPage (below) — right column
@@ -299,37 +287,18 @@ function ChangePasswordCard() {
 
 function RecentActivityCard() {
 
-  const [activities, setActivities] = useState([]);
-  const [isLoadingActivity, setIsLoadingActivity] = useState(true);
-
-
-  const fetchRecentActivity = async () => {
-    try {
-      const response = await axios.get('/api/account/recentactivity', { withCredentials: true });
-      if (response.status === 200) {
-        setActivities(response.data);
-        setIsLoadingActivity(false);
-      }
-    } catch (error) {
-      console.error('Failed to fetch recent activity:', error);
-      setIsLoadingActivity(false);
-    }
-  };
-
-
-  // Fetch data on mount and every 2 seconds
-  useEffect(() => {
-    fetchRecentActivity();
-    const interval = setInterval(fetchRecentActivity, 2000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: activities = [], isPending } = useQuery({
+    queryKey: ['account-activity'],
+    queryFn: async () => (await axios.get('/api/account/recentactivity', { withCredentials: true })).data,
+    refetchInterval: 2000,
+  });
 
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 h-[550px] flex flex-col">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 bg-red-50 rounded-lg">
-          <HistoryIcon sx={{ color: "rgb(123, 0, 63)" }} />
+          <HistoryIcon sx={{ color: "primary.main" }} />
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
@@ -342,8 +311,10 @@ function RecentActivityCard() {
       </div>
 
       <div className="space-y-3 flex-1 min-h-0 overflow-y-auto">
-        {isLoadingActivity ? (
-          <p className="text-gray-400 italic text-sm">Loading...</p>
+        {isPending ? (
+          [...Array(4)].map((_, i) => (
+            <Skeleton key={i} variant="rounded" height={72} />
+          ))
         ) : activities.length > 0 ? (
           activities.map((activity) => (
             <div
@@ -386,42 +357,26 @@ function RecentActivityCard() {
 
 export default function AccountPage({ authdata }) {
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Toaster position="top-center" />
-      <Navbar authdata={authdata} />
-      <div className="flex">
-        <Sidebar authdata={authdata} />
-
-        <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-105px)]">
-          {/* Page Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">Account Settings</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Manage your account preferences
-            </p>
-          </div>
-
-          <div className="flex gap-6 items-start">
-            {/* Left Column - Account Settings */}
-            <div className="w-[400px]">
-              <AccountInfoCard authdata={authdata} />
-              <ChangePasswordCard />
-            </div>
-
-            {/* Right Column - Recent Activity */}
-            <div className="w-[480px]">
-              <RecentActivityCard />
-            </div>
-          </div>
-        </div>
+    <div className="flex-1 p-6 overflow-y-auto h-[calc(100vh-105px)] bg-gray-100">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Account Settings</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage your account preferences
+        </p>
       </div>
 
-      {/* Footer */}
-      <div
-        className="h-8 flex justify-center items-center text-white text-xs"
-        style={{ background: "rgb(123, 0, 63)" }}
-      >
-        Copyright © | All Rights Reserved | VUKnF
+      <div className="flex gap-6 items-start">
+        {/* Left Column - Account Settings */}
+        <div className="w-[400px]">
+          <AccountInfoCard authdata={authdata} />
+          <ChangePasswordCard />
+        </div>
+
+        {/* Right Column - Recent Activity */}
+        <div className="w-[480px]">
+          <RecentActivityCard />
+        </div>
       </div>
     </div>
   );

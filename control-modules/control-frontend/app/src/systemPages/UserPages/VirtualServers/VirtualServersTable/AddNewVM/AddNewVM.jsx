@@ -195,16 +195,18 @@ export default function AddNewVM({ vmData, setOpen, getData }) {
           <Box>
             <Grid container spacing={1} align="center" direction="row">
               <Grid item xs={vmData ? 6 : 12}>
+                {/* Joy button — the MUI theme doesn't reach it,
+                    but its emitted CSS variables do */}
                 <Button
                   type="submit"
                   variant="contained"
                   sx={{
-                    backgroundColor: disableSave ? 'grey' : 'rgb(123, 0, 63)',
+                    backgroundColor: disableSave ? 'grey' : 'var(--mui-palette-primary-main)',
                     color: 'white',
                     boxShadow: '0px 8px 15px rgba(0, 0, 0, 0.1)',
                     width: '100%',
                     transition: 'all 0.2s ease',
-                    "&:hover": disableSave ? 'none' : { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "#E64164" },
+                    "&:hover": disableSave ? 'none' : { boxShadow: "0 4px 12px rgba(0,0,0,0.15)", backgroundColor: "var(--mui-palette-primary-dark)" },
                   }}
                   onClick={handleSaveButton}
                   disabled={disableSave}

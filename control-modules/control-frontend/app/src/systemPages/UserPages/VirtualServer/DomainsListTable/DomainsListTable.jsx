@@ -2,11 +2,11 @@
 //  [*] DomainsListTable — domain names of one VM
 //
 //  The Domain Names tab of the VM page: a DataGrid of the
-//  VM's domains (id, name, Cloudflare?, SSL?) loaded from
-//  /api/vm/dns/<id> — reloading whenever the dialog below
-//  closes. Clicking a row opens AddEditDomain prefilled;
-//  the toolbar's Insert New opens it empty. A 401 bounces
-//  to /login.
+//  VM's domains (id, name, Cloudflare?, SSL?) — a TanStack
+//  query on /api/vm/dns/<id>, invalidated on every save/
+//  delete and dialog close. Clicking a row opens
+//  AddEditDomain prefilled; the toolbar's Insert New opens it
+//  empty. A 401 bounces to /login.
 //
 //  Note: the LoadingOverlay/Pagination entries in `slots` are
 //  capitalized, but DataGrid v7 slot keys are camelCase — the
@@ -24,6 +24,7 @@
 
 import { DataGrid } from "@mui/x-data-grid";
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from "axios";
 import { Box, Button, LinearProgress } from '@mui/material';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
@@ -50,6 +51,7 @@ function QuickSearchToolbar({ triggerAddNew }) {
   return (
     <Box sx={{ p: 0.5, pb: 0 }} >
 
+      {/* Insert New — contained-primary from the theme */}
       <Button
         variant="contained"
         sx={{
@@ -57,10 +59,6 @@ function QuickSearchToolbar({ triggerAddNew }) {
           paddingLeft: '15px',
           paddingRight: '10px',
           height: 30,
-          backgroundColor: 'rgb(123, 0, 63)',
-          "&:hover": {
-            backgroundColor: 'rgb(230, 65, 100)',
-          },
         }}
         onClick={() => { triggerAddNew() }}
         >
@@ -85,9 +83,26 @@ function QuickSearchToolbar({ triggerAddNew }) {
 
 export default function DomainsListTable({ virtualServerID }) {
 
-  const [loadingData, setLoadingData] = useState(true);
-  const [data, setData] = useState([]);
   const [openBackdrop, setOpenBackdrop] = useState(false);
+  const queryClient = useQueryClient();
+
+  // The VM's domain list; an auth failure bounces to /login
+  // like every grid fetch did before
+  const { data = [], isPending: loadingData, error } = useQuery({
+    queryKey: ['vm-dns', virtualServerID],
+    queryFn: async () => (await axios.get("/api/vm/dns/"+virtualServerID, { withCredentials: true })).data,
+  });
+
+  useEffect(() => {
+    if (error?.response?.status === 401) {
+      window.location.href = '/login';
+    }
+  }, [error]);
+
+  // Handed to the dialog and run on every dialog close, so
+  // saves and deletes show up immediately
+  const getData = () =>
+    queryClient.invalidateQueries({ queryKey: ['vm-dns', virtualServerID] });
 
 
   const DomainsListTable_Columns = [
@@ -120,27 +135,8 @@ export default function DomainsListTable({ virtualServerID }) {
   ];
 
 
-  async function getData() {
-    try {
-      const response = await axios.get("/api/vm/dns/"+virtualServerID, { withCredentials: true });
-      setData(response.data);
-      setLoadingData(false);
-    } catch (error) {
-      if (error.response.status === 401) {
-        window.location.href = '/login';
-      }
-    }
-  }
-
-
-  // Reload when the add/edit dialog closes
-  useEffect(() => {
-    getData();
-  }, [openBackdrop]);
-
-
   // A clicked row opens the dialog prefilled; Insert New opens
-  // it empty
+  // it empty; any close refreshes the grid
   const [domainLineData, setDomainLineData] = useState();
 
   const handleRowClick = (params) => {
@@ -153,6 +149,13 @@ export default function DomainsListTable({ virtualServerID }) {
     setDomainLineData(undefined);
     setOpenBackdrop(true);
   }
+
+  const handleDialogOpen = (value) => {
+    setOpenBackdrop(value);
+    if (value === false) {
+      getData();
+    }
+  };
 
 
   return (
@@ -203,7 +206,7 @@ export default function DomainsListTable({ virtualServerID }) {
         <AddEditDomain
           virtualServerID={virtualServerID}
           rowData={domainLineData}
-          setOpen={setOpenBackdrop}
+          setOpen={handleDialogOpen}
           getData={getData}
         />
       :

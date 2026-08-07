@@ -2,13 +2,16 @@
 //  [*] Router — the app's route table
 //
 //  createBrowserRouter setup: every page is a child of the
-//  App layout route ("/"), which adds the auth provider (see
-//  App.jsx). Pages render through PageWrapper, which injects
-//  authdata and — for the VM detail page — the route param as
-//  a prop. The URL map matches the old Next.js app 1:1:
+//  App layout route ("/"), which adds the theme and auth
+//  providers (App.jsx). Below it, the pathless AppShell
+//  layout route holds the persistent Navbar/Sidebar/Footer
+//  frame — pages render into its outlet through PageWrapper,
+//  which injects authdata and — for the VM detail page — the
+//  route param as a prop. The URL map matches the old Next.js
+//  app 1:1:
 //
 //    /             — redirect by role (admin → /admin, → /vm)
-//    /login        — login + registration (bare, no auth)
+//    /login        — login + registration (bare, no frame)
 //    /vm           — the virtual servers list
 //    /vm/:id       — one virtual server
 //    /account      — account settings
@@ -21,6 +24,7 @@
 
 import { createBrowserRouter } from 'react-router-dom';
 import App from '@/App';
+import AppShell from '@/AppShell';
 import PageWrapper from '@/PageWrapper';
 import HomeRedirect from '@/HomeRedirect';
 
@@ -42,20 +46,26 @@ export const router = createBrowserRouter([
     path: '/',
     element: <App />,
     children: [
-      // Login — rendered bare (App skips the auth provider)
+      // Login — rendered bare (App skips the providers)
       { path: 'login', element: <Login /> },
 
-      // Home — redirect by role
-      { index: true, element: <HomeRedirect /> },
+      // Everything else lives inside the persistent frame
+      {
+        element: <AppShell />,
+        children: [
+          // Home — redirect by role
+          { index: true, element: <HomeRedirect /> },
 
-      // User pages
-      { path: 'vm', element: <PageWrapper component={VirtualServers} /> },
-      { path: 'vm/:virtualServerID', element: <PageWrapper component={VirtualServer} paramName="virtualServerID" /> },
-      { path: 'account', element: <PageWrapper component={Account} /> },
+          // User pages
+          { path: 'vm', element: <PageWrapper component={VirtualServers} /> },
+          { path: 'vm/:virtualServerID', element: <PageWrapper component={VirtualServer} paramName="virtualServerID" /> },
+          { path: 'account', element: <PageWrapper component={Account} /> },
 
-      // Admin pages
-      { path: 'admin', element: <PageWrapper component={Home} adminOnly /> },
-      { path: 'admin/users', element: <PageWrapper component={UsersList} adminOnly /> },
+          // Admin pages
+          { path: 'admin', element: <PageWrapper component={Home} adminOnly /> },
+          { path: 'admin/users', element: <PageWrapper component={UsersList} adminOnly /> },
+        ],
+      },
     ],
   },
 ]);

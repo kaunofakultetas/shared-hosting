@@ -5,8 +5,10 @@
 //  react-hooks rules (rules-of-hooks as an error — conditional
 //  hooks are real bugs; exhaustive-deps stays a warning since
 //  the dependency arrays are hand-tuned in several places).
+//  no-unused-vars ignores UPPER_CASE names, so dormant
+//  constants documented for future use survive the linter.
 //
-//  Run inside the hosting-control-frontend-new container:
+//  Run inside the hosting-control-frontend container:
 //    npm run lint
 // -----------------------------------------------------------
 
@@ -34,6 +36,7 @@ export default [
     },
     rules: {
       ...js.configs.recommended.rules,
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
