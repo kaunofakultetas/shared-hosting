@@ -10,8 +10,9 @@
 //
 //  Search matches VM name, owner email, VM id, domain names
 //  and container/stack names; the search text and the
-//  other-users switch live in the URL (?q=...&all=1), so they
-//  survive opening a VM and coming back. Delete additionally
+//  other-users switch live in the URL (?q=...&all=1) and the
+//  scroll spot in sessionStorage, so opening a VM and coming
+//  back lands exactly where the user left. Delete additionally
 //  requires the VM to be stopped and a 3-second hold on the
 //  shared LongPressIconButton.
 //
@@ -33,8 +34,8 @@
 //    - VirtualServers.jsx — the /vm page body
 // -----------------------------------------------------------
 
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useNavigate, useSearchParams, useNavigationType } from "react-router-dom";
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -66,7 +67,6 @@ import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import ClearIcon from "@mui/icons-material/Clear";
 import DomainIcon from "@mui/icons-material/Domain";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-
 
 
 
@@ -152,7 +152,6 @@ function useVirtualServers(showOtherUsers) {
 
 
 
-
 // -----------------------------------------------------------
 // vmMatchesQuery
 // -----------------------------------------------------------
@@ -196,7 +195,6 @@ function vmMatchesQuery(vm, searchQuery) {
 
   return false;
 }
-
 
 
 
@@ -262,7 +260,6 @@ function QuickActions({ vm, isRunning, onStartStop, onDelete }) {
     </div>
   );
 }
-
 
 
 
@@ -343,7 +340,6 @@ function DomainRow({ domain }) {
 
 
 
-
 // -----------------------------------------------------------
 // DomainsSection
 // -----------------------------------------------------------
@@ -374,7 +370,6 @@ function DomainsSection({ domains }) {
     </div>
   );
 }
-
 
 
 
@@ -442,7 +437,6 @@ function StacksSection({ stacks, vmRunning }) {
     </div>
   );
 }
-
 
 
 
@@ -555,7 +549,6 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
 
 
 
-
 // -----------------------------------------------------------
 // SearchBox
 // -----------------------------------------------------------
@@ -587,28 +580,29 @@ function SearchBox({ value, onChange, onClear }) {
           },
         },
       }}
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <SearchIcon sx={{ color: "gray" }} />
-          </InputAdornment>
-        ),
-        endAdornment: value && (
-          <InputAdornment position="end">
-            <IconButton
-              size="small"
-              onClick={onClear}
-              sx={{ p: 0.5 }}
-            >
-              <ClearIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-          </InputAdornment>
-        ),
+      slotProps={{
+        input: {
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ color: "gray" }} />
+            </InputAdornment>
+          ),
+          endAdornment: value && (
+            <InputAdornment position="end">
+              <IconButton
+                size="small"
+                onClick={onClear}
+                sx={{ p: 0.5 }}
+              >
+                <ClearIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </InputAdornment>
+          ),
+        },
       }}
     />
   );
 }
-
 
 
 
@@ -637,7 +631,6 @@ function EmptyState({ title, subtitle }) {
     </div>
   );
 }
-
 
 
 
@@ -724,17 +717,16 @@ function ListHeader({ authdata, searchQuery, showOtherUsers, updateParam, shownC
 
 
 
-
 // -----------------------------------------------------------
 // VirtualServersTable (default export)
 // -----------------------------------------------------------
 //
-// The wiring: URL-backed search/switch state, the dialog
-// state and the grid itself — everything with real content
-// lives in the pieces above, the list and its actions in
-// useVirtualServers. Navigation to a VM is client-side; the
-// detail page's data is often already in the query cache, so
-// it opens instantly.
+// The wiring: URL-backed search/switch state, the scroll
+// memory, the dialog state and the grid itself — everything
+// with real content lives in the pieces above, the list and
+// its actions in useVirtualServers. Navigation to a VM is
+// client-side; the detail page's data is often already in the
+// query cache, so it opens instantly.
 //
 // Used by:
 //   - VirtualServers.jsx — the /vm page body
@@ -768,6 +760,36 @@ export default function VirtualServersTable({ authdata }) {
   const filteredData = data.filter((vm) => vmMatchesQuery(vm, searchQuery));
 
 
+  // Scroll memory: the list scrolls inside its own div, so the
+  // browser can't bring the position back on its own. The spot
+  // is saved when the page unmounts and re-applied exactly once
+  // — only on back/forward (POP, not a fresh sidebar click) and
+  // only once the cards are rendered, so the container is tall
+  // enough to take the offset.
+  const scrollRef = useRef(null);
+  const restoredScrollRef = useRef(false);
+  const navigationType = useNavigationType();
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    return () => {
+      try {
+        sessionStorage.setItem("vmListScroll", String(node?.scrollTop ?? 0));
+      } catch { /* storage unavailable — Back just starts at the top */ }
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (restoredScrollRef.current || navigationType !== "POP" || loadingData) return;
+    restoredScrollRef.current = true;
+    try {
+      const saved = Number(sessionStorage.getItem("vmListScroll") ?? 0);
+      sessionStorage.removeItem("vmListScroll");
+      if (saved > 0 && scrollRef.current) scrollRef.current.scrollTop = saved;
+    } catch { /* storage unavailable — Back just starts at the top */ }
+  }, [navigationType, loadingData]);
+
+
   const handleNavigate = (vm) => {
     navigate(`/vm/${vm.id}`);
   };
@@ -799,7 +821,7 @@ export default function VirtualServersTable({ authdata }) {
 
 
   return (
-    <div className="h-[calc(100vh-105px)] w-full overflow-y-auto bg-gray-50 p-6">
+    <div ref={scrollRef} className="h-[calc(100vh-105px)] w-full overflow-y-auto bg-gray-50 p-6">
       <ListHeader
         authdata={authdata}
         searchQuery={searchQuery}

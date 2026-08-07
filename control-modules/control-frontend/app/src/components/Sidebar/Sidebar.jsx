@@ -1,8 +1,8 @@
 // -----------------------------------------------------------
 //  [*] Sidebar — left navigation
 //
-//  Left navigation of the app, ported from the tracer system,
-//  Zabbix-style: a narrow icon rail sits in the page layout;
+//  Left navigation of the app, Zabbix-style: a narrow icon
+//  rail sits in the page layout;
 //  moving the mouse over it expands the full panel OVER the
 //  page content (the content does not reflow), and leaving
 //  collapses it again after a short delay. The pin button at
@@ -21,9 +21,9 @@
 //  matching the current route is highlighted in the brand
 //  tint.
 //
-//  Unlike the tracer original there is no keepalive re-sync
-//  machinery here: AppShell mounts this component exactly
-//  once, so state simply lives for the whole session.
+//  There is no keepalive re-sync machinery here: AppShell
+//  mounts this component exactly once, so state simply lives
+//  for the whole session.
 //
 //  Split into (root component last):
 //

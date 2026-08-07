@@ -1,22 +1,24 @@
 // -----------------------------------------------------------
 //  [*] DataGrid custom components — QuickSearchToolbar
 //
-//  The shared DataGrid toolbar shell: an always-visible quick
-//  filter (input is trimmed before matching), the
+//  The shared DataGrid toolbar shell: an always-expanded
+//  quick filter (input is trimmed before matching), the
 //  ColumnsButton and — only when onAddNew is given — the
 //  burgundy "add new" ToolbarButton. Page-specific extras
-//  come in as children and render after the buttons.
+//  come in as children and render after the buttons, inside
+//  the same Toolbar row.
 //
-//  Adapted from the tracer original: tracer builds this on
-//  DataGrid v8's composable Toolbar/QuickFilter components,
-//  which don't exist in v7 — this version uses v7's
-//  GridToolbarContainer + GridToolbarQuickFilter instead.
-//  Same props, same look.
+//  Built on DataGrid v8's composable Toolbar/QuickFilter
+//  components. The grids mounting it must also pass
+//  showToolbar — in v8 the toolbar slot renders only when
+//  that flag is set.
 //
 //  Props:
 //    - placeholder  — quick filter placeholder text; when not
 //                     given, the translated default is used
 //                     ("Search..." / "Ieškoti...")
+//    - ariaLabel    — aria-label for the quick filter input;
+//                     left off the DOM when not given
 //    - columnsLabel — ColumnsButton label; when not given the
 //                     button keeps its own default
 //    - addNewLabel  — label of the "add new" button
@@ -27,7 +29,7 @@
 //    - children     — page-specific toolbar extras
 // -----------------------------------------------------------
 
-import { GridToolbarContainer, GridToolbarQuickFilter } from "@mui/x-data-grid";
+import { Toolbar, QuickFilter, QuickFilterControl } from "@mui/x-data-grid";
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 
 import { useTranslations } from "@/i18n";
@@ -54,20 +56,22 @@ import ToolbarButton from '@/components/DatagridCustomComponents/ToolbarButton';
 //   - DomainsListTable — the toolbar slot
 // -----------------------------------------------------------
 
-export default function QuickSearchToolbar({ placeholder, columnsLabel, addNewLabel, onAddNew, children }) {
+export default function QuickSearchToolbar({ placeholder, ariaLabel, columnsLabel, addNewLabel, onAddNew, children }) {
 
   const t = useTranslations("COMPONENTS.datagrid");
 
   return (
-    <GridToolbarContainer sx={{ justifyContent: 'flex-start' }}>
-      <GridToolbarQuickFilter
-        quickFilterParser={(searchInput) => [searchInput.trim()]}
-        placeholder={placeholder ?? t("searchPlaceholder")}
-        size="small"
-      />
+    <Toolbar sx={{ justifyContent: 'flex-start' }}>
+      <QuickFilter
+        expanded
+        parser={(searchInput) => [searchInput.trim()]}
+        formatter={(quickFilterValues) => quickFilterValues.join('')}
+      >
+        <QuickFilterControl placeholder={placeholder ?? t("searchPlaceholder")} size="small" aria-label={ariaLabel} />
+      </QuickFilter>
       <ColumnsButton label={columnsLabel} />
       {onAddNew && <ToolbarButton label={addNewLabel} icon={AddCircleOutlinedIcon} onClick={onAddNew} />}
       {children}
-    </GridToolbarContainer>
+    </Toolbar>
   );
 }

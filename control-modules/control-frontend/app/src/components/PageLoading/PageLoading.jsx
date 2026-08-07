@@ -12,9 +12,8 @@
 //  or leave it off for just the spinner.
 //
 //  Nothing calls this here at the moment — today's blocking
-//  loads are all covered by skeletons. Kept for parity with
-//  the tracer copy, for the next panel that has no layout to
-//  skeleton.
+//  loads are all covered by skeletons. Kept ready for the
+//  next panel that has no layout to skeleton.
 // -----------------------------------------------------------
 
 import CircularProgress from '@mui/material/CircularProgress';

@@ -295,7 +295,6 @@ function ContainerStacks({ stacks, vmRunning }) {
 
 
 
-
 // -----------------------------------------------------------
 // VmNameEditor
 // -----------------------------------------------------------
@@ -408,7 +407,6 @@ function VmNameEditor({ name, rename }) {
     </div>
   );
 }
-
 
 
 
@@ -529,7 +527,6 @@ function VmHeaderCard({ vmData, virtualServerID, startStop, rename }) {
 
 
 
-
 // -----------------------------------------------------------
 // ControlsTab
 // -----------------------------------------------------------
@@ -597,7 +594,6 @@ function ControlsTab({ vmId }) {
     </div>
   );
 }
-
 
 
 
@@ -691,11 +687,13 @@ export default function VirtualServerPage({ virtualServerID }) {
 
   return (
     <div className="flex-1 p-4 overflow-y-auto h-[calc(100vh-105px)] bg-gray-100">
-      {/* Back Button — contained-primary from the theme,
-          client-side navigation back to the cached list */}
+      {/* Back Button — contained-primary from the theme. Real
+          history back when there is an in-app entry to return
+          to (keeps the list's ?q=&all= filters and scroll spot);
+          a deep link straight into a VM falls back to /vm */}
       <Button
         variant="contained"
-        onClick={() => navigate("/vm")}
+        onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate("/vm"))}
         startIcon={<ArrowBackIcon />}
         sx={{
           mb: 2,

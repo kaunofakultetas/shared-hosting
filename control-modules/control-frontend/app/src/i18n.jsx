@@ -7,6 +7,11 @@
 //  remembered in the `locale` cookie; English is the fallback
 //  for everything.
 //
+//  The locale cookie is kept for a year, so the choice
+//  survives closing the browser, and <html lang> follows the
+//  active locale (screen readers and browser
+//  spellcheck/translate read it).
+//
 //  Exports:
 //    IntlProvider     — context provider (wraps the app)
 //    useLocale        — current locale code ("en" | "lt")
@@ -20,7 +25,7 @@
 //    t("greeting", { name })    → fills {name} placeholders
 // -----------------------------------------------------------
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { messagesMap } from '@/messages';
 
 
@@ -72,7 +77,8 @@ const IntlContext = createContext({
 //
 // Holds the live locale and the matching message tree.
 // setLocale validates the value, persists it to the cookie
-// and re-renders the app — no page reload.
+// (kept for a year, so the choice survives closing the
+// browser) and re-renders the app — no page reload.
 //
 // Used by:
 //   - providers.jsx — wraps the app inside the theme
@@ -85,10 +91,17 @@ export function IntlProvider({ children }) {
 
   const setLocale = useCallback((newLocale) => {
     if (SUPPORTED_LOCALES.includes(newLocale)) {
-      document.cookie = `locale=${newLocale}; path=/`;
+      document.cookie = `locale=${newLocale}; path=/; max-age=31536000`;
       setLocaleState(newLocale);
     }
   }, []);
+
+  // Keep <html lang> in sync — on first mount (the cookie may
+  // say "lt" while index.html ships lang="en") and on every
+  // switch
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <IntlContext.Provider value={{ locale, messages, setLocale }}>

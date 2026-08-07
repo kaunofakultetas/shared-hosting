@@ -5,7 +5,6 @@
 //  title/description header with an optional variant icon,
 //  arbitrary children as the body, and either the standard
 //  Confirm/Cancel pair or fully custom action buttons.
-//  Carried over 1:1 from the tracer system.
 //
 //  Variants ("default" | "danger" | "warning" | "info" |
 //  "success") pick the header icon and the confirm button
@@ -531,8 +530,8 @@ export default function UniversalModal({
 // All props pass through, so anything can still be
 // overridden.
 //
-// Nothing calls this preset here at the moment — kept for
-// parity with the tracer copy.
+// Nothing calls this preset here at the moment — kept as
+// part of the modal's stock preset set.
 // -----------------------------------------------------------
 
 export function ConfirmModal({
@@ -567,8 +566,8 @@ export function ConfirmModal({
 // error icon) with translated irreversible-action wording.
 // Pass onConfirm with the actual delete call.
 //
-// Nothing calls this preset here at the moment — kept for
-// parity with the tracer copy.
+// Nothing calls this preset here at the moment — kept as
+// part of the modal's stock preset set.
 // -----------------------------------------------------------
 
 export function DeleteModal({
@@ -605,8 +604,8 @@ export function DeleteModal({
 // translated "OK" button (cancel hidden by default since
 // there is nothing to cancel).
 //
-// Nothing calls this preset here at the moment — kept for
-// parity with the tracer copy.
+// Nothing calls this preset here at the moment — kept as
+// part of the modal's stock preset set.
 // -----------------------------------------------------------
 
 export function AlertModal({
@@ -643,8 +642,8 @@ export function AlertModal({
 // "Understood" confirm. Keeps the cancel button (unlike
 // AlertModal) in case the caller wires onCancel to back out.
 //
-// Nothing calls this preset here at the moment — kept for
-// parity with the tracer copy.
+// Nothing calls this preset here at the moment — kept as
+// part of the modal's stock preset set.
 // -----------------------------------------------------------
 
 export function WarningModal({

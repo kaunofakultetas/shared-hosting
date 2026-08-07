@@ -7,8 +7,7 @@
 //  language switcher and the logout button.
 //
 //  The switcher shows the language you would SWITCH TO
-//  ("Lietuvių" while in English and vice versa) — the tracer
-//  original labels it the other way around.
+//  ("Lietuvių" while in English and vice versa).
 //
 //  Logging out is just a hard navigation to /login — the
 //  login page drops the session cookie on mount.
@@ -34,7 +33,6 @@ import { useTranslations, useLocale, useSetLocale } from "@/i18n";
 
 
 
-
 // -----------------------------------------------------------
 // LanguageSwitcher
 // -----------------------------------------------------------
@@ -43,8 +41,7 @@ import { useTranslations, useLocale, useSetLocale } from "@/i18n";
 // setLocale — that writes the choice to the `locale` cookie
 // (so later visits keep it) and re-renders the app in the
 // new language, no page reload. Styled like the Logout button
-// next to it (contained primary with a white border), unlike
-// the tracer original's Tahoma look.
+// next to it (contained primary with a white border).
 //
 // Used by:
 //   - Navbar (below) — one switcher for the "other" language
@@ -72,7 +69,6 @@ function LanguageSwitcher({ targetLocale, label }) {
 
 
 
-
 // -----------------------------------------------------------
 // Navbar (default export)
 // -----------------------------------------------------------
@@ -92,7 +88,7 @@ export default function Navbar({ authdata }) {
       {/* VU logo */}
       <Link to="/" className="no-underline mx-[30px]">
         <div>
-          <img src='/img/vulogo.png' alt="avatar" />
+          <img src='/img/vulogo.png' alt="VU logo" />
         </div>
       </Link>
 

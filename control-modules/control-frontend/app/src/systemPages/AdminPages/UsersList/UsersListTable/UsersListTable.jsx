@@ -240,6 +240,7 @@ export default function UsersListTable() {
           pageSizeOptions={[100]}
           rowHeight={30}
           onRowClick={handleRowClick}
+          showToolbar
 
           initialState={{
             columns: {

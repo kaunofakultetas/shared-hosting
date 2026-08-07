@@ -107,14 +107,16 @@ function PasswordField({ label, value, onChange, show, onToggleShow, error, help
       onChange={onChange}
       error={error}
       helperText={helperText}
-      InputProps={{
-        endAdornment: (
-          <InputAdornment position="end">
-            <IconButton onClick={onToggleShow} edge="end">
-              {show ? <VisibilityOffIcon /> : <VisibilityIcon />}
-            </IconButton>
-          </InputAdornment>
-        ),
+      slotProps={{
+        input: {
+          endAdornment: (
+            <InputAdornment position="end">
+              <IconButton onClick={onToggleShow} edge="end">
+                {show ? <VisibilityOffIcon /> : <VisibilityIcon />}
+              </IconButton>
+            </InputAdornment>
+          ),
+        },
       }}
     />
   );

@@ -7,17 +7,15 @@
 //  progress ring; releasing early cancels and can show an
 //  error toast, completing can show a success toast.
 //
-//  Carried over 1:1 from the tracer system, plus one local
-//  addition at the end (LongPressIconButton). Works with both
-//  mouse and touch. Split into small pieces (main component
-//  near the end):
+//  Works with both mouse and touch. Split into small pieces
+//  (main component near the end):
 //
 //    useLongPress           — press state + rAF progress loop
 //    PressProgress          — circular progress ring
 //    ButtonTooltip          — tooltip that works when disabled
 //    LongPressButton        — the button itself (default export)
 //    LongPressDeleteButton  — red "delete" preset
-//    LongPressIconButton    — IconButton flavor (ours)
+//    LongPressIconButton    — IconButton flavor
 //
 //  Imported via the folder's index.js:
 //    @/components/LongPressButton
@@ -359,11 +357,10 @@ export function LongPressDeleteButton({
 // LongPressIconButton (exported)
 // -----------------------------------------------------------
 //
-// Our addition beyond the tracer original: the same
-// hold-to-confirm behavior on a round MUI IconButton — for
-// icon-only spots the Button flavor can't imitate. Same core
-// props; no tooltip/pressedContent (the caller wraps its own
-// Tooltip).
+// The same hold-to-confirm behavior on a round MUI
+// IconButton — for icon-only spots the Button flavor can't
+// imitate. Same core props; no tooltip/pressedContent (the
+// caller wraps its own Tooltip).
 //
 // Used by:
 //   - VirtualServersTable — the VM cards' delete button
