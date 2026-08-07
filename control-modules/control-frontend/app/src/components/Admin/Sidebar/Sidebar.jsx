@@ -94,7 +94,6 @@ const CLOSE_DELAY_MS = 200;
 
 
 
-
 // -----------------------------------------------------------
 // SECTIONS
 // -----------------------------------------------------------
@@ -158,7 +157,6 @@ const SECTIONS = [
 
 
 
-
 // -----------------------------------------------------------
 // clampWidth
 // -----------------------------------------------------------
@@ -172,7 +170,6 @@ const SECTIONS = [
 
 const clampWidth = (width) =>
   Math.min(Math.max(width, MIN_EXPANDED_WIDTH), MAX_EXPANDED_WIDTH);
-
 
 
 
@@ -200,7 +197,6 @@ const visibleSections = (authdata) =>
       ...section,
       items: section.items.filter((item) => !item.adminOnly || authdata?.admin === 1),
     }));
-
 
 
 
@@ -238,7 +234,6 @@ const findActiveHref = (sections, pathname) => {
 
   return best;
 };
-
 
 
 
@@ -286,7 +281,6 @@ function useSidebarPreferences() {
 
 
 
-
 // -----------------------------------------------------------
 // useHoverExpand
 // -----------------------------------------------------------
@@ -318,7 +312,6 @@ function useHoverExpand() {
 
   return { hovered, onMouseEnter, onMouseLeave };
 }
-
 
 
 
@@ -368,7 +361,6 @@ function useContentWidth(ghostRef) {
 
 
 
-
 // -----------------------------------------------------------
 // SectionTitle
 // -----------------------------------------------------------
@@ -393,7 +385,6 @@ function SectionTitle({ title, open }) {
     </div>
   );
 }
-
 
 
 
@@ -458,7 +449,6 @@ function MenuItemContent({ icon: Icon, label, open, active }) {
 
 
 
-
 // -----------------------------------------------------------
 // MenuItem
 // -----------------------------------------------------------
@@ -486,7 +476,6 @@ function MenuItem({ href, icon: Icon, label, open, active, external = false }) {
     </Link>
   );
 }
-
 
 
 
@@ -533,7 +522,6 @@ function PinButton({ pinned, onToggle }) {
 
 
 
-
 // -----------------------------------------------------------
 // SidebarLinks
 // -----------------------------------------------------------
@@ -568,7 +556,6 @@ function SidebarLinks({ sections, open, activeHref }) {
     </>
   );
 }
-
 
 
 

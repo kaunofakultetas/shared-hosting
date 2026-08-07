@@ -44,8 +44,22 @@ import PersonIcon from "@mui/icons-material/Person";
 import HistoryIcon from "@mui/icons-material/History";
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// formatTimeAgo
+// -----------------------------------------------------------
+//
 // Timestamps arrive absolute; the activity list shows them
-// relative ("5 mins ago")
+// relative ("5 mins ago").
+//
+// Used by:
+//   - RecentActivityCard (below) — every activity row
+// -----------------------------------------------------------
+
 const formatTimeAgo = (timestamp) => {
   const now = new Date();
   const time = new Date(timestamp);
@@ -59,6 +73,9 @@ const formatTimeAgo = (timestamp) => {
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
   return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 };
+
+
+
 
 
 
@@ -101,6 +118,9 @@ function PasswordField({ label, value, onChange, show, onToggleShow, error, help
 
 
 
+
+
+
 // -----------------------------------------------------------
 // AccountInfoCard
 // -----------------------------------------------------------
@@ -128,6 +148,9 @@ function AccountInfoCard({ authdata }) {
     </div>
   );
 }
+
+
+
 
 
 
@@ -273,6 +296,9 @@ function ChangePasswordCard() {
 
 
 
+
+
+
 // -----------------------------------------------------------
 // RecentActivityCard
 // -----------------------------------------------------------
@@ -343,6 +369,9 @@ function RecentActivityCard() {
     </div>
   );
 }
+
+
+
 
 
 

@@ -39,7 +39,6 @@ import Particles from './components/Particles/Particles';
 
 
 
-
 // -----------------------------------------------------------
 // BrandSubmitButton
 // -----------------------------------------------------------
@@ -75,7 +74,6 @@ function BrandSubmitButton({ busy, busyLabel, label, onClick }) {
     </button>
   );
 }
-
 
 
 
@@ -169,7 +167,6 @@ function LoginForm({ selectedForm, setSelectedForm, handleLogin, errorBoxText })
     </form>
   );
 }
-
 
 
 
@@ -360,7 +357,6 @@ function RegisterForm({ selectedForm, setSelectedForm }) {
     </form>
   );
 }
-
 
 
 

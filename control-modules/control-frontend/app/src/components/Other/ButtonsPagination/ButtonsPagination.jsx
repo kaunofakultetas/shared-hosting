@@ -21,6 +21,20 @@ import Pagination from '@mui/material/Pagination';
 import PaginationItem from '@mui/material/PaginationItem';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// CustomPagination (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - UsersListTable / DomainsListTable — the Pagination slot
+//     (currently inert — see the file header)
+// -----------------------------------------------------------
+
 export default function CustomPagination() {
     const apiRef = useGridApiContext();
     const page = useGridSelector(apiRef, gridPageSelector);

@@ -18,6 +18,19 @@ import { Button } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// Navbar (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - AppShell — mounted once above every signed-in page
+// -----------------------------------------------------------
+
 export default function Navbar({ authdata }) {
 
   return (

@@ -32,6 +32,20 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import toast from 'react-hot-toast';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// AddEditDomain (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - DomainsListTable — row click (edit) and Insert New
+//     (create)
+// -----------------------------------------------------------
+
 export default function AddEditDomain({ virtualServerID, rowData, setOpen, getData }) {
 
   const [data, setData] = useState(undefined);

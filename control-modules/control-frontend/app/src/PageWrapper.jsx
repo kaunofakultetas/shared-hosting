@@ -25,6 +25,19 @@ import { useParams, Navigate } from 'react-router-dom';
 import { useAuth } from '@/AuthGuard';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// PageWrapper (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - router.jsx — wraps every page except /login
+// -----------------------------------------------------------
+
 export default function PageWrapper({ component: Component, paramName, adminOnly }) {
   const authdata = useAuth();
   const params = useParams();

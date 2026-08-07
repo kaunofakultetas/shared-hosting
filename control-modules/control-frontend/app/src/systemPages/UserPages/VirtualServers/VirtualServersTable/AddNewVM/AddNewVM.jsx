@@ -24,6 +24,19 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import toast from 'react-hot-toast';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// AddNewVM (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - VirtualServersTable — opened by the New Server button
+// -----------------------------------------------------------
+
 export default function AddNewVM({ vmData, setOpen, getData }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);

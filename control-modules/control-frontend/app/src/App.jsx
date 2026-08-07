@@ -27,6 +27,19 @@ import theme from '@/theme';
 import { AuthProvider } from '@/AuthGuard';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// App (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - router.jsx — element of the "/" layout route
+// -----------------------------------------------------------
+
 export default function App() {
 
   const { pathname } = useLocation();

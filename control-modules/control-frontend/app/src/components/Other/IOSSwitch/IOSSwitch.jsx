@@ -14,6 +14,19 @@ import { styled } from '@mui/material/styles';
 import Switch from '@mui/material/Switch';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// IOSSwitch (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - VirtualServersTable — the "Show other users" toggle
+// -----------------------------------------------------------
+
 const IOSSwitch = styled((props) => (
     <Switch focusVisibleClassName=".Mui-focusVisible" disableRipple {...props} />
     ))(({ theme }) => ({

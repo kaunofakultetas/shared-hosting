@@ -17,6 +17,20 @@ import ArrowUpwardSharpIcon from '@mui/icons-material/ArrowUpwardSharp';
 import ArrowDownwardSharpIcon from '@mui/icons-material/ArrowDownwardSharp';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// Widget (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - Home.jsx — the Users / Virtual Servers / Domain Names
+//     cards
+// -----------------------------------------------------------
+
 export default function Widget({ text, bottomtext, count, countSecondary, icon, link, difference }) {
 
   // If countSecondary is provided, show as "count / countSecondary" format

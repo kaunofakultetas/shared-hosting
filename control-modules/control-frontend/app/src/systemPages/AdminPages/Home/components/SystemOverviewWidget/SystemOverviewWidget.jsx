@@ -34,28 +34,77 @@ import SdStorageIcon from '@mui/icons-material/SdStorage';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 
 
-// Tint thresholds — CPU and Docker Hub turn amber at 60% and
-// red at 80%; RAM and disk (below) only at 80%/90%
+
+
+
+
+
+// -----------------------------------------------------------
+// getUsageColor
+// -----------------------------------------------------------
+//
+// Green/amber/red tint set from a usage percentage — CPU and
+// Docker Hub turn amber at 60% and red at 80%; RAM and disk
+// (below) only at 80%/90%.
+//
+// Used by:
+//   - SystemOverviewWidget (below) — the CPU and Docker Hub
+//     cells
+// -----------------------------------------------------------
+
 const getUsageColor = (percentage) => {
   if (percentage >= 80) return { color: '#dc2626', bg: '#fef2f2', ring: '#fecaca' };
   if (percentage >= 60) return { color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' };
   return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
 };
 
+
+
+
+
+
+
+// -----------------------------------------------------------
+// getUsageColorRam
+// -----------------------------------------------------------
+//
 // RAM variant — higher thresholds (identical to the disk one,
-// kept separate so each gauge can be tuned on its own)
+// kept separate so each gauge can be tuned on its own).
+//
+// Used by:
+//   - SystemOverviewWidget (below) — the RAM cell
+// -----------------------------------------------------------
+
 const getUsageColorRam = (percentage) => {
   if (percentage >= 90) return { color: '#dc2626', bg: '#fef2f2', ring: '#fecaca' };
   if (percentage >= 80) return { color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' };
   return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
 };
 
-// Disk variant — see getUsageColorRam
+
+
+
+
+
+
+// -----------------------------------------------------------
+// getUsageColorDisk
+// -----------------------------------------------------------
+//
+// Disk variant — see getUsageColorRam.
+//
+// Used by:
+//   - SystemOverviewWidget (below) — the disk cell
+// -----------------------------------------------------------
+
 const getUsageColorDisk = (percentage) => {
   if (percentage >= 90) return { color: '#dc2626', bg: '#fef2f2', ring: '#fecaca' };
   if (percentage >= 80) return { color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' };
   return { color: '#10b981', bg: '#ecfdf5', ring: '#a7f3d0' };
 };
+
+
+
 
 
 
@@ -94,6 +143,9 @@ function StatCell({ colors, icon: Icon, value, label, barPercent }) {
     </div>
   );
 }
+
+
+
 
 
 

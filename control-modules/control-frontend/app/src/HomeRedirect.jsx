@@ -15,6 +15,19 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/AuthGuard';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// HomeRedirect (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - router.jsx — the index route of "/"
+// -----------------------------------------------------------
+
 export default function HomeRedirect() {
   const authdata = useAuth();
 

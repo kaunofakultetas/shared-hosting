@@ -16,6 +16,19 @@ import { loadSlim } from "tsparticles-slim";
 import { useCallback, useState, useEffect } from "react";
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// ParticlesComponent (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - Login — the fixed background layer of the page
+// -----------------------------------------------------------
+
 export default function ParticlesComponent(props) {
 
   const [particleNumber, setParticleNumber] = useState(0);

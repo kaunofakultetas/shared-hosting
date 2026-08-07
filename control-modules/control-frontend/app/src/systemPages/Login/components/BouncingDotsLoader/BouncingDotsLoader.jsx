@@ -12,6 +12,19 @@
 import styles from './BouncingDotsLoader.module.css';
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// BouncingDotsLoader (default export)
+// -----------------------------------------------------------
+//
+// Used by:
+//   - Login — BrandSubmitButton's busy state
+// -----------------------------------------------------------
+
 export default function BouncingDotsLoader() {
   return (
     <div className={styles.bouncingLoader}>

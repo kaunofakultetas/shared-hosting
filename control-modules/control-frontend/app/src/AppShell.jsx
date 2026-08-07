@@ -33,7 +33,6 @@ import Sidebar from '@/components/Admin/Sidebar/Sidebar';
 
 
 
-
 // -----------------------------------------------------------
 // Footer
 // -----------------------------------------------------------
@@ -52,7 +51,6 @@ function Footer() {
     </footer>
   );
 }
-
 
 
 
@@ -101,7 +99,6 @@ function AppSkeleton() {
     </>
   );
 }
-
 
 
 

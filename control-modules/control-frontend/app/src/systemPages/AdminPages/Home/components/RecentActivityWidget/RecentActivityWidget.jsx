@@ -6,6 +6,11 @@
 //  /api/dashboard/recentactivity every 2 seconds. The
 //  per-user variant of this list lives on the Account page.
 //
+//  Split into (root component last):
+//
+//    formatTimeAgo        — "5 mins ago" style timestamps
+//    RecentActivityWidget — the card (default export)
+//
 //  Used by:
 //    - Home.jsx — right card of the main content row
 // -----------------------------------------------------------
@@ -15,8 +20,22 @@ import { Skeleton } from "@mui/material";
 import axios from "axios";
 
 
+
+
+
+
+
+// -----------------------------------------------------------
+// formatTimeAgo
+// -----------------------------------------------------------
+//
 // Timestamps arrive absolute; the list shows them relative
-// ("5 mins ago")
+// ("5 mins ago").
+//
+// Used by:
+//   - RecentActivityWidget (below) — every activity row
+// -----------------------------------------------------------
+
 const formatTimeAgo = (timestamp) => {
   const now = new Date();
   const time = new Date(timestamp);
@@ -30,6 +49,11 @@ const formatTimeAgo = (timestamp) => {
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
   return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 };
+
+
+
+
+
 
 
 // -----------------------------------------------------------
