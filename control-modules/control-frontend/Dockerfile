@@ -1,73 +1,25 @@
-FROM node:23.5.0-alpine AS base
+FROM node:24.2.0-alpine AS builder
 
-# BUILD ENV VARIABLES
-# ARG XXXXX
-
-
-
-
-
-
-
-####################################
-###### Dependencies container ######
-####################################
-FROM base AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+# Copy application source code
+COPY app /app
+
+# Install dependencies and build
 RUN npm install
-
-
-
-
-
-
-####################################
-######### Builder container ########
-####################################
-FROM base AS builder
-WORKDIR /app
-
-# Copy node_modules folder
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy all text/program files (excluding directories)
-COPY *.json *.ts *.js *.mjs *.d.ts ./
-
-# Copy source code and public directory
-COPY src/ ./src/
-COPY public/ ./public/
-
-# Build
 RUN npm run build
-
-
-
 
 
 
 ################################
 ##### Production container #####
 ################################
-FROM base AS prod
+FROM caddy:2.11-alpine AS prod
 
 WORKDIR /app
-ENV NODE_ENV=production
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+COPY --from=builder /app/dist /app/dist
+COPY Caddyfile /etc/caddy/Caddyfile
 
-RUN mkdir .next
-RUN chown -R nextjs:nodejs .next
-
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
-ENV PORT=3000
-EXPOSE 3000
-CMD HOSTNAME="0.0.0.0" node server.js
-# CMD ["sleep", "infinity"]
+EXPOSE 80
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
