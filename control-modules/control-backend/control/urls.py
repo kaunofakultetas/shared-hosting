@@ -39,7 +39,7 @@ from control.users.api.account_views import change_password, registration_code, 
 from control.users.api.users_views import admin_users
 
 urlpatterns += [
-    path('api/login', login_view),                                          # POST — plain-text "OK" or a Lithuanian error message
+    path('api/login', login_view),                                          # POST — JSON; failures carry a machine code the login page maps
     path('api/logout', logout_view),                                        # POST — flush the session (login page calls it on mount)
     path('api/register', register_view),                                    # POST — self-registration with an admin's code
 

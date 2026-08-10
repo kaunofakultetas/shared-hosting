@@ -1,9 +1,11 @@
 ############################################################
 #  [*] Users admin view — the /admin/users grid backend
 #
-#  GET list + POST insertupdate/delete, admins only. The
-#  mutation responses keep the grid contract: HTTP 200 with
-#  {"type": "ok"} or {"type": "error", "reason": <sentence>}.
+#  GET list + POST insertupdate/delete, admins only.
+#  Mutations answer real status codes (400 validation, 404
+#  missing user, 409 conflicts) with a {"type": "error",
+#  "reason": <sentence>} body the dialog renders; success is
+#  200 {"type": "ok"}.
 #
 #  Real failures surface as type=error reasons the dialog
 #  renders:
@@ -68,19 +70,25 @@ def admin_users(request):
     elif request.method == 'POST':
         postData = get_json(request)
         if postData is None:
-            return JsonResponse({'type': 'error', 'reason': 'Invalid request'})
+            return JsonResponse({'type': 'error', 'reason': 'Invalid request'}, status=400)
 
 
         # --- INSERT/UPDATE ---
         if postData.get('action') == 'insertupdate':
             email = postData['email'].lower().strip()
+            password = postData['password'].strip()
+
+            # A non-empty password must meet the policy, both on
+            # create and on an edit that changes it
+            if len(password) != 0 and len(password) < 8:
+                return JsonResponse({'type': 'error', 'reason': 'Password must be at least 8 characters long'}, status=400)
 
             # Create
             if postData['id'] == '':
-                if len(postData['password']) == 0:
-                    return JsonResponse({'type': 'error', 'reason': 'Password must be at least 8 characters long'})
+                if len(password) == 0:
+                    return JsonResponse({'type': 'error', 'reason': 'Password must be at least 8 characters long'}, status=400)
 
-                passwordHash = bcrypt.hashpw(postData['password'].strip().encode(), bcrypt.gensalt(rounds=12)).decode()
+                passwordHash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
                 try:
                     with transaction.atomic():
                         SystemUser.objects.create(
@@ -90,25 +98,25 @@ def admin_users(request):
                             enabled=bool(postData['enabled']),
                         )
                 except IntegrityError:
-                    return JsonResponse({'type': 'error', 'reason': 'User with this email already exists'})
+                    return JsonResponse({'type': 'error', 'reason': 'User with this email already exists'}, status=409)
 
             # Update
             else:
                 thisUser = SystemUser.objects.filter(id=postData['id']).first()
                 if thisUser is None:
-                    return JsonResponse({'type': 'error', 'reason': 'User not found'})
+                    return JsonResponse({'type': 'error', 'reason': 'User not found'}, status=404)
 
                 thisUser.email = email
                 thisUser.admin = bool(postData['admin'])
                 thisUser.enabled = bool(postData['enabled'])
-                if len(postData['password']) != 0:
-                    thisUser.password = bcrypt.hashpw(postData['password'].strip().encode(), bcrypt.gensalt(rounds=12)).decode()
+                if len(password) != 0:
+                    thisUser.password = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
 
                 try:
                     with transaction.atomic():
                         thisUser.save()
                 except IntegrityError:
-                    return JsonResponse({'type': 'error', 'reason': 'User with this email already exists'})
+                    return JsonResponse({'type': 'error', 'reason': 'User with this email already exists'}, status=409)
 
             return JsonResponse({'type': 'ok'})
 
@@ -118,11 +126,11 @@ def admin_users(request):
 
             # Prevent user from deleting himself
             if int(postData['id']) == request.current_user.id:
-                return JsonResponse({'type': 'error', 'reason': 'Cannot delete yourself'})
+                return JsonResponse({'type': 'error', 'reason': 'Cannot delete yourself'}, status=400)
 
             # Check if user has any virtual servers
             if VirtualServer.objects.filter(owner_id=postData['id'], deleted=False).exists():
-                return JsonResponse({'type': 'error', 'reason': 'User has virtual servers'})
+                return JsonResponse({'type': 'error', 'reason': 'User has virtual servers'}, status=409)
 
             # Delete user
             SystemUser.objects.filter(id=postData['id']).delete()
@@ -130,7 +138,7 @@ def admin_users(request):
 
 
         # --- ILLEGAL ACTION ---
-        return JsonResponse({'type': 'error', 'reason': 'Illegal action'})
+        return JsonResponse({'type': 'error', 'reason': 'Illegal action'}, status=400)
 
 
     return JsonResponse({'message': 'Method not allowed'}, status=405)

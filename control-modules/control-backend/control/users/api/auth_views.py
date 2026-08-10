@@ -3,9 +3,10 @@
 #
 #  The authentication surface. Hard wire contracts:
 #
-#    - /api/login answers HTTP 200 plain text, either "OK"
-#      or a Lithuanian sentence the login page renders
-#      verbatim (it string-matches 'OK')
+#    - /api/login answers JSON with real status codes; error
+#      responses carry a machine code (MISSING_EMAIL,
+#      INVALID_CREDENTIALS, ...) the login page maps to its
+#      own wording
 #    - /api/checkauth returns {id, email, admin} and doubles
 #      as the Caddy forward_auth target for the :8443 VM
 #      tools (with /vm/<id>) and stays cheap on purpose
@@ -24,9 +25,10 @@
 ############################################################
 
 import re
+from datetime import timedelta
 
 import bcrypt
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.utils import timezone
 
 from control.common.auth import (
@@ -52,17 +54,18 @@ from control.users.models import RegistrationCode, SystemUser
 # login_view
 ############################################################
 #
-# POST /api/login — {email, password} → plain-text "OK" or a
-# Lithuanian error, always HTTP 200. Unknown users and wrong
-# passwords take equally long (dummy bcrypt check), so timing
-# can't enumerate accounts.
+# POST /api/login — {email, password}. 200 {"message": "OK"}
+# on success; failures carry a machine code the login page
+# maps to its own wording: 400 MISSING_CREDENTIALS /
+# MISSING_EMAIL / MISSING_PASSWORD, 401 INVALID_CREDENTIALS.
 #
-# A disabled account is refused with the generic invalid-
-# credentials message, so probing can't tell "disabled"
-# apart from "wrong password".
+# Every outcome costs exactly ONE bcrypt: the real check when
+# the account exists, the dummy when it does not. Unknown
+# email, wrong password and correct-password-but-disabled all
+# answer 401 in the same time — timing can enumerate nothing.
 #
 # Used by:
-#   - Login.jsx — string-matches the literal 'OK'
+#   - Login.jsx — maps the codes to its hardcoded English
 ############################################################
 
 def login_view(request):
@@ -73,44 +76,42 @@ def login_view(request):
 
     # Preauth checks
     if not postData or (not postData.get('email') and not postData.get('password')):
-        return HttpResponse('Įveskite El. Pašto adresą ir Slaptažodį.')
+        return JsonResponse({'message': 'MISSING_CREDENTIALS'}, status=400)
 
     if not postData.get('email'):
-        return HttpResponse('Įveskite El. Pašto adresą.')
+        return JsonResponse({'message': 'MISSING_EMAIL'}, status=400)
 
     if not postData.get('password'):
-        return HttpResponse('Įveskite Slaptažodį.')
+        return JsonResponse({'message': 'MISSING_PASSWORD'}, status=400)
 
 
     email = postData['email'].strip().lower()
     password = postData['password'].strip()
 
 
-    # Authentication — corrupt stored hashes count as a wrong
-    # password instead of a 500
+    # Authentication — exactly one bcrypt on every path. A
+    # corrupt stored hash counts as a wrong password instead
+    # of a 500.
     thisUser = get_user_by_email(email)
-    if thisUser is not None:
-        try:
-            passwordOk = bcrypt.checkpw(password.encode(), thisUser.password.encode())
-        except ValueError:
-            passwordOk = False
-
-        if passwordOk and thisUser.enabled == 1:
-            login(request, thisUser)
-            log_activity(thisUser.id, f'User {thisUser.email} logged in (IP: {request.headers.get("X-Forwarded-For")})')
-            return HttpResponse('OK')
-
-        if not passwordOk:
-            # Dummy check — keep the timing of the success path
-            bcrypt.checkpw(b'This Only Used to prevent time based user enumeration attack, so doing nothing there.',
-                           DUMMY_BCRYPT_HASH.encode())
-        return HttpResponse('El. Paštas ir/arba Slaptažodis neteisingas.')
-
-    else:
-        # Dummy check — keep the timing of the success path
+    if thisUser is None:
+        # The dummy substitutes for the real check
         bcrypt.checkpw(b'This Only Used to prevent time based user enumeration attack, so doing nothing there.',
                        DUMMY_BCRYPT_HASH.encode())
-        return HttpResponse('El. Paštas ir/arba Slaptažodis neteisingas.')
+        return JsonResponse({'message': 'INVALID_CREDENTIALS'}, status=401)
+
+    try:
+        passwordOk = bcrypt.checkpw(password.encode(), thisUser.password.encode())
+    except ValueError:
+        passwordOk = False
+
+    if passwordOk and thisUser.enabled == 1:
+        login(request, thisUser)
+        log_activity(thisUser.id, f'User {thisUser.email} logged in (IP: {request.headers.get("X-Forwarded-For")})')
+        return JsonResponse({'message': 'OK'})
+
+    # Wrong password or disabled account — the real check
+    # above already cost the one bcrypt
+    return JsonResponse({'message': 'INVALID_CREDENTIALS'}, status=401)
 
 
 
@@ -175,8 +176,13 @@ def register_view(request):
         return JsonResponse({'message': 'Email is required'}, status=400)
     if not postData.get('password'):
         return JsonResponse({'message': 'Password is required'}, status=400)
-    if len(postData.get('password')) < 6:
-        return JsonResponse({'message': 'Password must be at least 6 characters'}, status=400)
+
+    # Strip BEFORE the length check and the hash — login strips
+    # the typed password, so an unstripped hash could never be
+    # matched again (a permanent lockout)
+    password = postData['password'].strip()
+    if len(password) < 8:
+        return JsonResponse({'message': 'Password must be at least 8 characters'}, status=400)
 
 
     # Validate email format
@@ -201,7 +207,7 @@ def register_view(request):
 
 
     # Create new user (Enabled by default since they have a valid registration code)
-    passwordHash = bcrypt.hashpw(postData['password'].encode(), bcrypt.gensalt(rounds=12)).decode()
+    passwordHash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
     SystemUser.objects.create(email=email, password=passwordHash, admin=False, enabled=True)
 
 
@@ -259,8 +265,11 @@ def checkauth(request, virtualServerID=None):
     }
 
 
-    # Update last seen
-    SystemUser.objects.filter(id=request.current_user.id).update(last_login=timezone.now())
+    # Bump "last seen" — but at most once a minute: every SPA
+    # page load AND every :8443 forward_auth subrequest lands
+    # here, and a write per GET is a lot of writes
+    staleBefore = timezone.now() - timedelta(minutes=1)
+    SystemUser.objects.filter(id=request.current_user.id).exclude(last_login__gte=staleBefore).update(last_login=timezone.now())
     return JsonResponse(user_info, json_dumps_params={'indent': 4})
 
 
@@ -292,6 +301,9 @@ def checkauth_admin(request):
         'admin': request.current_user.admin,
     }
 
-    # Update last seen
-    SystemUser.objects.filter(id=request.current_user.id).update(last_login=timezone.now())
+    # Bump "last seen" — but at most once a minute: every SPA
+    # page load AND every :8443 forward_auth subrequest lands
+    # here, and a write per GET is a lot of writes
+    staleBefore = timezone.now() - timedelta(minutes=1)
+    SystemUser.objects.filter(id=request.current_user.id).exclude(last_login__gte=staleBefore).update(last_login=timezone.now())
     return JsonResponse(user_info, json_dumps_params={'indent': 4})

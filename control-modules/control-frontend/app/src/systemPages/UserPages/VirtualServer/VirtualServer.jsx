@@ -88,8 +88,8 @@ import CloseIcon from "@mui/icons-material/Close";
 // the next poll; action results land in toasts.
 //
 // vmData is null until the first answer (the page shows its
-// skeleton) — and stays null when the backend returns an
-// empty list for the id. rename(newName) resolves true on
+// skeleton) — a 404 (unknown id, or a VM the monitor has
+// not seen yet) keeps it null and the poll keeps retrying. rename(newName) resolves true on
 // success so the caller knows when to leave edit mode. A 401
 // means the session ended or the VM belongs to someone else —
 // the whole page bounces to "/", like the old server-side
@@ -106,7 +106,7 @@ function useVirtualServer(virtualServerID) {
 
   const { data: vmData = null, error } = useQuery({
     queryKey: ['vm', virtualServerID],
-    queryFn: async () => (await axios.get(`/api/vm/${virtualServerID}`)).data[0],
+    queryFn: async () => (await axios.get(`/api/vm/${virtualServerID}`)).data,
     refetchInterval: 5000,
     retry: false,
   });

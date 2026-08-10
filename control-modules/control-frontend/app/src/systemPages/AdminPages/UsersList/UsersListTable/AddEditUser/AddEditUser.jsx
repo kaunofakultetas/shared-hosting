@@ -216,15 +216,20 @@ export default function AddEditUser({ rowData, setOpen, getData, sourceRect }) {
   const updateField = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
 
+  // Failures arrive as real status codes (400/404/409), so
+  // axios throws — the body still carries the translated-in
+  // reason sentence
   async function sendData(postData) {
-    const response = await axios.post("/api/admin/users", postData, { withCredentials: true });
-
-    if (response.data.type === 'ok') {
+    try {
+      await axios.post("/api/admin/users", postData, { withCredentials: true });
       toast.success(<b>{t("EDIT_MODAL.TOASTS.saved")}</b>, { duration: 3000 });
-    } else if (response.data.type === 'error') {
-      toast.error(<b>{t("EDIT_MODAL.TOASTS.error", { reason: response.data.reason })}</b>, { duration: 8000 });
-    } else {
-      toast.error(<b>{t("EDIT_MODAL.TOASTS.unknown")}</b>, { duration: 8000 });
+    } catch (error) {
+      const reason = error.response?.data?.reason;
+      if (reason) {
+        toast.error(<b>{t("EDIT_MODAL.TOASTS.error", { reason })}</b>, { duration: 8000 });
+      } else {
+        toast.error(<b>{t("EDIT_MODAL.TOASTS.unknown")}</b>, { duration: 8000 });
+      }
     }
     getData();
     modalCloseRef.current?.();

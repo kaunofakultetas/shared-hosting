@@ -10,6 +10,7 @@
 #    - QuickRegistrationWidget — the code lifecycle
 ############################################################
 
+import logging
 import random
 import string
 from datetime import timedelta
@@ -20,6 +21,9 @@ from django.utils import timezone
 
 from control.common.auth import admin_required, format_datetime, get_json, log_activity, login_required
 from control.users.models import RecentActivity, RegistrationCode, SystemUser
+
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -47,14 +51,19 @@ def change_password(request):
     postData = get_json(request)
 
 
-    # Validation
+    # Validation — both passwords are stripped like the login
+    # view strips them: an unstripped hash could never be
+    # matched at login again (a permanent lockout)
     if not postData or not postData.get('currentPassword'):
         return JsonResponse({'message': 'Current password is required'}, status=400)
 
     if not postData.get('newPassword'):
         return JsonResponse({'message': 'New password is required'}, status=400)
 
-    if len(postData.get('newPassword')) < 8:
+    currentPassword = postData['currentPassword'].strip()
+    newPassword = postData['newPassword'].strip()
+
+    if len(newPassword) < 8:
         return JsonResponse({'message': 'New password must be at least 8 characters'}, status=400)
 
 
@@ -63,12 +72,12 @@ def change_password(request):
     if thisUser is None:
         return JsonResponse({'message': 'User not found'}, status=404)
 
-    if not bcrypt.checkpw(postData['currentPassword'].encode(), thisUser.password.encode()):
+    if not bcrypt.checkpw(currentPassword.encode(), thisUser.password.encode()):
         return JsonResponse({'message': 'Current password is incorrect'}, status=401)
 
 
     # Hash new password and update
-    newPasswordHash = bcrypt.hashpw(postData['newPassword'].encode(), bcrypt.gensalt(rounds=12)).decode()
+    newPasswordHash = bcrypt.hashpw(newPassword.encode(), bcrypt.gensalt(rounds=12)).decode()
     SystemUser.objects.filter(id=request.current_user.id).update(password=newPasswordHash)
 
     # Log activity
@@ -173,4 +182,5 @@ def account_recentactivity(request):
         ]
         return JsonResponse(recent_activity, safe=False, status=200)
     except Exception as e:
-        return JsonResponse({'message': f'Failed to get recent activity: {str(e)}'}, status=500)
+        logger.exception('Failed to get recent activity')
+        return JsonResponse({'message': 'Failed to get recent activity'}, status=500)

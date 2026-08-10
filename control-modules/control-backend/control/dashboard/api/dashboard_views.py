@@ -13,6 +13,7 @@
 #    - HostingSystemWidget  — /api/dashboard/hostingsystem
 ############################################################
 
+import logging
 import os
 from datetime import datetime
 
@@ -24,6 +25,8 @@ from control.dashboard.registry_monitor import get_rate_limit
 from control.hosting.models import DomainName, VirtualServer
 from control.users.models import RecentActivity, SystemUser
 
+
+logger = logging.getLogger(__name__)
 
 CADVISOR_HOST = os.getenv('CADVISOR_HOST', 'hosting-control-cadvisor')
 CADVISOR_PORT = os.getenv('CADVISOR_PORT', '8080')
@@ -139,9 +142,11 @@ def dashboard_system(request):
     except requests.exceptions.Timeout:
         return JsonResponse({'message': 'cAdvisor request timeout'}, status=504)
     except requests.exceptions.RequestException as e:
-        return JsonResponse({'message': f'Failed to connect to cAdvisor: {str(e)}'}, status=500)
+        logger.exception('Failed to connect to cAdvisor')
+        return JsonResponse({'message': 'Failed to connect to cAdvisor'}, status=500)
     except (KeyError, IndexError, ValueError) as e:
-        return JsonResponse({'message': f'Failed to parse cAdvisor data: {str(e)}'}, status=500)
+        logger.exception('Failed to parse cAdvisor data')
+        return JsonResponse({'message': 'Failed to parse cAdvisor data'}, status=500)
 
 
 
@@ -176,7 +181,8 @@ def dashboard_recentactivity(request):
         ]
         return JsonResponse(recent_activity, safe=False, status=200)
     except Exception as e:
-        return JsonResponse({'message': f'Failed to get recent activity: {str(e)}'}, status=500)
+        logger.exception('Failed to get recent activity')
+        return JsonResponse({'message': 'Failed to get recent activity'}, status=500)
 
 
 
@@ -208,4 +214,5 @@ def dashboard_hostingsystem(request):
         }
         return JsonResponse(hosting_system, status=200)
     except Exception as e:
-        return JsonResponse({'message': f'Failed to get hosting system information: {str(e)}'}, status=500)
+        logger.exception('Failed to get hosting system information')
+        return JsonResponse({'message': 'Failed to get hosting system information'}, status=500)

@@ -36,6 +36,17 @@ import BouncingDotsLoader from './components/BouncingDotsLoader/BouncingDotsLoad
 import Particles from './components/Particles/Particles';
 
 
+// The backend answers login failures with machine codes and
+// real status codes — this page maps them to its wording
+// (hardcoded English like everything else on /login)
+const LOGIN_ERROR_MESSAGES = {
+  MISSING_CREDENTIALS: 'Enter your email address and password.',
+  MISSING_EMAIL: 'Enter your email address.',
+  MISSING_PASSWORD: 'Enter your password.',
+  INVALID_CREDENTIALS: 'Email and/or password is incorrect.',
+};
+
+
 
 
 
@@ -393,16 +404,15 @@ export default function Login() {
   }, []);
 
 
+  // A failed login throws (real status codes) — the machine
+  // code in the body picks the message
   const handleLogin = async (email, password) => {
     try {
-      const response = await axios.post("/api/login", { email, password });
-      if (response.data === "OK") {
-        window.location.href = "/";
-      } else {
-        setLoginErrorBoxText(response.data);
-      }
-    } catch {
-      setLoginErrorBoxText("Login failed");
+      await axios.post("/api/login", { email, password });
+      window.location.href = "/";
+    } catch (error) {
+      const errorCode = error.response?.data?.message;
+      setLoginErrorBoxText(LOGIN_ERROR_MESSAGES[errorCode] ?? "Login failed. Please try again.");
     }
   };
 

@@ -84,11 +84,13 @@ def parse_stack_name(labels):
 # vm_list
 ############################################################
 #
-# GET /api/vm — every VM the caller may see, driven by the
-# containers cache. GET /api/vm/<id> — one VM, still as an
-# array (the frontend does .data[0]). ?showOtherUsers=true
-# is admin-only; with a specific id it is ignored —
-# ownership is what gates single-VM access.
+# GET /api/vm — every VM the caller may see (a JSON array,
+# ids as integers), driven by the containers cache.
+# GET /api/vm/<id> — that one VM as a plain object, or 404
+# while it has no container in the cache (a just-created VM
+# becomes visible on the monitor's next pass).
+# ?showOtherUsers=true is admin-only; with a specific id it
+# is ignored — ownership is what gates single-VM access.
 #
 # Used by:
 #   - VirtualServersTable.jsx (3 s poll), VirtualServer.jsx
@@ -150,10 +152,9 @@ def vm_list(request, virtualServerID=None):
         })
 
 
-    # Assemble — the SQL grouped by the id as TEXT, so keep
-    # string ordering here (the frontend re-sorts numerically)
+    # Assemble, in numeric id order
     responseData = []
-    for vmIdText in sorted(dindRows):
+    for vmIdText in sorted(dindRows, key=int):
         thisVm = virtualServers.get(vmIdText)
         if thisVm is None:
             continue
@@ -172,7 +173,7 @@ def vm_list(request, virtualServerID=None):
         ]
 
         responseData.append({
-            'id': vmIdText,
+            'id': thisVm.id,
             'name': thisVm.name,
             'status': dindRows[vmIdText].status,
             'state': dindRows[vmIdText].state,
@@ -181,6 +182,15 @@ def vm_list(request, virtualServerID=None):
             'stacks': stacks or None,
             'domains': domainsByVm.get(thisVm.id) or None,
         })
+
+
+    # A specific id → the object itself; 404 covers both an
+    # unknown id and a VM whose container the monitor has not
+    # seen yet
+    if virtualServerID is not None:
+        if not responseData:
+            return JsonResponse({'message': 'Virtual server not found'}, status=404)
+        return JsonResponse(responseData[0], json_dumps_params={'indent': 4})
 
     return JsonResponse(responseData, safe=False, json_dumps_params={'indent': 4})
 
@@ -222,8 +232,14 @@ def vm_control(request):
     if postData is None:
         return JsonResponse({'message': 'Invalid request'}, status=400)
 
+    # The id arrives as an integer; a non-numeric value gets a
+    # clean 400 instead of a garbage container name downstream
     virtualServerID = postData.get('virtualServerID')
     if virtualServerID is not None:
+        try:
+            virtualServerID = int(virtualServerID)
+        except (TypeError, ValueError):
+            return JsonResponse({'message': 'Invalid virtualServerID'}, status=400)
         containerName = DIND_PREFIX + str(virtualServerID)
     action = postData.get('action')
 
