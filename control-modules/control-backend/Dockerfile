@@ -23,7 +23,7 @@ CMD sh -c "\
             echo 'Monitor exited - restarting in 3 s'; \
             sleep 3; \
         done) & \
-        if [ \"$APP_DEBUG\" = 'true' ] || [ \"$DJANGO_DEBUG\" = 'True' ]; then \
+        if echo \"$APP_DEBUG $DJANGO_DEBUG\" | grep -qi true; then \
             python3 manage.py runserver 0.0.0.0:8000; \
         else \
             exec gunicorn control.wsgi:application --bind 0.0.0.0:8000 --workers 5 --timeout 360 --access-logfile /logs/access.log; \

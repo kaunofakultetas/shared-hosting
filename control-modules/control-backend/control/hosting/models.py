@@ -19,6 +19,12 @@ from django.db import models
 from control.users.models import SystemUser
 
 
+# The platform-wide naming contract: VM <id> runs in the host
+# container DIND_PREFIX + <id>. The single definition — the
+# views and the monitor import it from here.
+DIND_PREFIX = 'hosting-users-dind-'
+
+
 
 
 

@@ -237,8 +237,12 @@ def admin_required(func):
 # check_user_is_allowed_to_access_vm
 ############################################################
 #
-# Admins may access every VM; everyone else only their own.
-# A missing VM answers False (→ 401), never an error.
+# Admins may access every EXISTING, non-deleted VM; everyone
+# else only their own. The existence check matters for the
+# :8443 forward_auth gate — without it, an admin's tool tab
+# for a dead id would be proxied into a dead upstream (502)
+# instead of denied. Missing or deleted VMs answer False
+# (→ 401), never an error.
 #
 # Used by:
 #   - auth_views.checkauth (the :8443 forward_auth gate)
@@ -252,9 +256,9 @@ def check_user_is_allowed_to_access_vm(user, virtualServerID):
         return False
 
     if user.admin == 1:
-        return True
+        return VirtualServer.objects.filter(id=virtualServerID, deleted=False).exists()
 
-    ownerID = VirtualServer.objects.filter(id=virtualServerID).values_list('owner_id', flat=True).first()
+    ownerID = VirtualServer.objects.filter(id=virtualServerID, deleted=False).values_list('owner_id', flat=True).first()
     if ownerID is not None and ownerID == user.id:
         return True
 

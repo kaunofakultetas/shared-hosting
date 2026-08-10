@@ -31,7 +31,7 @@ from control.common.auth import (
     login_required,
 )
 from control.hosting import docker_controller
-from control.hosting.models import DomainName, VirtualServer
+from control.hosting.models import DomainName
 
 
 
@@ -152,14 +152,10 @@ def dns_isvalid(request):
 def vm_dns(request, virtualServerID, domainID=None):
 
     # Check if user is allowed to access specific virtual server
+    # The access check also covers existence: unknown and
+    # soft-deleted VMs answer 401 for everyone, admins included
     if check_user_is_allowed_to_access_vm(request.current_user, virtualServerID) == False:
         return JsonResponse({'message': 'Unauthorized'}, status=401)
-
-    # Admins skip the ownership check, so make sure the VM
-    # exists before hanging domains off it (the FK would
-    # reject it anyway — this answers cleanly instead)
-    if not VirtualServer.objects.filter(id=virtualServerID).exists():
-        return JsonResponse({'message': 'Virtual server not found'}, status=404)
 
 
 

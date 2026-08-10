@@ -80,7 +80,7 @@ from control.hosting.api.sshrouter_views import sshrouter
 urlpatterns += [
     path('api/vm', vm_list),                                                # GET  — all visible VMs (?showOtherUsers= for admins)
     path('api/vm/control', vm_control),                                     # POST — create/start/stop/delete/rename
-    path('api/vm/<int:virtualServerID>', vm_list),                          # GET  — one VM (still returns an array)
+    path('api/vm/<int:virtualServerID>', vm_list),                          # GET  — one VM as an object, 404 while not visible
 
     path('api/vm/dns/isvalid', dns_isvalid),                                # GET  — live domain-name validation
     path('api/vm/dns/<int:virtualServerID>', vm_dns),                       # GET list / POST add / PUT edit

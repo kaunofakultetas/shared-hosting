@@ -31,10 +31,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from control.hosting import docker_controller
-from control.hosting.models import DockerContainer, VirtualServer
-
-
-DIND_PREFIX = 'hosting-users-dind-'
+from control.hosting.models import DIND_PREFIX, DockerContainer, VirtualServer
 
 
 
@@ -82,7 +79,10 @@ def push_docker_info_to_db(json_obj, parentServerID=0):
 
             # Adopt dind containers that have no VM row — e.g.
             # created by hand on the host. Ownerless on purpose;
-            # non-numeric suffixes are skipped.
+            # non-numeric suffixes are skipped. get_or_create
+            # stamps the timestamps itself on the create path —
+            # existing rows are NOT touched, so updated_at keeps
+            # meaning "last state change".
             if parentServerID == 0 and container['Names'].startswith(DIND_PREFIX):
                 virtualServerID = container['Names'].replace(DIND_PREFIX, '')
                 if virtualServerID.isdigit():
@@ -90,7 +90,6 @@ def push_docker_info_to_db(json_obj, parentServerID=0):
                         id=int(virtualServerID),
                         defaults={'owner': None, 'name': '', 'enabled': True, 'deleted': False},
                     )
-                    VirtualServer.objects.filter(id=int(virtualServerID)).update(updated_at=timeNow)
 
         # Drop this parent's rows that were not in the snapshot
         DockerContainer.objects.filter(parent_server_id=parentServerID).exclude(synced_at=timeNow).delete()
@@ -147,8 +146,14 @@ class Command(BaseCommand):
                 self.stdout.flush()
 
 
-            # Clean up old docker containers
-            DockerContainer.objects.filter(synced_at__lt=timezone.now() - timedelta(minutes=5)).delete()
+            # Clean up old docker containers — guarded on its
+            # own: a transient "database is locked" here must
+            # degrade to a skipped sweep, not kill the monitor
+            try:
+                DockerContainer.objects.filter(synced_at__lt=timezone.now() - timedelta(minutes=5)).delete()
+            except Exception as e:
+                self.stdout.write(f'Docker Info Updater Error: {e}')
+                self.stdout.flush()
 
             if options['once']:
                 self.stdout.write(self.style.SUCCESS('Single pass done'))

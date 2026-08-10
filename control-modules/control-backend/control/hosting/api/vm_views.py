@@ -31,15 +31,12 @@ from control.common.auth import (
     login_required,
 )
 from control.hosting import docker_controller
-from control.hosting.models import DockerContainer, DomainName, VirtualServer
+from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer
 from control.users.models import SystemUser
 
 
-DIND_PREFIX = 'hosting-users-dind-'
-
 # Names may use every Lithuanian letter, digits, underscore,
-# parentheses and space (the error message's "hyphens" is the
-# original's wording — hyphens are in fact not allowed)
+# parentheses and space — exactly what the error message says
 LITHUANIAN_CHARS = 'aąbcčdeęėfghiįyjklmnopqrsštuųūvwxyzž0123456789_() '
 
 
@@ -248,16 +245,19 @@ def vm_control(request):
     # --- CREATE ---
     if action == 'create':
 
-        # Validation
+        # Validation — on the stripped name, so padding can't
+        # smuggle past the 3-char minimum or store padded labels
         if 'name' not in postData:
             return JsonResponse({'message': 'Name is required'}, status=400)
-        if len(postData.get('name')) < 3:
+
+        serverName = postData['name'].strip()
+        if len(serverName) < 3:
             return JsonResponse({'message': 'New name must be at least 3 characters long'}, status=400)
-        if len(postData.get('name')) > 30:
+        if len(serverName) > 30:
             return JsonResponse({'message': 'Name must be less than 30 characters long'}, status=400)
-        for character in postData.get('name'):
+        for character in serverName:
             if character.lower() not in LITHUANIAN_CHARS:
-                return JsonResponse({'message': 'Name can only contain letters, numbers, spaces, and hyphens'}, status=400)
+                return JsonResponse({'message': 'Name can only contain letters, numbers, spaces, underscores and parentheses'}, status=400)
 
         # Create the row FIRST and commit it, so the ID is
         # claimed before the container exists and the monitor
@@ -265,7 +265,7 @@ def vm_control(request):
         with transaction.atomic():
             thisVm = VirtualServer.objects.create(
                 owner_id=request.current_user.id,
-                name=postData.get('name'),
+                name=serverName,
                 enabled=True,
                 deleted=False,
             )
@@ -285,18 +285,18 @@ def vm_control(request):
                 VirtualServer.objects.filter(id=virtualServerID).update(deleted=True, updated_at=timezone.now())
             return JsonResponse({'message': 'Failed to create virtual server'}, status=500)
 
-        # Update database
+        # The row was created enabled — only the activity is left
         with transaction.atomic():
-            VirtualServer.objects.filter(id=virtualServerID).update(enabled=True, updated_at=timezone.now())
             log_activity(request.current_user.id, f'Virtual server #{virtualServerID} created')
 
         return JsonResponse({'message': 'OK'}, status=200)
 
 
 
-    # ------ OTHER ACTIONS REQUIRE OWNERSHIP CHECK ------
+    # ------ OTHER ACTIONS REQUIRE AN EXISTING, NON-DELETED VM
+    #        AND OWNERSHIP ------
     thisVm = VirtualServer.objects.filter(id=virtualServerID).first()
-    if thisVm is None:
+    if thisVm is None or thisVm.deleted:
         return JsonResponse({'message': 'Virtual server not found'}, status=404)
 
     if request.current_user.admin == 0 and thisVm.owner_id != request.current_user.id:
@@ -372,19 +372,20 @@ def vm_control(request):
     # --- RENAME ---
     elif action == 'rename':
 
-        # Validation
+        # Validation — on the stripped name, like create
         if 'newName' not in postData:
             return JsonResponse({'message': 'New name is required'}, status=400)
-        if len(postData.get('newName')) < 3:
+
+        newName = postData['newName'].strip()
+        if len(newName) < 3:
             return JsonResponse({'message': 'New name must be at least 3 characters long'}, status=400)
-        if len(postData.get('newName')) > 30:
+        if len(newName) > 30:
             return JsonResponse({'message': 'New name must be less than 30 characters long'}, status=400)
-        for character in postData.get('newName'):
+        for character in newName:
             if character.lower() not in LITHUANIAN_CHARS:
-                return JsonResponse({'message': 'New name can only contain letters, numbers, spaces, and hyphens'}, status=400)
+                return JsonResponse({'message': 'New name can only contain letters, numbers, spaces, underscores and parentheses'}, status=400)
 
         # Update database
-        newName = postData.get('newName')
         with transaction.atomic():
             VirtualServer.objects.filter(id=virtualServerID).update(name=newName, updated_at=timezone.now())
             log_activity(request.current_user.id, f'Virtual server #{virtualServerID} renamed to "{newName}"')
