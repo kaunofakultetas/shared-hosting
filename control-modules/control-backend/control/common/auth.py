@@ -1,9 +1,9 @@
 ############################################################
 #  [*] Session auth — hand-rolled, no django.contrib.auth
 #
-#  The session cookie contract the frontend relies on: name
-#  "session", not HttpOnly, browser-session lifetime.
-#  Passwords are bcrypt hashes verified directly. The session
+#  The session cookie: named "session", HttpOnly (logout is
+#  a real endpoint, not JavaScript), browser-session
+#  lifetime. Passwords are bcrypt hashes. The session
 #  stores only the user's ID; the user row is re-read from
 #  the DB on every request, so permission/enabled changes
 #  apply immediately.
@@ -158,9 +158,9 @@ def get_user_by_email(email):
 #
 # login() rotates the session key (fixation defense) and
 # stores the user's ID — nothing else lives in the session.
-# There is no logout function on purpose: the SPA logs out by
-# deleting the cookie from JavaScript, which is why the
-# cookie is not HttpOnly.
+# Logout lives in auth_views.logout_view (a session flush);
+# the cookie itself is HttpOnly and JavaScript never touches
+# it.
 #
 # Used by:
 #   - auth_views.login_view, the decorators below

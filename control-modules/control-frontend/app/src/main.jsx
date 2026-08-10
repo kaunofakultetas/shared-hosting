@@ -3,11 +3,13 @@
 //
 //  Renders the router (route table in router.jsx, providers
 //  in App.jsx, page shell in AppShell.jsx) into the #root div
-//  of index.html, wrapped in StrictMode and the TanStack
-//  Query provider — ONE QueryClient owns every backend fetch:
-//  caching, the polling cadences (refetchInterval), and the
-//  invalidations the action handlers fire after a change.
-//  Global styles (Tailwind + Inter font) are pulled in here.
+//  of index.html, wrapped in StrictMode, the ErrorBoundary
+//  (a render crash shows a reload card instead of a white
+//  screen) and the TanStack Query provider — ONE QueryClient
+//  owns every backend fetch: caching, the polling cadences
+//  (refetchInterval), and the invalidations the action
+//  handlers fire after a change. Global styles (Tailwind +
+//  Inter font) are pulled in here.
 // -----------------------------------------------------------
 
 import { StrictMode } from 'react';
@@ -15,6 +17,7 @@ import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router } from '@/router';
+import ErrorBoundary from '@/components/ErrorBoundary/ErrorBoundary';
 import '@/globals.css';
 
 
@@ -30,8 +33,10 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>
 );

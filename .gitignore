@@ -1,6 +1,9 @@
 # Shared hosting system data files
 _DATA/
 
+# Service logs (gunicorn access logs etc.)
+_LOGS/
+
 # Users Virtual Servers
 SERVERS/
 

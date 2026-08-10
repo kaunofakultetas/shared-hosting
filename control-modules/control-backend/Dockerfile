@@ -26,6 +26,6 @@ CMD sh -c "\
         if [ \"$APP_DEBUG\" = 'true' ] || [ \"$DJANGO_DEBUG\" = 'True' ]; then \
             python3 manage.py runserver 0.0.0.0:8000; \
         else \
-            exec gunicorn control.wsgi:application --bind 0.0.0.0:8000 --workers 5 --timeout 360; \
+            exec gunicorn control.wsgi:application --bind 0.0.0.0:8000 --workers 5 --timeout 360 --access-logfile /logs/access.log; \
         fi; \
     }"

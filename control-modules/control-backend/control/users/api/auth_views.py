@@ -12,11 +12,13 @@
 #    - /api/checkauth/admin is the forward_auth gate for
 #      /dbgate/* and /swagger
 #
-#  There is NO logout endpoint on purpose — the login page
-#  deletes the (non-HttpOnly) session cookie from JavaScript.
+#  POST /api/logout flushes the session server-side — the
+#  cookie is HttpOnly, so JavaScript cannot delete it; the
+#  login page calls the endpoint on mount instead.
 #
 #  Used by:
-#    - Login.jsx — login + registration forms
+#    - Login.jsx — login + registration forms + the logout
+#      call on mount
 #    - AuthGuard.jsx — checkauth on every page load
 #    - control-caddy Caddyfile — both forward_auth gates
 ############################################################
@@ -109,6 +111,33 @@ def login_view(request):
         bcrypt.checkpw(b'This Only Used to prevent time based user enumeration attack, so doing nothing there.',
                        DUMMY_BCRYPT_HASH.encode())
         return HttpResponse('El. Paštas ir/arba Slaptažodis neteisingas.')
+
+
+
+
+
+
+
+
+############################################################
+# logout_view
+############################################################
+#
+# POST /api/logout — flush the session: the server-side row
+# dies and the response expires the HttpOnly cookie. Needs no
+# login and always answers OK — logging out an already-dead
+# session is a success, not an error.
+#
+# Used by:
+#   - Login.jsx — on mount, so opening /login IS the logout
+############################################################
+
+def logout_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'Method not allowed'}, status=405)
+
+    request.session.flush()
+    return JsonResponse({'message': 'OK'})
 
 
 

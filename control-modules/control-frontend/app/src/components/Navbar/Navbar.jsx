@@ -10,7 +10,7 @@
 //  ("Lietuvių" while in English and vice versa).
 //
 //  Logging out is just a hard navigation to /login — the
-//  login page drops the session cookie on mount.
+//  login page POSTs /api/logout on mount.
 //
 //  Split into (root component last):
 //

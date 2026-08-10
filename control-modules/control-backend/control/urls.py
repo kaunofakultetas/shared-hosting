@@ -28,18 +28,19 @@ urlpatterns = []
 #
 # The session login, the Caddy forward_auth targets, the
 # admin users grid and everything under /api/account.
-# /api/login and /api/register are the only unauthenticated
-# paths in this group.
+# /api/login, /api/register and /api/logout are the
+# unauthenticated paths in this group.
 #
 # Views live in control/users/api/.
 ############################################################
 
-from control.users.api.auth_views import login_view, register_view, checkauth, checkauth_admin
+from control.users.api.auth_views import login_view, logout_view, register_view, checkauth, checkauth_admin
 from control.users.api.account_views import change_password, registration_code, account_recentactivity
 from control.users.api.users_views import admin_users
 
 urlpatterns += [
     path('api/login', login_view),                                          # POST — plain-text "OK" or a Lithuanian error message
+    path('api/logout', logout_view),                                        # POST — flush the session (login page calls it on mount)
     path('api/register', register_view),                                    # POST — self-registration with an admin's code
 
     path('api/checkauth', checkauth),                                       # GET  — who is logged in (SPA calls it on every load)

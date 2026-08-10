@@ -190,15 +190,17 @@ MIDDLEWARE = [
 ############################################################
 #
 # DB-backed sessions in the SQLite file — they survive
-# restarts and deploys. The cookie contract the frontend
-# relies on: named "session", NOT HttpOnly (the login page's
-# logout works by deleting the cookie from JavaScript) and
-# browser-session lifetime.
+# restarts and deploys. The cookie: named "session", HttpOnly
+# (JavaScript never touches it — logout is POST /api/logout)
+# and browser-session lifetime. Secure is on outside DEBUG:
+# Caddy terminates TLS in front, and a Secure cookie over
+# plain-http dev access would be refused by the browser.
 ############################################################
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_NAME = 'session'
-SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 

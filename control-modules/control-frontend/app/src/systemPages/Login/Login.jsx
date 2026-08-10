@@ -7,12 +7,12 @@
 //  self-registration by admin-issued code — both stay mounted
 //  and toggle visibility, so switching keeps the typed input.
 //
-//  Opening /login also acts as logout: the session cookie is
-//  dropped on mount (the backend sets it non-httpOnly, so
-//  document.cookie can clear it — this replaces the old
-//  Next.js deleteTokens server action). After a successful
-//  login the page hard-navigates to "/" and HomeRedirect
-//  sends the user to their home by role.
+//  Opening /login also acts as logout: the page POSTs
+//  /api/logout on mount, which flushes the session and
+//  expires the HttpOnly cookie (JavaScript cannot touch it
+//  directly). After a successful login the page
+//  hard-navigates to "/" and HomeRedirect sends the user to
+//  their home by role.
 //
 //  This page renders bare — App skips every provider on
 //  /login (a failed auth check would hard-redirect here and
@@ -386,9 +386,10 @@ export default function Login() {
   const [loginErrorBoxText, setLoginErrorBoxText] = useState("");
 
 
-  // Visiting /login logs the user out — drop the session cookie
+  // Visiting /login logs the user out — flush the session
+  // server-side (the cookie is HttpOnly, JS can't clear it)
   useEffect(() => {
-    document.cookie = "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    axios.post("/api/logout").catch(() => { /* already signed out */ });
   }, []);
 
 
