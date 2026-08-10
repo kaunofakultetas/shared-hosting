@@ -1,16 +1,49 @@
-import sys
-import csv
+############################################################
+#  [*] CaddyfileUpdater — the users-Caddy vhost generator
+#
+#  Renders the whole users Caddyfile from the backend's
+#  domain table and hot-reloads the users Caddy container.
+#  One server block per domain: https with a real cert when
+#  ssl=1, plain http otherwise; Cloudflare-only domains get
+#  `tls internal` plus an IP allowlist that 403s anything not
+#  arriving through Cloudflare. Everything proxies to the
+#  VM's inner Caddy at hosting-users-dind-<id>:80, with a
+#  502 handler for VMs that host nothing on port 80. A
+#  catch-all :80 block answers for every unknown domain.
+#
+#  The rendered file is the throwaway artifact — the domain
+#  table is the source of truth, and every mutation rewrites
+#  the file wholesale.
+############################################################
+
 import os
-import json
 import re
 from subprocess import Popen, PIPE
 
 
 
+
+
+
+
+
+############################################################
+# CaddyfileUpdater
+############################################################
+#
+# The template strings live as class attributes, written
+# indented for readability and dedented once at class-build
+# time (the re.sub below each). cloudflare_block is the one
+# WITHOUT a dedent on purpose: it is spliced INSIDE server
+# blocks, so it keeps its extra indentation.
+#
+# Methods:
+#   generate_caddyfile — domain rows → the whole file text
+#   save_caddyfile     — write to CADDYFILE_LOCATION
+#   reload_caddy       — docker exec caddy reload
+############################################################
+
 class CaddyfileUpdater:
-    '''
-    Class to update the Caddyfile configuration from a list of DNS entries.
-    '''
 
 
     # Global options block
@@ -59,7 +92,9 @@ class CaddyfileUpdater:
     cloudflare_snippet = re.sub(r'^ {4}', '', cloudflare_snippet, flags=re.MULTILINE)
 
 
-    # Configuration to block non‑Cloudflare requests if needed.
+    # Blocks every request that did not arrive through a
+    # Cloudflare IP — spliced inside a server block, hence no
+    # dedent
     cloudflare_block = '''
         # Block Non cloudflare requests
         @block_non_cloudflare {
@@ -71,8 +106,7 @@ class CaddyfileUpdater:
     '''
 
 
-
-    # Resolve any other domain names
+    # The catch-all for every domain the table does not know
     resolve_any_other_domain_names = '''
     :80 {
         respond "Hosting platform does not host any applications at this domain name." 200
@@ -82,16 +116,26 @@ class CaddyfileUpdater:
 
 
 
+
+
+
+    ############################################################
+    # generate_caddyfile
+    ############################################################
+    #
+    # dns_entries → the complete Caddyfile text. Each entry is
+    # a dict with lowercase keys (the backend's wire shape):
+    # id, virtualserverid, domainname, iscloudflare (0/1),
+    # ssl (0/1). The old docstring documented CSV-era
+    # capitalized keys that the code never reads — the "CSV"
+    # wording in the comments below is the same fossil.
+    #
+    # Used by:
+    #   - main.updatecaddyconfig_HTTPPOST — every regeneration
+    ############################################################
+
     def generate_caddyfile(self, dns_entries):
-        '''
-        Function to generate a Caddyfile content from a list of DNS entries.
-        dns_entries: list of dictionaries, each containing the following keys:
-            - ID: int
-            - VirtualServerID: int
-            - DomainName: str
-            - IsCloudflare: int (0 or 1)
-        '''
-        
+
         # Start building the Caddyfile content.
         caddyfile_content = ""
         caddyfile_content += self.global_options + "\n\n"
@@ -100,7 +144,6 @@ class CaddyfileUpdater:
 
         # Iterate over all DNS entries.
         for dns_entry in dns_entries:
-            # Extract values from CSV.
             dns_id = dns_entry["id"]
             virtual_server_id = dns_entry["virtualserverid"]
             domain_name = dns_entry["domainname"]
@@ -108,7 +151,7 @@ class CaddyfileUpdater:
             is_ssl = dns_entry["ssl"]
 
 
-            # Begin the server block.
+            # Begin the server block — https only when ssl=1
             server_block = f"# DNS ID: {dns_id}\n"
             if is_ssl == 1:
                 server_block += f"{domain_name} {{\n"
@@ -116,7 +159,9 @@ class CaddyfileUpdater:
                 server_block += f"http://{domain_name} {{\n"
 
 
-            # HTTPS configuration
+            # TLS: Cloudflare terminates public TLS itself, so
+            # its domains get an internal cert; plain ssl=1
+            # domains get a real ACME cert
             if is_cloudflare == 1:
                 server_block += "    tls internal"
             else:
@@ -131,7 +176,9 @@ class CaddyfileUpdater:
                 server_block += "\n\n"
 
 
-            # Add the reverse proxy configuration.
+            # Reverse proxy into the VM's inner Caddy; behind
+            # Cloudflare the real client IP arrives in the
+            # forwarded header, otherwise it IS the peer
             if is_cloudflare == 1:
                 server_block += f"    reverse_proxy http://hosting-users-dind-{virtual_server_id}:80 {{\n"
                 server_block += "        header_up X-Forwarded-For {http.request.header.X-Forwarded-For}\n"
@@ -160,12 +207,43 @@ class CaddyfileUpdater:
 
 
 
+
+
+
+    ############################################################
+    # save_caddyfile
+    ############################################################
+    #
+    # Write the rendered file to the shared users-caddy volume
+    # (CADDYFILE_LOCATION, default /users-caddy/Caddyfile).
+    #
+    # Used by:
+    #   - main.updatecaddyconfig_HTTPPOST
+    ############################################################
+
     def save_caddyfile(self, caddyfile_content):
         caddy_location = os.environ.get("CADDYFILE_LOCATION", '/users-caddy/Caddyfile')
         with open(caddy_location, "w") as file:
             file.write(caddyfile_content)
-        
 
+
+
+
+
+
+    ############################################################
+    # reload_caddy
+    ############################################################
+    #
+    # `caddy reload` inside the users Caddy container, through
+    # the docker socket. Returns True/False — a failed reload
+    # leaves the OLD config serving (Caddy keeps running), and
+    # the route answers 500 so the backend rolls the domain
+    # change back.
+    #
+    # Used by:
+    #   - caddy/routes.updatecaddyconfig_HTTPPOST
+    ############################################################
 
     def reload_caddy(self):
         process = Popen([
@@ -173,12 +251,4 @@ class CaddyfileUpdater:
         ])
         output, error = process.communicate()
 
-        if process.returncode != 0:
-            return json.dumps({'message': f'Failed to reload Caddy'})
-            
-        return json.dumps({'message': f'Caddy reloaded successfully'})
-
-
-
-
-
+        return process.returncode == 0

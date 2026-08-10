@@ -109,10 +109,10 @@ def get_disk_usage():
 # any non-2xx, so callers inside a request transaction get
 # rollback-on-failure — DB and Caddyfile never diverge.
 #
-# COMPATIBILITY: the payload is a JSON *string* passed to
-# requests' json= (double-encoded). That is what the
-# sidecar's parser expects — do not "fix" this without
-# changing control-docker too.
+# The payload is the plain JSON object {"domains": [...]} —
+# the sidecar answers 500 when the caddy reload fails, and
+# the raise_for_status below is what turns that into the
+# backend-side transaction rollback.
 #
 # Used by:
 #   - dns_views — after every domain change
@@ -124,7 +124,7 @@ def update_caddy_config():
     from control.hosting.models import DomainName
 
     # iscloudflare/ssl go over the wire as 0/1 integers — the
-    # sidecar's renderer predates the boolean columns
+    # sidecar's renderer compares against 1 literally
     domains = {
         'domains': [
             {
@@ -138,6 +138,6 @@ def update_caddy_config():
         ]
     }
 
-    response = requests.post(f'{BASE_URL}/api/updatecaddyconfig', json=json.dumps(domains), timeout=30)
+    response = requests.post(f'{BASE_URL}/api/updatecaddyconfig', json=domains, timeout=30)
     response.raise_for_status()
     return json.loads(response.text)

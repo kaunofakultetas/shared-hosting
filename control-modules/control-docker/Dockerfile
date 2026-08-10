@@ -2,13 +2,12 @@ FROM python:3.13.1-alpine
 
 WORKDIR /app
 
-RUN apk add --update docker openrc zip
+RUN apk add --update docker-cli
 
 
 RUN pip install --no-cache-dir              \
     "Flask==3.0.0"                          \
-    "Flask-CORS==4.0.0"                     \
-    "docker==7.1.0"                         \
+    "requests==2.32.3"                      \
     "requests-unixsocket==0.4.1"
 
     
