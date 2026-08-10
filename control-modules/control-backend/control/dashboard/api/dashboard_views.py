@@ -1,48 +1,71 @@
 ############################################################
-# Author:           Tomas Vanagas
-# Updated:          2025-11-28
-# Version:          1.0
-# Description:      Dashboard routes
+#  [*] Dashboard views — the admin home's three widgets
+#
+#  Admin-only, polled every 2 seconds by the dashboard:
+#  host metrics computed from cAdvisor samples, the global
+#  activity feed and the platform totals. Response shapes
+#  are load-bearing — the widgets poll every 2 seconds and
+#  render these keys verbatim.
+#
+#  Used by:
+#    - SystemOverviewWidget — /api/dashboard/system
+#    - RecentActivityWidget — /api/dashboard/recentactivity
+#    - HostingSystemWidget  — /api/dashboard/hostingsystem
 ############################################################
 
-from flask import Blueprint, jsonify
-from datetime import datetime
-import requests
 import os
-import json
+from datetime import datetime
 
-from ..database.db import get_db_connection
-from ..auth.user import admin_required
-from .registry_monitor import get_rate_limit
+import requests
+from django.http import JsonResponse
 
+from control.common.auth import admin_required, format_datetime
+from control.dashboard.registry_monitor import get_rate_limit
+from control.hosting.models import DomainName, VirtualServer
+from control.users.models import RecentActivity, SystemUser
 
-
-dashboard_bp = Blueprint('dashboard', __name__)
 
 CADVISOR_HOST = os.getenv('CADVISOR_HOST', 'hosting-control-cadvisor')
 CADVISOR_PORT = os.getenv('CADVISOR_PORT', '8080')
 
 
 
-@dashboard_bp.route('/api/dashboard/system', methods=['GET'])
+
+
+
+
+
+############################################################
+# dashboard_system
+############################################################
+#
+# GET /api/dashboard/system — CPU (delta of cAdvisor's last
+# two samples), memory working-set, the largest real
+# filesystem, and the Docker Hub pull budget (60 s cache in
+# registry_monitor).
+#
+# Used by:
+#   - SystemOverviewWidget — 2 s poll
+############################################################
+
 @admin_required
-def dashboard_system_HTTPGET():
+def dashboard_system(request):
     try:
         # Fetch machine info and container stats from cAdvisor
         machine_resp = requests.get(f'http://{CADVISOR_HOST}:{CADVISOR_PORT}/api/v1.3/machine', timeout=5)
         containers_resp = requests.get(f'http://{CADVISOR_HOST}:{CADVISOR_PORT}/api/v1.3/containers', timeout=5)
-        
+
         if machine_resp.status_code != 200 or containers_resp.status_code != 200:
-            return jsonify({'message': 'Failed to fetch cAdvisor data'}), 500
-        
+            return JsonResponse({'message': 'Failed to fetch cAdvisor data'}, status=500)
+
         machine_info = machine_resp.json()
         root_stats = containers_resp.json().get('stats', [])
-        
+
         if len(root_stats) < 1:
-            return jsonify({'message': 'No stats data available yet', 'cpu_percent': 0, 'memory_percent': 0, 'disk_percent': 0}), 503
-        
+            return JsonResponse({'message': 'No stats data available yet', 'cpu_percent': 0, 'memory_percent': 0, 'disk_percent': 0}, status=503)
+
         latest = root_stats[-1]
-        
+
         # CPU calculation (requires 2 data points)
         cpu_percent = 0
         if len(root_stats) >= 2:
@@ -53,7 +76,7 @@ def dashboard_system_HTTPGET():
             time_delta = (latest_time - previous_time).total_seconds() * 1e9
             num_cores = machine_info['num_cores']
             cpu_percent = (cpu_delta / time_delta / num_cores) * 100.0 if time_delta > 0 and num_cores > 0 else 0
-        
+
         # Memory calculation
         memory_used = latest['memory']['working_set']
         memory_total = machine_info['memory_capacity']
@@ -61,7 +84,7 @@ def dashboard_system_HTTPGET():
 
         # Disk calculation - find largest real filesystem
         disk_used = disk_total = 0
-        
+
         if 'filesystems' in machine_info:
             for fs_info in machine_info['filesystems']:
                 capacity = fs_info.get('capacity', 0)
@@ -73,7 +96,7 @@ def dashboard_system_HTTPGET():
                             if fs_stat.get('device') == device:
                                 disk_used = fs_stat.get('usage', 0)
                                 break
-        
+
         # Fallback: find largest filesystem from stats
         if disk_total == 0 and 'filesystem' in latest:
             for fs in latest['filesystem']:
@@ -83,9 +106,8 @@ def dashboard_system_HTTPGET():
                     if not device.startswith(('/dev/loop', 'tmpfs', 'devtmpfs', 'overlay')):
                         disk_total = capacity
                         disk_used = fs.get('usage', 0)
-        
-        disk_percent = (disk_used / disk_total) * 100.0 if disk_total > 0 else 0
 
+        disk_percent = (disk_used / disk_total) * 100.0 if disk_total > 0 else 0
 
 
         # DockerHub pull limits
@@ -95,16 +117,14 @@ def dashboard_system_HTTPGET():
                 'limit': dockerhub_pull_limits['limit'],
                 'remaining': dockerhub_pull_limits['remaining'],
                 'used': dockerhub_pull_limits['used'],
-                'percent': dockerhub_pull_limits['percent']
+                'percent': dockerhub_pull_limits['percent'],
             }
-
-
 
 
         # Convert to GB
         GB = 1024 ** 3
-        
-        return jsonify({
+
+        return JsonResponse({
             'cpu_percent': round(cpu_percent, 1),
             'memory_percent': round(memory_percent, 1),
             'disk_percent': round(disk_percent, 1),
@@ -114,74 +134,78 @@ def dashboard_system_HTTPGET():
             'disk_total_gb': round(disk_total / GB, 2),
             'disk_used_gb': round(disk_used / GB, 2),
             'dockerhub_pull_limits': dockerhub_pull_limits,
-        }), 200
-    
+        }, status=200)
+
     except requests.exceptions.Timeout:
-        return jsonify({'message': 'cAdvisor request timeout'}), 504
+        return JsonResponse({'message': 'cAdvisor request timeout'}, status=504)
     except requests.exceptions.RequestException as e:
-        return jsonify({'message': f'Failed to connect to cAdvisor: {str(e)}'}), 500
+        return JsonResponse({'message': f'Failed to connect to cAdvisor: {str(e)}'}, status=500)
     except (KeyError, IndexError, ValueError) as e:
-        return jsonify({'message': f'Failed to parse cAdvisor data: {str(e)}'}), 500
+        return JsonResponse({'message': f'Failed to parse cAdvisor data: {str(e)}'}, status=500)
 
 
 
 
 
 
-@dashboard_bp.route('/api/dashboard/recentactivity', methods=['GET'])
+
+
+############################################################
+# dashboard_recentactivity
+############################################################
+#
+# GET /api/dashboard/recentactivity — the newest 5 activity
+# rows across ALL users; deleted authors show as
+# "Deleted User".
+#
+# Used by:
+#   - RecentActivityWidget — 2 s poll
+############################################################
+
 @admin_required
-def dashboard_recentactivity_HTTPGET():
+def dashboard_recentactivity(request):
     try:
-        with get_db_connection() as conn:
-            sqlFetchData = conn.execute('''
-                WITH GetRecentActivity AS (
-                    SELECT
-                        System_RecentActivity.ID,
-                        IFNULL(System_Users.Email, 'Deleted User') AS UserEmail,
-                        System_RecentActivity.Message,
-                        System_RecentActivity.Time
-                    FROM System_RecentActivity
-                    LEFT JOIN System_Users
-                        ON System_Users.ID = System_RecentActivity.UserID
-                    ORDER BY System_RecentActivity.ID DESC
-                    LIMIT 5
-                )
-
-                SELECT 
-                    json_group_array(
-                        json_object(
-                            'log_id', ID,
-                            'email', UserEmail,
-                            'message', Message,
-                            'time', Time
-                        )
-                    )
-                FROM GetRecentActivity
-            ''')
-            recent_activity = sqlFetchData.fetchone()[0]
-            recent_activity = json.loads(recent_activity)
-        return jsonify(recent_activity), 200
+        recent_activity = [
+            {
+                'log_id': thisRow.id,
+                'email': thisRow.user.email if thisRow.user else 'Deleted User',
+                'message': thisRow.message,
+                'time': format_datetime(thisRow.created_at),
+            }
+            for thisRow in RecentActivity.objects.select_related('user').order_by('-id')[:5]
+        ]
+        return JsonResponse(recent_activity, safe=False, status=200)
     except Exception as e:
-        return jsonify({'message': f'Failed to get recent activity: {str(e)}'}), 500
+        return JsonResponse({'message': f'Failed to get recent activity: {str(e)}'}, status=500)
 
 
 
 
-@dashboard_bp.route('/api/dashboard/hostingsystem', methods=['GET'])
+
+
+
+
+############################################################
+# dashboard_hostingsystem
+############################################################
+#
+# GET /api/dashboard/hostingsystem — the platform totals.
+# VM counts exclude the reserved HOST row (ID 0) and
+# soft-deleted servers.
+#
+# Used by:
+#   - HostingSystemWidget — 2 s poll
+############################################################
+
 @admin_required
-def dashboard_hostingsystem_HTTPGET():
+def dashboard_hostingsystem(request):
     try:
-        with get_db_connection() as conn:
-            sqlFetchData = conn.execute('''
-                SELECT json_object(
-                    'users', (SELECT COUNT(*) FROM System_Users),
-                    'virtualservers_running', (SELECT COUNT(*) FROM Hosting_VirtualServers WHERE Deleted = 0 AND ID <> 0 AND Enabled = 1),
-                    'virtualservers_total', (SELECT COUNT(*) FROM Hosting_VirtualServers WHERE Deleted = 0 AND ID <> 0),
-                    'domains', (SELECT COUNT(*) FROM Hosting_DomainNames)
-                ) AS HostingSystemJSON
-            ''')
-            hosting_system = sqlFetchData.fetchone()[0]
-            hosting_system = json.loads(hosting_system)
-        return jsonify(hosting_system), 200
+        hosting_system = {
+            'users': SystemUser.objects.count(),
+            'virtualservers_running': VirtualServer.objects.filter(deleted=False, enabled=True).exclude(id=0).count(),
+            'virtualservers_total': VirtualServer.objects.filter(deleted=False).exclude(id=0).count(),
+            'domains': DomainName.objects.count(),
+        }
+        return JsonResponse(hosting_system, status=200)
     except Exception as e:
-        return jsonify({'message': f'Failed to get hosting system information: {str(e)}'}), 500
+        return JsonResponse({'message': f'Failed to get hosting system information: {str(e)}'}, status=500)

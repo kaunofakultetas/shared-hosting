@@ -1,19 +1,31 @@
-FROM python:3.13.1-alpine
+FROM python:3.13-slim
 
 WORKDIR /app
 
 
 RUN pip install --no-cache-dir              \
-    "Flask==3.0.0"                          \
-    "Flask-Login==0.6.3"                    \
-    "Flask-RESTful==0.3.10"                 \
-    "Flask-CORS==4.0.0"                     \
-    "bcrypt==4.1.2"                         \
-    "requests==2.32.3"
+    "Django==5.2.15"                        \
+    "django-environ==0.13.0"                \
+    "bcrypt==4.2.1"                         \
+    "requests==2.32.3"                      \
+    "gunicorn==26.0.0"
 
 
 COPY . .
 
 
 EXPOSE 8000
-CMD ["python3", "-u", "main.py", "--http"]
+CMD sh -c "\
+    python3 manage.py bootstrap_db && \
+    { \
+        (while true; do \
+            python3 -u manage.py monitor_containers; \
+            echo 'Monitor exited - restarting in 3 s'; \
+            sleep 3; \
+        done) & \
+        if [ \"$APP_DEBUG\" = 'true' ] || [ \"$DJANGO_DEBUG\" = 'True' ]; then \
+            python3 manage.py runserver 0.0.0.0:8000; \
+        else \
+            exec gunicorn control.wsgi:application --bind 0.0.0.0:8000 --workers 5 --timeout 360; \
+        fi; \
+    }"
