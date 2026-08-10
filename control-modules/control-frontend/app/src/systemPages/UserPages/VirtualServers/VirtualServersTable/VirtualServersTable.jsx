@@ -140,6 +140,10 @@ function useVirtualServers(showOtherUsers) {
     if (vm.state !== "running") {
       axios.post("/api/vm/control", { virtualServerID: vm.id, action: "delete" }).then(refreshVms);
       toast.success(<b>{t("TOASTS.deleting", { id: vm.id })}</b>, { duration: 10000 });
+    } else {
+      // A poll can flip the state to running MID-HOLD — never
+      // swallow a completed 3-second hold in silence
+      toast.error(<b>{t("CARD.stop_first")}</b>, { duration: 4000 });
     }
   };
 
@@ -462,25 +466,27 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
   const t = useTranslations("PAGES.vmList");
   const isRunning = vm.state === "running";
 
+  // A create in flight: the row exists, the container does
+  // not yet — no navigation, no actions, amber accents
+  const isCreating = vm.state === "creating";
+  const accentHex = isRunning ? "#22c55e" : isCreating ? "#f59e0b" : vm.state === "unknown" ? "#9ca3af" : "#ef4444";
+
   return (
     <div
-      onClick={() => onNavigate(vm)}
+      onClick={() => { if (!isCreating) onNavigate(vm); }}
       className="group relative bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all duration-300 cursor-pointer overflow-hidden"
     >
       {/* Ambient Glow */}
       <div
         className="absolute top-0 left-0 right-0 h-24 opacity-15 pointer-events-none"
         style={{
-          background: isRunning
-            ? "linear-gradient(to bottom, #22c55e 0%, transparent 100%)"
-            : "linear-gradient(to bottom, #ef4444 0%, transparent 100%)",
+          background: `linear-gradient(to bottom, ${accentHex} 0%, transparent 100%)`,
         }}
       />
       {/* Status Indicator Bar */}
       <div
-        className={`absolute top-0 left-0 right-0 h-1 ${
-          isRunning ? "bg-green-500" : "bg-red-500"
-        } z-10`}
+        className="absolute top-0 left-0 right-0 h-1 z-10"
+        style={{ backgroundColor: accentHex }}
       />
 
       {/* Card Content */}
@@ -493,13 +499,17 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
                 #{vm.id}
               </span>
               <Chip
-                label={isRunning ? t("CARD.running") : t("CARD.stopped")}
+                label={
+                  isCreating ? t("CARD.creating")
+                  : vm.state === "unknown" ? t("CARD.unknown")
+                  : isRunning ? t("CARD.running") : t("CARD.stopped")
+                }
                 size="small"
                 sx={{
                   fontWeight: 600,
                   fontSize: "0.7rem",
                   height: 22,
-                  backgroundColor: isRunning ? "green" : "red",
+                  backgroundColor: isRunning ? "green" : isCreating ? "#f59e0b" : vm.state === "unknown" ? "#9ca3af" : "red",
                   color: "white",
                 }}
               />
@@ -509,12 +519,15 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
             </h3>
           </div>
 
-          <QuickActions
-            vm={vm}
-            isRunning={isRunning}
-            onStartStop={onStartStop}
-            onDelete={onDelete}
-          />
+          {/* No actions while the build is in flight */}
+          {!isCreating && (
+            <QuickActions
+              vm={vm}
+              isRunning={isRunning}
+              onStartStop={onStartStop}
+              onDelete={onDelete}
+            />
+          )}
         </div>
 
 

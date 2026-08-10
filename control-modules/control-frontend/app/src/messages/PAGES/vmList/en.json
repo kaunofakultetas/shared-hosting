@@ -18,6 +18,8 @@
   "CARD": {
     "running": "Running",
     "stopped": "Stopped",
+    "creating": "Creating…",
+    "unknown": "Unknown",
     "stop_server": "Stop Server",
     "start_server": "Start Server",
     "stop_first": "Stop server first",

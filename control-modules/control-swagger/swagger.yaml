@@ -504,7 +504,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Message' }
         '404':
-          description: VM exists but its container has not been seen by the monitor yet
+          description: Race guard only — the VM was deleted mid-request (a pending VM answers 200 with state "creating")
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Message' }
@@ -514,14 +514,17 @@ paths:
       tags: [Virtual Servers]
       summary: Create / start / stop / delete / rename
       description: |
-        `create` is open to every signed-in user; the VM row is committed
-        BEFORE the (up to 120 s) container build, so the id is claimed even
-        if the build fails — a failed build soft-deletes the row again.
-        All other actions require the owner or an admin, and an existing,
-        non-deleted VM (404 otherwise). `delete` also removes the VM's
-        domains and regenerates the users Caddyfile, so its vhosts die with
-        it. Names are stripped; 3–30 chars of letters, numbers, spaces,
-        underscores and parentheses.
+        `create` is open to every signed-in user. create and delete are
+        ASYNC: the database change commits, the response is 202, and the
+        physical work runs in the background — the list shows a "creating"
+        card that flips to running (or vanishes, with an activity entry,
+        if the build fails); a deleted card disappears immediately and
+        comes back if the teardown fails. delete also removes the VM's
+        domains and regenerates the users Caddyfile before answering.
+        start/stop/rename stay synchronous. All actions except create
+        require the owner or an admin and an existing, non-deleted VM
+        (404 otherwise). Names are stripped; 3–30 chars of letters,
+        numbers, spaces, underscores and parentheses.
       security: [{ cookieAuth: [] }]
       requestBody:
         required: true
@@ -537,7 +540,15 @@ paths:
                 newName: { type: string, description: rename only }
       responses:
         '200':
-          description: Action accepted
+          description: start/stop/rename done
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [OK] }
+        '202':
+          description: create/delete accepted — the physical work finishes in the background; the list reflects the outcome
           content:
             application/json:
               schema:
@@ -973,8 +984,14 @@ components:
       properties:
         id: { type: integer, description: 'The platform contract: container/SSH/directory name' }
         name: { type: string }
-        status: { type: string, example: Up 2 hours, description: Docker CLI display string }
-        state: { type: string, example: running }
+        status: { type: string, nullable: true, example: Up 2 hours, description: Docker CLI display string; null while no container exists }
+        state:
+          type: string
+          example: running
+          description: |
+            Docker's state while the container exists; synthesized
+            otherwise — "creating" for a fresh row whose container has not
+            appeared yet, "unknown" for an old row without one.
         enabled: { type: integer, enum: [0, 1], description: The intended state (start/stop) }
         owneremail: { type: string, nullable: true, description: Null for adopted/ownerless VMs }
         stacks:

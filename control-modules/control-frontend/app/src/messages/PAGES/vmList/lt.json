@@ -18,6 +18,8 @@
   "CARD": {
     "running": "Veikia",
     "stopped": "Sustabdytas",
+    "creating": "Kuriamas…",
+    "unknown": "Nežinoma",
     "stop_server": "Stabdyti serverį",
     "start_server": "Paleisti serverį",
     "stop_first": "Pirmiausia sustabdykite serverį",

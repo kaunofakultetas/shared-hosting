@@ -1,24 +1,27 @@
 ############################################################
 #  [*] VM views — the list and the control actions
 #
-#  GET /api/vm assembles the whole card payload in Python
-#  over the containers cache:
-#  a VM appears only while its hosting-users-dind-<ID>
-#  container is in the cache (so a row alone shows nothing),
-#  the id is a STRING, and stacks/domains are null when
-#  empty. The frontend polls this every 3 seconds and sorts
-#  by id client-side.
+#  GET /api/vm assembles the whole card payload in Python:
+#  the REGISTRY drives the list (every non-deleted VM shows)
+#  and the containers cache decorates it with live state — a
+#  row whose container the monitor has not seen yet renders
+#  as "creating" (fresh row) or "unknown" (old row). Ids are
+#  integers; stacks/domains are null when empty. The frontend
+#  polls this every 3 seconds.
 #
-#  POST /api/vm/control proxies to the docker sidecar. The
-#  create flow is the one deliberately re-ordered piece (see
-#  vm_control) — everything else answers byte-identically.
+#  POST /api/vm/control proxies to the docker sidecar;
+#  create and delete answer 202 and finish in one-shot
+#  background threads (see vm_control).
 #
 #  Used by:
 #    - VirtualServersTable.jsx — list + card actions
 #    - VirtualServer.jsx — the detail page (same endpoint)
 ############################################################
 
-from django.db import transaction
+import threading
+from datetime import timedelta
+
+from django.db import close_old_connections, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 
@@ -115,10 +118,14 @@ def vm_list(request, virtualServerID=None):
             dindRows[vmIdText] = thisRow
 
 
-    # The matching non-deleted VM rows and their owners' emails
+    # ALL non-deleted VM rows — the REGISTRY drives the list;
+    # the cache only decorates it with live state. A row whose
+    # container the monitor has not seen yet still shows, as
+    # "creating" (fresh row) or "unknown" (old row — manually
+    # removed container, or the sidecar is unreachable).
     virtualServers = {
-        str(thisVm.id): thisVm
-        for thisVm in VirtualServer.objects.filter(id__in=[int(vmId) for vmId in dindRows], deleted=False)
+        thisVm.id: thisVm
+        for thisVm in VirtualServer.objects.filter(deleted=False).exclude(id=0)
     }
     ownerEmails = dict(
         SystemUser.objects.filter(id__in=[thisVm.owner_id for thisVm in virtualServers.values() if thisVm.owner_id is not None])
@@ -166,18 +173,27 @@ def vm_list(request, virtualServerID=None):
 
     # Assemble, in numeric id order
     responseData = []
-    for vmIdText in sorted(dindRows, key=int):
-        thisVm = virtualServers.get(vmIdText)
-        if thisVm is None:
-            continue
+    for vmId in sorted(virtualServers):
+        thisVm = virtualServers[vmId]
 
         # A specific id was asked for — only that one
-        if virtualServerID is not None and vmIdText != str(virtualServerID):
+        if virtualServerID is not None and vmId != virtualServerID:
             continue
 
         # Non-admin view of the list — own VMs only
         if virtualServerID is None and showOtherUsersVMs == False and thisVm.owner_id != request.current_user.id:
             continue
+
+        # Live state from the cache; without a cache row the
+        # registry row speaks for itself — a fresh one is a
+        # create in flight, an old one is honestly unknown
+        dindRow = dindRows.get(str(vmId))
+        if dindRow is not None:
+            state, status = dindRow.state, dindRow.status
+        elif timezone.now() - thisVm.created_at < timedelta(minutes=5):
+            state, status = 'creating', None
+        else:
+            state, status = 'unknown', None
 
         stacks = [
             {'stackname': stackName, 'containers': containers}
@@ -187,8 +203,8 @@ def vm_list(request, virtualServerID=None):
         responseData.append({
             'id': thisVm.id,
             'name': thisVm.name,
-            'status': dindRows[vmIdText].status,
-            'state': dindRows[vmIdText].state,
+            'status': status,
+            'state': state,
             'enabled': int(thisVm.enabled),
             'owneremail': ownerEmails.get(thisVm.owner_id),
             'stacks': stacks or None,
@@ -197,15 +213,103 @@ def vm_list(request, virtualServerID=None):
         })
 
 
-    # A specific id → the object itself; 404 covers both an
-    # unknown id and a VM whose container the monitor has not
-    # seen yet
+    # A specific id → the object itself. The access check
+    # already guaranteed the row exists — the 404 only guards
+    # the race of a delete landing mid-request.
     if virtualServerID is not None:
         if not responseData:
             return JsonResponse({'message': 'Virtual server not found'}, status=404)
         return JsonResponse(responseData[0], json_dumps_params={'indent': 4})
 
     return JsonResponse(responseData, safe=False, json_dumps_params={'indent': 4})
+
+
+
+
+
+
+
+
+############################################################
+# run_in_background
+############################################################
+#
+# One-shot daemon thread for the slow physical work (a sysbox
+# docker run takes a minute, the data archive longer) — the
+# request answers 202 immediately and the frontend's 3-second
+# poll observes the outcome. Failures are handled INSIDE the
+# target (flag revert + activity row); the wrapper only
+# guarantees the thread's DB connections are returned.
+#
+# Deliberately not a job queue: one attempt, state in the
+# registry row, reconciliation by the monitor — the same
+# pattern the rest of the platform runs on. A deploy landing
+# mid-create self-heals (the monitor adopts the finished
+# container into the already-committed row).
+#
+# Used by:
+#   - vm_control (below) — the create and delete actions
+############################################################
+
+def run_in_background(target):
+    def wrapped():
+        try:
+            target()
+        finally:
+            close_old_connections()
+    threading.Thread(target=wrapped, daemon=True).start()
+
+
+
+
+
+
+
+
+############################################################
+# create_vm_physically / delete_vm_physically
+############################################################
+#
+# The thread targets. Create: one sidecar attempt; failure
+# soft-deletes the row again (the "creating" card vanishes on
+# the next poll) and logs why. Delete: one sidecar attempt;
+# failure REVERTS the deleted flag (the card comes back, the
+# user can retry) and logs why — the domains were already
+# removed in the request, and stay removed.
+#
+# Used by:
+#   - vm_control (below) via run_in_background
+############################################################
+
+def create_vm_physically(virtualServerID, actorUserId):
+    containerName = DIND_PREFIX + str(virtualServerID)
+    try:
+        resp = docker_controller.create_vm(containerName)
+        createFailed = resp.status_code != 200
+    except requests.RequestException:
+        createFailed = True
+
+    with transaction.atomic():
+        if createFailed:
+            VirtualServer.objects.filter(id=virtualServerID).update(deleted=True, updated_at=timezone.now())
+            log_activity(actorUserId, f'Virtual server #{virtualServerID} creation failed')
+        else:
+            log_activity(actorUserId, f'Virtual server #{virtualServerID} created')
+
+
+
+def delete_vm_physically(virtualServerID, actorUserId):
+    containerName = DIND_PREFIX + str(virtualServerID)
+    try:
+        resp = docker_controller.delete_vm(containerName)
+        deleteFailed = resp.status_code != 200
+    except requests.RequestException:
+        deleteFailed = True
+
+    if deleteFailed:
+        with transaction.atomic():
+            VirtualServer.objects.filter(id=virtualServerID).update(deleted=False, updated_at=timezone.now())
+            log_activity(actorUserId, f'Virtual server #{virtualServerID} deletion failed')
 
 
 
@@ -223,12 +327,17 @@ def vm_list(request, virtualServerID=None):
 #   start/stop/delete/rename {virtualServerID, [newName]}
 #                                 — owner or admin
 #
+# create and delete are ASYNC: the database change commits,
+# the response is 202, and the physical work runs in a
+# one-shot background thread — the card shows "creating" (or
+# disappears) on the next poll and reverts if the thread
+# fails. start/stop/rename stay synchronous (they are fast).
+#
 # Runs OUTSIDE the request transaction on purpose: on create
-# the row must be COMMITTED before the slow sidecar call, so
-# the ID is claimed and the monitor can never adopt the new
+# the row must be COMMITTED before the thread starts, so the
+# ID is claimed and the monitor can never adopt the new
 # container as an ownerless orphan while the create is in
-# flight. If the physical create fails, the row is
-# soft-deleted again.
+# flight.
 #
 # Used by:
 #   - VirtualServersTable.jsx / VirtualServer.jsx /
@@ -286,26 +395,15 @@ def vm_control(request):
                 deleted=False,
             )
         virtualServerID = thisVm.id
-        containerName = DIND_PREFIX + str(virtualServerID)
 
-        # Create the virtual server physically
-        try:
-            resp = docker_controller.create_vm(containerName)
-            createFailed = resp.status_code != 200
-        except requests.RequestException:
-            createFailed = True
+        # The physical build runs in the background — the card
+        # shows "creating" on the next poll and either flips to
+        # running (monitor sees the container) or vanishes
+        # (thread soft-deleted the row and logged why)
+        actorUserId = request.current_user.id
+        run_in_background(lambda: create_vm_physically(virtualServerID, actorUserId))
 
-        # Physical create failed — take the row back out
-        if createFailed:
-            with transaction.atomic():
-                VirtualServer.objects.filter(id=virtualServerID).update(deleted=True, updated_at=timezone.now())
-            return JsonResponse({'message': 'Failed to create virtual server'}, status=500)
-
-        # The row was created enabled — only the activity is left
-        with transaction.atomic():
-            log_activity(request.current_user.id, f'Virtual server #{virtualServerID} created')
-
-        return JsonResponse({'message': 'OK'}, status=200)
+        return JsonResponse({'message': 'OK'}, status=202)
 
 
 
@@ -358,30 +456,32 @@ def vm_control(request):
 
     # --- DELETE ---
     elif action == 'delete':
-        try:
-            resp = docker_controller.delete_vm(containerName)
-        except requests.RequestException:
-            return JsonResponse({'message': 'Failed to delete virtual server'}, status=500)
-        if resp.status_code != 200:
-            return JsonResponse({'message': 'Failed to delete virtual server'}, status=500)
 
-        # Update database
+        # The intent commits NOW: the card disappears on the
+        # next poll and the domains are freed immediately (the
+        # global uniqueness must not be held by a dying VM).
+        # The cache rows are the monitor's to prune.
         with transaction.atomic():
             VirtualServer.objects.filter(id=virtualServerID).update(deleted=True, updated_at=timezone.now())
-            DockerContainer.objects.filter(parent_server_id=virtualServerID).delete()
             DomainName.objects.filter(virtual_server_id=virtualServerID).delete()
             log_activity(request.current_user.id, f'Virtual server #{virtualServerID} deleted')
 
         # Regenerate the users Caddyfile so the deleted VM's
-        # vhosts die with it. The VM
-        # is already gone — a Caddy hiccup must not fail the
-        # delete, the next domain change re-syncs anyway.
+        # vhosts die with the flag, before the slow teardown.
+        # A Caddy hiccup must not fail the delete — the next
+        # domain change re-syncs anyway.
         try:
             docker_controller.update_caddy_config()
         except Exception as e:
             print(f'Caddy config update after VM delete failed: {e}')
 
-        return JsonResponse({'message': 'OK'}, status=200)
+        # The physical teardown (stop + rm + data archive) runs
+        # in the background; a failure reverts the flag and the
+        # card comes back
+        actorUserId = request.current_user.id
+        run_in_background(lambda: delete_vm_physically(virtualServerID, actorUserId))
+
+        return JsonResponse({'message': 'OK'}, status=202)
 
 
 

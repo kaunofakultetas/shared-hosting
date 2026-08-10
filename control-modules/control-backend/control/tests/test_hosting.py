@@ -10,12 +10,18 @@
 #  descriptive names instead of banners.
 ############################################################
 
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
 from django.test import TestCase
 from django.utils import timezone
+
+
+# Runs the would-be background thread inline, so the async
+# create/delete tests observe the completed outcome
+RUN_INLINE = lambda target: target()
 
 from control.tests.helpers import (
     create_dind_row,
@@ -98,11 +104,23 @@ class VmListTests(TestCase):
         vms = adminClient.get('/api/vm?showOtherUsers=true').json()
         self.assertEqual({vm['id'] for vm in vms}, {self.ownVm.id, self.foreignVm.id})
 
-    def test_vm_without_cache_row_is_invisible(self):
-        hiddenVm = create_vm(self.user, name='no container yet')
+    def test_vm_without_cache_row_shows_creating_then_unknown(self):
+        pendingVm = create_vm(self.user, name='no container yet')
         login(self.client, 'user@test.local', 'test-pass-8')
-        vms = self.client.get('/api/vm').json()
-        self.assertNotIn(hiddenVm.id, [vm['id'] for vm in vms])
+
+        # Fresh registry row, no container → a create in flight
+        vms = {vm['id']: vm for vm in self.client.get('/api/vm').json()}
+        self.assertEqual(vms[pendingVm.id]['state'], 'creating')
+        self.assertIsNone(vms[pendingVm.id]['status'])
+
+        # The single fetch shows it too (no more 404 while pending)
+        self.assertEqual(self.client.get(f'/api/vm/{pendingVm.id}').json()['state'], 'creating')
+
+        # An OLD row without a container is honestly unknown
+        from control.hosting.models import VirtualServer
+        VirtualServer.objects.filter(id=pendingVm.id).update(created_at=timezone.now() - timedelta(minutes=10))
+        vms = {vm['id']: vm for vm in self.client.get('/api/vm').json()}
+        self.assertEqual(vms[pendingVm.id]['state'], 'unknown')
 
     def test_deleted_vm_is_invisible_even_with_cache_row(self):
         deadVm = create_vm(self.user, deleted=True)
@@ -192,23 +210,32 @@ class VmControlTests(TestCase):
             self.assertEqual(response.status_code, 400, message)
             self.assertEqual(response.json()['message'], message)
 
+    @patch('control.hosting.api.vm_views.run_in_background', new=RUN_INLINE)
     @patch('control.hosting.docker_controller.create_vm', return_value=OK_RESPONSE)
-    def test_create_success(self, createMock):
+    def test_create_accepts_and_builds_in_background(self, createMock):
         response = self.control({'action': 'create', 'name': '  Mano serveris (1)  '})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 202)
 
         newVm = VirtualServer.objects.latest('id')
         self.assertEqual(newVm.name, 'Mano serveris (1)')   # stripped
         self.assertEqual(newVm.owner_id, self.user.id)
         self.assertTrue(newVm.enabled)
+        self.assertFalse(newVm.deleted)
         createMock.assert_called_once_with(f'{DIND_PREFIX}{newVm.id}')
         self.assertTrue(RecentActivity.objects.filter(message=f'Virtual server #{newVm.id} created').exists())
 
+    @patch('control.hosting.api.vm_views.run_in_background', new=RUN_INLINE)
     @patch('control.hosting.docker_controller.create_vm', side_effect=requests.ConnectionError)
-    def test_create_sidecar_failure_soft_deletes_the_row(self, createMock):
+    def test_create_failure_soft_deletes_the_row_again(self, createMock):
+        # The request still answers 202 — the failure happens in
+        # the background and shows as the card vanishing + the
+        # activity entry
         response = self.control({'action': 'create', 'name': 'doomed'})
-        self.assertEqual(response.status_code, 500)
-        self.assertTrue(VirtualServer.objects.get(name='doomed').deleted)
+        self.assertEqual(response.status_code, 202)
+
+        doomedVm = VirtualServer.objects.get(name='doomed')
+        self.assertTrue(doomedVm.deleted)
+        self.assertTrue(RecentActivity.objects.filter(message=f'Virtual server #{doomedVm.id} creation failed').exists())
 
     @patch('control.hosting.docker_controller.start_vm', return_value=OK_RESPONSE)
     def test_start(self, startMock):
@@ -232,20 +259,33 @@ class VmControlTests(TestCase):
         foreignVm = create_vm(self.admin)
         self.assertEqual(self.control({'virtualServerID': foreignVm.id, 'action': 'stop'}).status_code, 401)
 
+    @patch('control.hosting.api.vm_views.run_in_background', new=RUN_INLINE)
     @patch('control.hosting.docker_controller.update_caddy_config')
     @patch('control.hosting.docker_controller.delete_vm', return_value=OK_RESPONSE)
-    def test_delete_cleans_everything(self, deleteMock, caddyMock):
+    def test_delete_accepts_and_tears_down_in_background(self, deleteMock, caddyMock):
         create_dind_row(self.vm)
-        create_inner_container(self.vm)
         DomainName.objects.create(virtual_server=self.vm, domain_name='dies.test.lt')
 
         response = self.control({'virtualServerID': self.vm.id, 'action': 'delete'})
-        self.assertEqual(response.json(), {'message': 'OK'})
+        self.assertEqual(response.status_code, 202)
 
         self.assertTrue(VirtualServer.objects.get(id=self.vm.id).deleted)
         self.assertFalse(DomainName.objects.filter(virtual_server=self.vm).exists())
-        self.assertFalse(DockerContainer.objects.filter(parent_server=self.vm).exists())
+        deleteMock.assert_called_once_with(f'{DIND_PREFIX}{self.vm.id}')
         caddyMock.assert_called_once()   # stale vhosts die with the VM
+        # The cache rows are deliberately NOT touched here — the
+        # monitor prunes them once the container is gone
+
+    @patch('control.hosting.api.vm_views.run_in_background', new=RUN_INLINE)
+    @patch('control.hosting.docker_controller.update_caddy_config')
+    @patch('control.hosting.docker_controller.delete_vm', side_effect=requests.ConnectionError)
+    def test_delete_failure_reverts_the_flag(self, deleteMock, caddyMock):
+        response = self.control({'virtualServerID': self.vm.id, 'action': 'delete'})
+        self.assertEqual(response.status_code, 202)
+
+        # The card comes back and the activity says why
+        self.assertFalse(VirtualServer.objects.get(id=self.vm.id).deleted)
+        self.assertTrue(RecentActivity.objects.filter(message=f'Virtual server #{self.vm.id} deletion failed').exists())
 
     def test_rename_strips_and_validates(self):
         response = self.control({'virtualServerID': self.vm.id, 'action': 'rename', 'newName': '  Naujas  '})
