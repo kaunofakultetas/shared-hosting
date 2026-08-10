@@ -152,7 +152,7 @@ The control plane manages the platform, providing user interfaces, APIs, and orc
 
 **Purpose**: REST API server providing business logic and data access.
 
-**Technology**: Django 5.2 with Python 3.13 — gunicorn (5 workers, prod) or runserver (dev)
+**Technology**: Django 5.2 with Python 3.13 — gunicorn (5 workers × 4 threads, prod) or runserver (dev)
 
 **Module Structure**:
 ```
