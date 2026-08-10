@@ -127,7 +127,9 @@ export default function AppShell() {
 
   return (
     <>
-      <Toaster position="top-center" />
+      {/* Toast texts center-aligned — multi-line messages look
+          lopsided left-aligned in a centered toast */}
+      <Toaster position="top-center" toastOptions={{ style: { textAlign: "center" } }} />
       <Navbar authdata={authdata} />
 
       <div className="flex">
