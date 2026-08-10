@@ -2,10 +2,55 @@ openapi: 3.0.3
 info:
   title: App Hosting Platform API Documentation
   description: |
-    API for managing app hosting platform.
-    This API allows frontend to manage app hosting platform, including user authentication,
-    virtual server management, and DNS configuration.
-  version: 1.0.0
+    The control-panel API of the VU KnF App Hosting Platform: authentication,
+    virtual server management, domain (vhost) management and the admin
+    dashboard. Served by the Django backend (`hosting-control-backend`) behind
+    the control Caddy endpoint; the Vite SPA is the primary consumer.
+
+    ## Authentication
+
+    Session-cookie based. `POST /api/login` sets the `session` cookie
+    (HttpOnly; Secure outside development; browser-session lifetime; the
+    session itself is a server-side row). `POST /api/logout` flushes it.
+    There are three authorization levels:
+
+    | Level | Meaning |
+    |---|---|
+    | Public | No session needed (`/api/login`, `/api/logout`, `/api/register`) |
+    | User | Any enabled account (401 otherwise) |
+    | Admin | Account with the admin flag (401 otherwise) |
+
+    Disabling an account takes effect immediately — live sessions stop
+    resolving, login is refused, and SSH lookups return a null hash.
+
+    Caddy also calls two endpoints as forward_auth gates: `/api/checkauth/vm/{id}`
+    guards the per-VM tools on :8443, `/api/checkauth/admin` guards /dbgate/*
+    and /swagger. Only the status code matters there.
+
+    ## Conventions
+
+    - **Login failures carry machine codes** (`MISSING_EMAIL`,
+      `INVALID_CREDENTIALS`, ...) — the login page maps them to wording.
+      Every login outcome costs exactly one bcrypt, so response timing
+      reveals nothing about account existence or state.
+    - **The admin users grid** answers `200 {"type": "ok"}` on success and
+      real status codes (400/404/409) with `{"type": "error", "reason": ...}`
+      on failure; the reason sentence is rendered by the dialog.
+    - **Booleans are exposed as 0/1 integers** (`admin`, `enabled`,
+      `iscloudflare`, `ssl`) — the frontend compares strictly.
+    - **Timestamps** are local-time strings `"YYYY-MM-DD HH:MM:SS"` (or null),
+      except `validUntil`, which is unix epoch seconds — countdown math needs
+      an absolute instant.
+    - **VM ids are integers** and are a platform-wide contract: id N is
+      container `hosting-users-dind-N`, SSH login `serverN` and data
+      directory `SERVERS/N`.
+    - **Unknown and soft-deleted VMs answer 401 from the access check**
+      (uniformly, admins included) on per-VM endpoints; `/api/vm/{id}` may
+      also answer 404 while an existing VM's container has not yet been seen
+      by the 3-second monitor.
+    - `/api/sshrouter` is an **internal service contract** for the SSH router
+      container — shared API key, never browser-reachable.
+  version: 2.0.0
   contact:
     name: VU KnF
 
@@ -19,19 +64,19 @@ servers:
 
 tags:
   - name: Authentication
-    description: User authentication and authorization endpoints
+    description: Login, logout, registration and the session/forward_auth probes
   - name: Account
-    description: User account management endpoints
+    description: The signed-in user's own account (password, registration code, activity)
   - name: Users
-    description: User management endpoints (Admin only)
+    description: The admin users grid (Admin only)
   - name: Virtual Servers
-    description: Virtual server management and control endpoints
+    description: VM list and lifecycle control
   - name: DNS
-    description: Domain name and DNS management endpoints
+    description: Domain names (vhosts) of a virtual server
   - name: Dashboard
-    description: Admin dashboard and system monitoring endpoints
+    description: Admin dashboard metrics
   - name: SSH Router
-    description: Internal SSH routing endpoints (requires API key)
+    description: Internal contract for the SSH router (shared API key)
 
 
 
@@ -42,227 +87,107 @@ paths:
   # ============================================
   /api/login:
     post:
-      tags:
-        - Authentication
-      summary: User login
-      description: Authenticate user with email and password. Returns a session cookie on success.
+      tags: [Authentication]
+      summary: Log in
+      description: |
+        Verifies the credentials and sets the `session` cookie. Failures
+        carry a machine code in `message`; every outcome (success, unknown
+        email, wrong password, disabled account) costs exactly one bcrypt,
+        so timing is uniform. Email is case-insensitive; both fields are
+        stripped of surrounding whitespace.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - email
-                - password
+              required: [email, password]
               properties:
-                email:
-                  type: string
-                  format: email
-                  description: User's email address
-                  example: user@example.com
-                password:
-                  type: string
-                  format: password
-                  description: User's password
-                  example: password123
+                email: { type: string, example: student@knf.vu.lt }
+                password: { type: string, format: password }
       responses:
         '200':
-          description: Login successful
+          description: Logged in — the session cookie is set
           headers:
             Set-Cookie:
-              description: Session cookie for authentication
-              schema:
-                type: string
+              schema: { type: string, example: session=...; HttpOnly; Path=/ }
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: OK
+                type: object
+                properties:
+                  message: { type: string, enum: [OK] }
         '400':
-          description: Invalid credentials or missing fields
+          description: Missing input
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-              examples:
-                missing_both:
-                  value: Įveskite El. Pašto adresą ir Slaptažodį.
-                  summary: Both email and password missing
-                missing_email:
-                  value: Įveskite El. Pašto adresą.
-                  summary: Email missing
-                missing_password:
-                  value: Įveskite Slaptažodį.
-                  summary: Password missing
-                invalid_credentials:
-                  value: El. Paštas ir/arba Slaptažodis neteisingas.
-                  summary: Invalid email or password
+                type: object
+                properties:
+                  message:
+                    type: string
+                    enum: [MISSING_CREDENTIALS, MISSING_EMAIL, MISSING_PASSWORD]
+        '401':
+          description: Unknown email, wrong password OR disabled account — indistinguishable on purpose
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [INVALID_CREDENTIALS] }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/logout:
+    post:
+      tags: [Authentication]
+      summary: Log out
+      description: |
+        Flushes the session (server-side row + cookie). Needs no login and
+        always answers OK — logging out an already-dead session is a
+        success. The login page calls this on mount, so opening /login IS
+        the logout.
+      responses:
+        '200':
+          description: Session flushed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [OK] }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
 
   /api/register:
     post:
-      tags:
-        - Authentication
-      summary: Register new user
+      tags: [Authentication]
+      summary: Self-registration with an admin's code
       description: |
-        Create a new user account using a valid registration code.
-        Registration codes are generated by admins and expire after 30 minutes.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserRegistration'
-      responses:
-        '201':
-          description: Registration successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Registration successful! You can now login.
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                missing_code:
-                  value:
-                    message: Registration code is required
-                missing_email:
-                  value:
-                    message: Email is required
-                missing_password:
-                  value:
-                    message: Password is required
-                short_password:
-                  value:
-                    message: Password must be at least 6 characters
-                invalid_email:
-                  value:
-                    message: Invalid email format
-                invalid_code:
-                  value:
-                    message: Invalid registration code
-                email_exists:
-                  value:
-                    message: Email already exists
-
-  /api/checkauth:
-    get:
-      tags:
-        - Authentication
-      summary: Check authentication status
-      description: Verify if user is authenticated and return user information. Also updates the user's last login timestamp.
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: User is authenticated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserInfo'
-        '401':
-          description: Unauthorized - User is not authenticated or disabled
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/checkauth/vm/{virtualServerID}:
-    get:
-      tags:
-        - Authentication
-      summary: Check authentication for specific virtual server
-      description: Verify if user is authenticated and authorized to access a specific virtual server. User must be the owner or an admin.
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: virtualServerID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID to check access for
-          example: 1
-      responses:
-        '200':
-          description: User is authenticated and authorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserInfo'
-        '401':
-          description: Unauthorized - User not authenticated or not allowed to access this virtual server
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/checkauth/admin:
-    get:
-      tags:
-        - Authentication
-      summary: Check admin authentication
-      description: Verify if user is authenticated as admin. Updates last login timestamp.
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: User is authenticated as admin
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserInfo'
-        '401':
-          description: Unauthorized - User is not admin
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-
-  # ============================================
-  # ACCOUNT MANAGEMENT
-  # ============================================
-  /api/account/change-password:
-    post:
-      tags:
-        - Account
-      summary: Change user password
-      description: Allow authenticated users to change their own password. Current password verification is required.
-      security:
-        - cookieAuth: []
+        Creates an enabled non-admin account when the registration code is
+        an admin's live one (30-minute validity). The activity is logged
+        under the admin who owns the code. The password is stripped before
+        hashing; minimum 8 characters.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - currentPassword
-                - newPassword
+              required: [registrationCode, email, password]
               properties:
-                currentPassword:
-                  type: string
-                  format: password
-                  description: User's current password
-                  example: oldPassword123
-                newPassword:
-                  type: string
-                  format: password
-                  minLength: 8
-                  description: New password (minimum 8 characters)
-                  example: newSecurePassword456
+                registrationCode: { type: string, example: AB12CD34 }
+                email: { type: string }
+                password: { type: string, format: password, minLength: 8 }
       responses:
-        '200':
-          description: Password changed successfully
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: 'Registration successful! You can now login.' }
+        '400':
+          description: Validation failure — the message is rendered verbatim by the form
           content:
             application/json:
               schema:
@@ -270,222 +195,263 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Password changed successfully
-        '400':
-          description: Invalid request
+                    enum:
+                      - No data provided
+                      - Registration code is required
+                      - Email is required
+                      - Password is required
+                      - Password must be at least 8 characters
+                      - Invalid email format
+                      - Invalid registration code
+                      - Email already exists
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/checkauth:
+    get:
+      tags: [Authentication]
+      summary: Who is logged in
+      description: |
+        The SPA calls this on every page load. Bumps the account's
+        "last seen" timestamp at most once per minute.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: The session's user
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                missing_current:
-                  value:
-                    message: Current password is required
-                missing_new:
-                  value:
-                    message: New password is required
-                short_password:
-                  value:
-                    message: New password must be at least 8 characters
+              schema: { $ref: '#/components/schemas/AuthUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/checkauth/vm/{virtualServerID}:
+    get:
+      tags: [Authentication]
+      summary: Session probe + VM access check (forward_auth gate)
+      description: |
+        Like /api/checkauth, additionally requiring access to the VM:
+        the owner or any admin, and the VM must exist and not be deleted.
+        Caddy calls this as the forward_auth gate of the :8443 VM tools
+        (Dockge, File Browser, WebSSH2), including their WebSocket
+        upgrades — only the status code matters there.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Access granted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthUser' }
         '401':
-          description: Current password is incorrect
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+
+  /api/checkauth/admin:
+    get:
+      tags: [Authentication]
+      summary: Admin gate (forward_auth for /dbgate/* and /swagger)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: The session's admin user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthUser' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
+
+
+
+
+  # ============================================
+  # ACCOUNT
+  # ============================================
+  /api/account/change-password:
+    post:
+      tags: [Account]
+      summary: Change own password
+      description: |
+        Verifies the current password, then stores the new one (stripped,
+        minimum 8 characters, bcrypt).
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '200':
+          description: Password changed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  message: { type: string, example: Password changed successfully }
+        '400':
+          description: Missing input or new password shorter than 8
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401':
+          description: No session, or the current password is incorrect
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
         '404':
-          description: User not found
+          description: Session user no longer exists
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+              schema: { $ref: '#/components/schemas/Message' }
 
   /api/account/registration-code:
     get:
-      tags:
-        - Account
-      summary: Get current registration code (Admin only)
+      tags: [Account]
+      summary: This admin's live registration code
       description: |
-        Retrieve the current admin's registration code if one exists and is not expired.
-        Expired codes are automatically deleted when this endpoint is called.
-      security:
-        - cookieAuth: []
+        Admin only. As a side effect, every expired code (any admin's) is
+        purged first — the widget polls this, keeping the table clean.
+      security: [{ cookieAuth: [] }]
       responses:
         '200':
-          description: Registration code found
+          description: The live code
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/RegistrationCodeResponse'
-        '401':
-          description: Unauthorized - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+              schema: { $ref: '#/components/schemas/RegistrationCode' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
         '404':
-          description: No registration code found
+          description: No live code
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: No registration code found
-
+              schema: { $ref: '#/components/schemas/Message' }
     post:
-      tags:
-        - Account
-      summary: Create new registration code (Admin only)
-      description: |
-        Generate a new registration code for user registration.
-        The code is valid for 30 minutes and replaces any existing code for this admin.
-        Code format: 8 uppercase alphanumeric characters.
-      security:
-        - cookieAuth: []
+      tags: [Account]
+      summary: Create (or replace) this admin's code
+      description: One live code per admin — creating again replaces it. Valid 30 minutes.
+      security: [{ cookieAuth: [] }]
       responses:
         '200':
-          description: Registration code created successfully
+          description: The fresh code
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/RegistrationCodeResponse'
-        '401':
-          description: Unauthorized - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
+              schema: { $ref: '#/components/schemas/RegistrationCode' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
     delete:
-      tags:
-        - Account
-      summary: Delete registration code (Admin only)
-      description: Remove the current admin's registration code, invalidating it immediately.
-      security:
-        - cookieAuth: []
+      tags: [Account]
+      summary: Delete this admin's code
+      security: [{ cookieAuth: [] }]
       responses:
         '200':
-          description: Registration code deleted successfully
+          description: Deleted (idempotent)
           content:
             application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Registration code deleted successfully
-        '401':
-          description: Unauthorized - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
 
-
-  # ============================================
-  # USERS MANAGEMENT (ADMIN)
-  # ============================================
-  /api/admin/users:
+  /api/account/recentactivity:
     get:
-      tags:
-        - Users
-      summary: Get all users (Admin only)
-      description: Retrieve list of all users with their virtual server counts and account status.
-      security:
-        - cookieAuth: []
+      tags: [Account]
+      summary: Own activity feed
+      description: The signed-in user's newest 500 activity rows.
+      security: [{ cookieAuth: [] }]
       responses:
         '200':
-          description: List of users
+          description: Newest first
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/UserListItem'
-        '401':
-          description: Unauthorized - Admin access required
+                items: { $ref: '#/components/schemas/ActivityRow' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/GenericFailure' }
+
+
+
+
+  # ============================================
+  # USERS (admin grid)
+  # ============================================
+  /api/admin/users:
+    get:
+      tags: [Users]
+      summary: Every account, with live-VM counts
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: All accounts
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-    
+                type: array
+                items: { $ref: '#/components/schemas/GridUser' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
     post:
-      tags:
-        - Users
-      summary: Create, update, or delete user (Admin only)
+      tags: [Users]
+      summary: Create, update or delete an account
       description: |
-        Manage user accounts. Supported actions:
-        - **insertupdate**: Create new user (if id is empty) or update existing user
-        - **delete**: Delete a user (fails if user has virtual servers)
-      security:
-        - cookieAuth: []
+        One endpoint, dispatched by `action`:
+
+        - `insertupdate` with `id: ""` creates (password required, min 8);
+          with a real `id` updates email/admin/enabled and — only when
+          non-empty — the password.
+        - `delete` removes the account. Refused for yourself (400) and while
+          the account owns non-deleted VMs (409). Deleting detaches history:
+          activity rows stay ("Deleted User"), soft-deleted VMs lose their
+          owner.
+
+        Success is `200 {"type": "ok"}`; failures use real status codes with
+        a `reason` sentence the dialog renders.
+      security: [{ cookieAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              oneOf:
-                - $ref: '#/components/schemas/UserCreateUpdate'
-                - $ref: '#/components/schemas/UserDelete'
-            examples:
-              create_user:
-                summary: Create new user
-                value:
-                  action: insertupdate
-                  id: ""
-                  email: newuser@example.com
-                  password: securePassword123
-                  admin: 0
-                  enabled: 1
-              update_user:
-                summary: Update existing user
-                value:
-                  action: insertupdate
-                  id: "5"
-                  email: updated@example.com
-                  password: ""
-                  admin: 0
-                  enabled: 1
-              delete_user:
-                summary: Delete user
-                value:
-                  action: delete
-                  id: "5"
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [insertupdate, delete] }
+                id:
+                  description: '"" to create, the user id to update/delete'
+                  oneOf: [{ type: string }, { type: integer }]
+                email: { type: string }
+                admin: { type: integer, enum: [0, 1] }
+                enabled: { type: integer, enum: [0, 1] }
+                password:
+                  type: string
+                  description: Empty on update = keep the current password
       responses:
         '200':
-          description: Operation successful
+          description: Success
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  type:
-                    type: string
-                    enum: [ok, error]
-                    example: ok
-                  reason:
-                    type: string
-                    description: Error reason (only present when type is error)
-              examples:
-                success:
-                  value:
-                    type: ok
-                password_error:
-                  value:
-                    type: error
-                    reason: Password must be at least 8 characters long
-                has_servers:
-                  value:
-                    type: error
-                    reason: User has virtual servers
-        '401':
-          description: Unauthorized - Admin access required
+                  type: { type: string, enum: [ok] }
+        '400':
+          description: Invalid body, password policy, self-delete or illegal action
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+              schema: { $ref: '#/components/schemas/GridError' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
+        '404':
+          description: Updated user does not exist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GridError' }
+        '409':
+          description: Email already taken, or the account still owns virtual servers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GridError' }
+
+
 
 
   # ============================================
@@ -493,1145 +459,567 @@ paths:
   # ============================================
   /api/vm:
     get:
-      tags:
-        - Virtual Servers
-      summary: Get virtual servers
+      tags: [Virtual Servers]
+      summary: The caller's virtual servers
       description: |
-        Retrieve list of virtual servers.
-        - Regular users see only their own servers
-        - Admins can optionally see all servers using the showOtherUsers parameter
-      security:
-        - cookieAuth: []
+        Driven by the 3-second container cache: a VM appears only while its
+        `hosting-users-dind-<id>` container is known to the monitor.
+        `showOtherUsers=true` (admin only) lists every user's VMs.
+      security: [{ cookieAuth: [] }]
       parameters:
         - name: showOtherUsers
           in: query
-          schema:
-            type: boolean
-            default: false
-          description: Show virtual servers from all users (Admin only)
+          required: false
+          schema: { type: string, enum: ['true', 'false'], default: 'false' }
       responses:
         '200':
-          description: List of virtual servers
+          description: The VM cards' data, ordered by id
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/VirtualServer'
+                items: { $ref: '#/components/schemas/VirtualServer' }
         '401':
-          description: Unauthorized
+          description: No session, or showOtherUsers without admin
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+              schema: { $ref: '#/components/schemas/Message' }
 
   /api/vm/{virtualServerID}:
     get:
-      tags:
-        - Virtual Servers
-      summary: Get specific virtual server
-      description: Retrieve details of a specific virtual server. User must be the owner or an admin.
-      security:
-        - cookieAuth: []
+      tags: [Virtual Servers]
+      summary: One virtual server
+      security: [{ cookieAuth: [] }]
       parameters:
-        - name: virtualServerID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID
-          example: 1
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
       responses:
         '200':
-          description: Virtual server details
+          description: The VM as a plain object
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/VirtualServer'
+              schema: { $ref: '#/components/schemas/VirtualServer' }
         '401':
-          description: Unauthorized - Not allowed to access this virtual server
+          description: No session, foreign VM, unknown VM or deleted VM
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: VM exists but its container has not been seen by the monitor yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
 
   /api/vm/control:
     post:
-      tags:
-        - Virtual Servers
-      summary: Control virtual server
+      tags: [Virtual Servers]
+      summary: Create / start / stop / delete / rename
       description: |
-        Perform actions on virtual servers:
-        - **create**: Create a new virtual server
-        - **start**: Start a stopped virtual server
-        - **stop**: Stop a running virtual server
-        - **delete**: Delete a virtual server
-        - **rename**: Rename a virtual server
-        
-        For all actions except create, the user must be the owner or an admin.
-      security:
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              oneOf:
-                - $ref: '#/components/schemas/VirtualServerCreate'
-                - $ref: '#/components/schemas/VirtualServerControl'
-                - $ref: '#/components/schemas/VirtualServerRename'
-            examples:
-              create:
-                summary: Create new virtual server
-                value:
-                  action: create
-                  name: My New Server
-              start:
-                summary: Start virtual server
-                value:
-                  action: start
-                  virtualServerID: "1"
-              stop:
-                summary: Stop virtual server
-                value:
-                  action: stop
-                  virtualServerID: "1"
-              delete:
-                summary: Delete virtual server
-                value:
-                  action: delete
-                  virtualServerID: "1"
-              rename:
-                summary: Rename virtual server
-                value:
-                  action: rename
-                  virtualServerID: "1"
-                  newName: My Renamed Server
-      responses:
-        '200':
-          description: Action completed successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: OK
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                missing_name:
-                  value:
-                    message: Name is required
-                short_name:
-                  value:
-                    message: New name must be at least 3 characters long
-                long_name:
-                  value:
-                    message: Name must be less than 30 characters long
-                invalid_chars:
-                  value:
-                    message: Name can only contain letters, numbers, spaces, and hyphens
-                invalid_action:
-                  value:
-                    message: Invalid action
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                create_failed:
-                  value:
-                    message: Failed to create virtual server
-                start_failed:
-                  value:
-                    message: Failed to start virtual server
-                stop_failed:
-                  value:
-                    message: Failed to stop virtual server
-                delete_failed:
-                  value:
-                    message: Failed to delete virtual server
-
-
-  # ============================================
-  # DNS MANAGEMENT
-  # ============================================
-  /api/vm/dns/isvalid:
-    get:
-      tags:
-        - DNS
-      summary: Validate domain name
-      description: |
-        Check if a domain name is valid and available for use.
-        
-        Validation rules:
-        - Minimum 5 characters
-        - Maximum 39 characters
-        - Must contain at least one dot
-        - No repeated dots (..)
-        - Only alphanumeric characters, hyphens, underscores, and dots allowed
-        - Must start and end with a letter (a-z)
-        - Must not be already taken by another virtual server
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: domainname
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Domain name to validate (URL encoded)
-          example: myapp.example.com
-        - name: virtualserverid
-          in: query
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID (used to exclude current domains from duplicate check)
-          example: 1
-      responses:
-        '200':
-          description: Validation result
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  isvalid:
-                    type: boolean
-                    description: Whether the domain name is valid
-                    example: true
-                  error_message:
-                    type: string
-                    description: Validation result message
-                    example: Domain name is valid
-
-  /api/vm/dns/{virtualServerID}:
-    get:
-      tags:
-        - DNS
-      summary: Get domain names for virtual server
-      description: Retrieve all domain names configured for a specific virtual server.
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: virtualServerID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID
-          example: 1
-      responses:
-        '200':
-          description: List of domain names
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DomainName'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-    post:
-      tags:
-        - DNS
-      summary: Add new domain name
-      description: |
-        Create a new domain name for a virtual server.
-        The domain name will be validated before creation.
-        After successful creation, the Caddy reverse proxy configuration is automatically updated.
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: virtualServerID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID
-          example: 1
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DomainNameCreate'
-      responses:
-        '200':
-          description: Domain name created successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: ok
-        '400':
-          description: Invalid domain name
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Error
-                  reason:
-                    type: string
-                    description: Validation error reason
-                    example: Domain name is already taken
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-    put:
-      tags:
-        - DNS
-      summary: Update domain name
-      description: |
-        Update an existing domain name configuration.
-        The domain name will be re-validated before update.
-        After successful update, the Caddy reverse proxy configuration is automatically updated.
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: virtualServerID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID
-          example: 1
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DomainNameUpdate'
-      responses:
-        '200':
-          description: Domain name updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: ok
-        '400':
-          description: Invalid domain name
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Error
-                  reason:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/vm/dns/{virtualServerID}/{domainID}:
-    delete:
-      tags:
-        - DNS
-      summary: Delete domain name
-      description: |
-        Remove a domain name from a virtual server.
-        After successful deletion, the Caddy reverse proxy configuration is automatically updated.
-      security:
-        - cookieAuth: []
-      parameters:
-        - name: virtualServerID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Virtual server ID
-          example: 1
-        - name: domainID
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Domain ID to delete
-          example: 5
-      responses:
-        '200':
-          description: Domain name deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: ok
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-
-  # ============================================
-  # DASHBOARD (ADMIN)
-  # ============================================
-  /api/dashboard/system:
-    get:
-      tags:
-        - Dashboard
-      summary: Get system resource usage (Admin only)
-      description: |
-        Retrieve current system resource usage including CPU, memory, and disk statistics.
-        Data is fetched from cAdvisor. Also includes DockerHub pull rate limits.
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: System resource usage
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SystemStats'
-        '401':
-          description: Unauthorized - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Failed to fetch cAdvisor data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          description: No stats data available yet
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: No stats data available yet
-                  cpu_percent:
-                    type: number
-                    example: 0
-                  memory_percent:
-                    type: number
-                    example: 0
-                  disk_percent:
-                    type: number
-                    example: 0
-        '504':
-          description: cAdvisor request timeout
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/dashboard/recentactivity:
-    get:
-      tags:
-        - Dashboard
-      summary: Get recent activity log (Admin only)
-      description: Retrieve the 5 most recent activity log entries from all users.
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Recent activity log
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ActivityLogEntry'
-        '401':
-          description: Unauthorized - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Failed to get recent activity
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /api/dashboard/hostingsystem:
-    get:
-      tags:
-        - Dashboard
-      summary: Get hosting system statistics (Admin only)
-      description: Retrieve summary statistics about the hosting system including user count, virtual servers, and domains.
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Hosting system statistics
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HostingSystemStats'
-        '401':
-          description: Unauthorized - Admin access required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Failed to get hosting system information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-
-  # ============================================
-  # SSH ROUTER (INTERNAL)
-  # ============================================
-  /api/sshrouter:
-    post:
-      tags:
-        - SSH Router
-      summary: Get SSH upstream configuration (Internal)
-      description: |
-        Internal endpoint used by the SSH proxy to get upstream server details for user connections.
-        Requires API key authentication instead of session cookie.
-        
-        **Note**: This is an internal endpoint not intended for direct frontend use.
+        `create` is open to every signed-in user; the VM row is committed
+        BEFORE the (up to 120 s) container build, so the id is claimed even
+        if the build fails — a failed build soft-deletes the row again.
+        All other actions require the owner or an admin, and an existing,
+        non-deleted VM (404 otherwise). `delete` also removes the VM's
+        domains and regenerates the users Caddyfile, so its vhosts die with
+        it. Names are stripped; 3–30 chars of letters, numbers, spaces,
+        underscores and parentheses.
+      security: [{ cookieAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - username
-                - api_key
+              required: [action]
               properties:
-                username:
-                  type: string
-                  pattern: '^server[0-9]+$'
-                  description: Username in format "server{ID}" where ID is the virtual server ID
-                  example: server1
-                api_key:
-                  type: string
-                  description: Backend SSH API key for authentication
-                  example: your-api-key-here
+                action: { type: string, enum: [create, start, stop, delete, rename] }
+                virtualServerID: { type: integer, description: Required for every action except create }
+                name: { type: string, description: create only }
+                newName: { type: string, description: rename only }
       responses:
         '200':
-          description: SSH upstream configuration
+          description: Action accepted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SSHUpstreamConfig'
+                type: object
+                properties:
+                  message: { type: string, enum: [OK] }
         '400':
-          description: Invalid request
+          description: Invalid body, invalid id, invalid action or name-rule violation (message rendered verbatim)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                missing_username:
-                  value:
-                    message: Username is required
-                invalid_username:
-                  value:
-                    message: Username must start with "server"
-                missing_api_key:
-                  value:
-                    message: API key is required
-                invalid_server_id:
-                  value:
-                    message: Server ID must be a number
+              schema: { $ref: '#/components/schemas/Message' }
         '401':
-          description: Invalid API key
+          description: No session, or not the owner (non-admin)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: Unknown or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '500':
+          description: The docker sidecar failed or timed out
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+
+
+
+
+  # ============================================
+  # DNS
+  # ============================================
+  /api/vm/dns/isvalid:
+    get:
+      tags: [DNS]
+      summary: Live domain validation
+      description: |
+        The dialog calls this on every keystroke. Rules: 5–39 chars, at
+        least one dot, no "..", `[a-zA-Z0-9-_.]` only, starts and ends with
+        a letter, not taken by ANOTHER VM.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: domainname, in: query, required: true, schema: { type: string } }
+        - { name: virtualserverid, in: query, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: The verdict (also 200 for invalid names)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  isvalid: { type: boolean }
+                  error_message: { type: string, example: Domain name is valid }
+        '400':
+          description: Missing domainname parameter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/vm/dns/{virtualServerID}:
+    get:
+      tags: [DNS]
+      summary: The VM's domains
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: All domains of this VM
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Domain' }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+    post:
+      tags: [DNS]
+      summary: Add a domain
+      description: |
+        Validates, stores lowercased, then pushes the whole domain table to
+        the docker sidecar which rewrites and reloads the users Caddyfile —
+        INSIDE the request transaction, so a failed push rolls the change
+        back and the two can never diverge.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DomainInput' }
+      responses:
+        '200':
+          description: Added and the users Caddy reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [ok] }
+        '400':
+          description: Validation failure or the domain is already taken
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+    put:
+      tags: [DNS]
+      summary: Update a domain
+      description: |
+        Resolved by (domain id AND virtual server id) — a domain id
+        belonging to another VM answers 404 and changes nothing, so one
+        VM's endpoint can never edit another VM's vhosts.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/DomainInput' }
+                - type: object
+                  required: [domainid]
+                  properties:
+                    domainid: { type: integer }
+      responses:
+        '200':
+          description: Updated and the users Caddy reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [ok] }
+        '400':
+          description: Validation failure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: The domain id does not belong to this VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+
+  /api/vm/dns/{virtualServerID}/{domainID}:
+    delete:
+      tags: [DNS]
+      summary: Delete a domain
+      description: Scoped by (domain id AND virtual server id), like PUT.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+        - { name: domainID, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Deleted and the users Caddy reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [ok] }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: The domain id does not belong to this VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
 
 
 
 
-# ============================================
-# COMPONENTS
-# ============================================
+  # ============================================
+  # DASHBOARD (admin)
+  # ============================================
+  /api/dashboard/system:
+    get:
+      tags: [Dashboard]
+      summary: Host gauges (cAdvisor) + Docker Hub pull limits
+      description: |
+        CPU/memory/disk from cAdvisor samples; the Docker Hub rate-limit
+        check is cached 60 s per worker. Polled every 2 s by the widget.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: The gauges
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemGauges' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
+        '500':
+          description: cAdvisor unreachable or unparseable — generic message, no internals
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '503':
+          description: Not enough cAdvisor samples yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+
+  /api/dashboard/recentactivity:
+    get:
+      tags: [Dashboard]
+      summary: The five newest activity rows (all users)
+      description: Deleted authors render as "Deleted User".
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 5
+                items: { $ref: '#/components/schemas/ActivityRow' }
+        '401': { $ref: '#/components/responses/AdminRequired' }
+        '500': { $ref: '#/components/responses/GenericFailure' }
+
+  /api/dashboard/hostingsystem:
+    get:
+      tags: [Dashboard]
+      summary: Platform totals
+      description: The HOST row (VM id 0) and soft-deleted VMs never count.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: The totals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users: { type: integer }
+                  virtualservers_running: { type: integer }
+                  virtualservers_total: { type: integer }
+                  domains: { type: integer }
+        '401': { $ref: '#/components/responses/AdminRequired' }
+        '500': { $ref: '#/components/responses/GenericFailure' }
+
+
+
+
+  # ============================================
+  # SSH ROUTER (internal)
+  # ============================================
+  /api/sshrouter:
+    post:
+      tags: [SSH Router]
+      summary: 'INTERNAL: upstream data for a server<N> SSH login'
+      description: |
+        Service contract for the `hosting-users-ssh-router` container — never
+        browser-reachable. The shared API key is compared in constant time,
+        and the endpoint fails CLOSED (503) when the key is not configured.
+        The router verifies the SSH password against `password_hash`;
+        `null` (no owner, or a DISABLED owner) can never verify — disabling
+        an account ends its SSH access. Deleted VMs answer 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, api_key]
+              properties:
+                username: { type: string, example: server42 }
+                api_key: { type: string }
+      responses:
+        '200':
+          description: Where to proxy and what to verify against
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  password_hash:
+                    type: string
+                    nullable: true
+                    description: The owner's bcrypt hash; null can never verify
+                  upstream_host: { type: string, example: hosting-users-dind-42 }
+                  upstream_port: { type: string, example: '22' }
+                  upstream_user: { type: string, example: root }
+                  upstream_pass: { type: string, example: root }
+        '400':
+          description: Missing/malformed username, non-numeric id or non-string key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401':
+          description: Wrong API key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: Unknown or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '503':
+          description: BACKEND_SSH_API_KEY not configured — fails closed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+
+
+
 components:
   securitySchemes:
     cookieAuth:
       type: apiKey
       in: cookie
       name: session
-      description: Session cookie set after successful login
+      description: Set by POST /api/login (HttpOnly; Secure outside development)
+
+  responses:
+    Unauthorized:
+      description: No valid session (or the account was disabled)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string, example: Unauthorized }
+    AdminRequired:
+      description: No valid session, or the account is not an admin
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string, example: 'Unauthorized: Admin required' }
+    MethodNotAllowed:
+      description: Wrong HTTP method
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string, example: Method not allowed }
+    GenericFailure:
+      description: Unexpected server failure — generic message, details only in the server log
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
 
   schemas:
-    # --------------------------------------------
-    # Common Schemas
-    # --------------------------------------------
-    Error:
+    Message:
       type: object
       properties:
-        message:
-          type: string
-          description: Error message
-          example: Unauthorized
+        message: { type: string }
 
-    # --------------------------------------------
-    # User/Auth Schemas
-    # --------------------------------------------
-    UserInfo:
+    ReasonError:
       type: object
       properties:
-        id:
-          type: integer
-          description: User ID
-          example: 1
-        email:
-          type: string
-          format: email
-          description: User's email address
-          example: user@example.com
-        admin:
-          type: integer
-          enum: [0, 1]
-          description: Admin status (0 = regular user, 1 = admin)
-          example: 0
+        message: { type: string, example: Error }
+        reason: { type: string, example: Domain name is already taken }
 
-    UserListItem:
+    GridError:
       type: object
       properties:
-        id:
-          type: integer
-          description: User ID
-          example: 1
-        email:
-          type: string
-          format: email
-          description: User's email address
-          example: user@example.com
-        servercount:
-          type: integer
-          description: Number of virtual servers owned by user
-          example: 3
-        admin:
-          type: integer
-          enum: [0, 1]
-          description: Admin status (0 = regular user, 1 = admin)
-          example: 0
-        enabled:
-          type: integer
-          enum: [0, 1]
-          description: Account enabled status (0 = disabled, 1 = enabled)
-          example: 1
+        type: { type: string, enum: [error] }
+        reason: { type: string, example: User with this email already exists }
+
+    AuthUser:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        admin: { type: integer, enum: [0, 1] }
+
+    GridUser:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        servercount: { type: integer, description: Non-deleted VMs owned }
+        admin: { type: integer, enum: [0, 1] }
+        enabled: { type: integer, enum: [0, 1] }
         lastseen:
           type: string
-          description: Last login timestamp
-          example: "2025-11-14 10:30:00"
+          nullable: true
+          example: '2026-08-10 14:30:00'
+          description: Bumped by checkauth at most once a minute; null = never seen
 
-    UserCreateUpdate:
-      type: object
-      required:
-        - action
-        - email
-        - admin
-        - enabled
-      properties:
-        action:
-          type: string
-          enum: [insertupdate]
-          description: Action type
-        id:
-          type: string
-          description: User ID (empty string for new user)
-          example: ""
-        email:
-          type: string
-          format: email
-          description: User's email address
-          example: user@example.com
-        password:
-          type: string
-          format: password
-          description: Password (required for new users, optional for updates)
-          example: securePassword123
-        admin:
-          type: integer
-          enum: [0, 1]
-          description: Admin status
-          example: 0
-        enabled:
-          type: integer
-          enum: [0, 1]
-          description: Account enabled status
-          example: 1
-
-    UserDelete:
-      type: object
-      required:
-        - action
-        - id
-      properties:
-        action:
-          type: string
-          enum: [delete]
-          description: Action type
-        id:
-          type: string
-          description: User ID to delete
-          example: "5"
-
-    UserRegistration:
-      type: object
-      required:
-        - registrationCode
-        - email
-        - password
-      properties:
-        registrationCode:
-          type: string
-          pattern: '^[A-Z0-9]{8}$'
-          description: 8-character registration code from admin
-          example: ABC12345
-        email:
-          type: string
-          format: email
-          description: Email address for new account
-          example: newuser@example.com
-        password:
-          type: string
-          format: password
-          minLength: 6
-          description: Password (minimum 6 characters)
-          example: mySecurePassword
-
-    RegistrationCodeResponse:
+    RegistrationCode:
       type: object
       properties:
-        message:
-          type: string
-          example: Registration code found
-        code:
-          type: string
-          pattern: '^[A-Z0-9]{8}$'
-          description: 8-character alphanumeric registration code
-          example: ABC12345
+        message: { type: string }
+        code: { type: string, example: AB12CD34 }
         validUntil:
           type: integer
-          description: Unix timestamp when the code expires
-          example: 1699999999
+          example: 1780000000
+          description: Unix epoch seconds — the widget's countdown needs an absolute instant
 
-    # --------------------------------------------
-    # Virtual Server Schemas
-    # --------------------------------------------
+    ActivityRow:
+      type: object
+      properties:
+        log_id: { type: integer }
+        email: { type: string, description: '"Deleted User" when the author is gone' }
+        message: { type: string, description: Rendered verbatim by the widgets }
+        time: { type: string, example: '2026-08-10 14:30:00' }
+
     VirtualServer:
       type: object
       properties:
-        id:
-          type: string
-          description: Virtual server ID
-          example: "1"
-        name:
-          type: string
-          description: Virtual server name
-          example: My Application
-        status:
-          type: string
-          description: Container status description
-          example: Up 2 hours
-        state:
-          type: string
-          enum: [running, exited, paused, created]
-          description: Container state
-          example: running
-        enabled:
-          type: integer
-          enum: [0, 1]
-          description: Whether the server is enabled
-          example: 1
-        owneremail:
-          type: string
-          format: email
-          description: Owner's email address
-          example: user@example.com
+        id: { type: integer, description: 'The platform contract: container/SSH/directory name' }
+        name: { type: string }
+        status: { type: string, example: Up 2 hours, description: Docker CLI display string }
+        state: { type: string, example: running }
+        enabled: { type: integer, enum: [0, 1], description: The intended state (start/stop) }
+        owneremail: { type: string, nullable: true, description: Null for adopted/ownerless VMs }
         stacks:
           type: array
           nullable: true
-          description: Docker compose stacks running in this virtual server
+          description: Containers inside the VM, grouped by compose project ('' = compose-less)
           items:
-            $ref: '#/components/schemas/Stack'
+            type: object
+            properties:
+              stackname: { type: string }
+              containers:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    image: { type: string }
+                    names: { type: string }
+                    runningfor: { type: string }
+                    state: { type: string }
+                    status: { type: string }
         domains:
           type: array
           nullable: true
-          description: Domain names configured for this virtual server
+          description: Like Domain but without virtualserverid (it is the card's own VM)
           items:
-            $ref: '#/components/schemas/DomainNameShort'
+            type: object
+            properties:
+              id: { type: integer }
+              domainname: { type: string }
+              iscloudflare: { type: integer, enum: [0, 1] }
+              ssl: { type: integer, enum: [0, 1] }
 
-    Stack:
+    Domain:
       type: object
       properties:
-        stackname:
-          type: string
-          description: Docker compose project name
-          example: myapp
-        containers:
-          type: array
-          items:
-            $ref: '#/components/schemas/Container'
+        id: { type: integer }
+        virtualserverid: { type: integer }
+        domainname: { type: string, example: mano.svetaine.lt }
+        iscloudflare: { type: integer, enum: [0, 1] }
+        ssl: { type: integer, enum: [0, 1] }
 
-    Container:
+    DomainInput:
       type: object
+      required: [domainname, iscloudflare, ssl]
       properties:
-        image:
-          type: string
-          description: Docker image name
-          example: nginx:latest
-        names:
-          type: string
-          description: Container name
-          example: myapp-web-1
-        runningfor:
-          type: string
-          description: How long the container has been running
-          example: 2 hours ago
-        state:
-          type: string
-          enum: [running, exited, paused, created]
-          description: Container state
-          example: running
-        status:
-          type: string
-          description: Container status description
-          example: Up 2 hours
-
-    VirtualServerCreate:
-      type: object
-      required:
-        - action
-        - name
-      properties:
-        action:
-          type: string
-          enum: [create]
-          description: Action type
-        name:
-          type: string
-          minLength: 3
-          maxLength: 30
-          description: Name for the new virtual server (letters, numbers, spaces, hyphens)
-          example: My New Server
-
-    VirtualServerControl:
-      type: object
-      required:
-        - action
-        - virtualServerID
-      properties:
-        action:
-          type: string
-          enum: [start, stop, delete]
-          description: Action to perform
-        virtualServerID:
-          type: string
-          description: Virtual server ID
-          example: "1"
-
-    VirtualServerRename:
-      type: object
-      required:
-        - action
-        - virtualServerID
-        - newName
-      properties:
-        action:
-          type: string
-          enum: [rename]
-          description: Action type
-        virtualServerID:
-          type: string
-          description: Virtual server ID
-          example: "1"
-        newName:
-          type: string
-          minLength: 3
-          maxLength: 30
-          description: New name for the virtual server
-          example: My Renamed Server
-
-    # --------------------------------------------
-    # Domain Name Schemas
-    # --------------------------------------------
-    DomainName:
-      type: object
-      properties:
-        id:
-          type: integer
-          description: Domain ID
-          example: 1
-        virtualserverid:
-          type: integer
-          description: Associated virtual server ID
-          example: 1
-        domainname:
-          type: string
-          description: Domain name
-          example: myapp.example.com
-        iscloudflare:
-          type: integer
-          enum: [0, 1]
-          description: Whether the domain is behind Cloudflare proxy
-          example: 0
-        ssl:
-          type: integer
-          enum: [0, 1]
-          description: Whether SSL is enabled for this domain
-          example: 1
-
-    DomainNameShort:
-      type: object
-      properties:
-        id:
-          type: integer
-          description: Domain ID
-          example: 1
-        domainname:
-          type: string
-          description: Domain name
-          example: myapp.example.com
-        iscloudflare:
-          type: integer
-          enum: [0, 1]
-          description: Whether the domain is behind Cloudflare proxy
-          example: 0
-        ssl:
-          type: integer
-          enum: [0, 1]
-          description: Whether SSL is enabled
-          example: 1
-
-    DomainNameCreate:
-      type: object
-      required:
-        - domainname
-        - iscloudflare
-        - ssl
-      properties:
-        domainname:
-          type: string
-          minLength: 5
-          maxLength: 39
-          description: Domain name to add
-          example: myapp.example.com
-        iscloudflare:
-          type: integer
-          enum: [0, 1]
-          description: Whether the domain is behind Cloudflare proxy
-          example: 0
-        ssl:
-          type: integer
-          enum: [0, 1]
-          description: Whether to enable SSL for this domain
-          example: 1
-
-    DomainNameUpdate:
-      type: object
-      required:
-        - domainid
-        - domainname
-        - iscloudflare
-        - ssl
-      properties:
-        domainid:
-          type: integer
-          description: Domain ID to update
-          example: 1
-        domainname:
-          type: string
-          minLength: 5
-          maxLength: 39
-          description: Updated domain name
-          example: myapp.example.com
-        iscloudflare:
-          type: integer
-          enum: [0, 1]
-          description: Whether the domain is behind Cloudflare proxy
-          example: 0
-        ssl:
-          type: integer
-          enum: [0, 1]
-          description: Whether to enable SSL
-          example: 1
-
-    # --------------------------------------------
-    # Dashboard Schemas
-    # --------------------------------------------
-    SystemStats:
-      type: object
-      properties:
-        cpu_percent:
-          type: number
-          format: float
-          description: CPU usage percentage
-          example: 25.5
-        memory_percent:
-          type: number
-          format: float
-          description: Memory usage percentage
-          example: 60.2
-        disk_percent:
-          type: number
-          format: float
-          description: Disk usage percentage
-          example: 45.8
-        cpu_cores:
-          type: integer
-          description: Number of CPU cores
-          example: 4
-        memory_total_gb:
-          type: number
-          format: float
-          description: Total memory in GB
-          example: 16.0
-        memory_used_gb:
-          type: number
-          format: float
-          description: Used memory in GB
-          example: 9.6
-        disk_total_gb:
-          type: number
-          format: float
-          description: Total disk space in GB
-          example: 500.0
-        disk_used_gb:
-          type: number
-          format: float
-          description: Used disk space in GB
-          example: 229.0
-        dockerhub_pull_limits:
-          type: object
-          nullable: true
-          description: DockerHub rate limit information
-          properties:
-            limit:
-              type: integer
-              description: Maximum pulls allowed
-              example: 200
-            remaining:
-              type: integer
-              description: Remaining pulls
-              example: 150
-            used:
-              type: integer
-              description: Pulls used
-              example: 50
-            percent:
-              type: number
-              format: float
-              description: Percentage of limit used
-              example: 25.0
-
-    ActivityLogEntry:
-      type: object
-      properties:
-        log_id:
-          type: integer
-          description: Log entry ID
-          example: 123
-        email:
-          type: string
-          description: User email (or "Deleted User" if user was deleted)
-          example: user@example.com
-        message:
-          type: string
-          description: Activity description
-          example: Virtual server #1 started
-        time:
-          type: string
-          description: Timestamp of the activity
-          example: "2025-11-14 10:30:00"
-
-    HostingSystemStats:
-      type: object
-      properties:
-        users:
-          type: integer
-          description: Total number of registered users
-          example: 15
-        virtualservers_running:
-          type: integer
-          description: Number of running virtual servers
-          example: 8
-        virtualservers_total:
-          type: integer
-          description: Total number of virtual servers (excluding deleted)
-          example: 12
-        domains:
-          type: integer
-          description: Total number of configured domain names
-          example: 25
-
-    # --------------------------------------------
-    # SSH Router Schemas
-    # --------------------------------------------
-    SSHUpstreamConfig:
-      type: object
-      properties:
-        password_hash:
-          type: string
-          description: Bcrypt password hash of the server owner
-          example: $2b$12$...
-        upstream_host:
-          type: string
-          description: Internal hostname of the virtual server container
-          example: hosting-users-dind-1
-        upstream_port:
-          type: string
-          description: SSH port on the upstream server
-          example: "22"
-        upstream_user:
-          type: string
-          description: SSH username for upstream connection
-          example: root
-        upstream_pass:
-          type: string
-          description: SSH password for upstream connection
-          example: root
+        domainname: { type: string, description: Stored lowercased }
+        iscloudflare: { type: integer, enum: [0, 1] }
+        ssl: { type: integer, enum: [0, 1] }

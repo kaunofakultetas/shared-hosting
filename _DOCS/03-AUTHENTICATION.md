@@ -12,8 +12,8 @@ The platform supports two authentication methods:
 
 | Method | Use Case | Mechanism |
 |--------|----------|-----------|
-| **Session-based** | Web UI access | Flask-Login with cookies |
-| **API Key** | SSH routing | Shared secret between services |
+| **Session-based** | Web UI access | Django DB-backed sessions + hand-rolled decorators (`control/common/auth.py`) |
+| **API Key** | SSH routing | Shared secret between services (constant-time compare, fails closed) |
 
 ### 1.2 Authentication Flow Summary
 
@@ -62,43 +62,56 @@ The platform supports two authentication methods:
 
 **Server-Side Process**:
 ```python
-# 1. Input validation
-if not email or not password:
-    return "Error message"
+# 1. Input validation → 400 with a machine code
+#    (MISSING_CREDENTIALS / MISSING_EMAIL / MISSING_PASSWORD)
 
 # 2. Normalize input
 email = email.strip().lower()
 password = password.strip()
 
-# 3. Fetch user from database
-user = get_user_by_email(email)
+# 3. Fetch user; unknown email pays a DUMMY bcrypt instead of
+#    the real one, so every outcome costs exactly one bcrypt
+#    and timing reveals nothing
 
-# 4. Verify password with bcrypt
-if bcrypt.checkpw(password.encode(), user.password.encode()):
-    login_user(user)  # Set session
-    return "OK"
+# 4. Verify password with bcrypt; success requires the account
+#    to be ENABLED — a disabled account with the correct
+#    password answers the same 401 in the same time
 
-# 5. Timing attack protection
-# Always perform bcrypt check to prevent enumeration
-bcrypt.checkpw("dummy", "$2b$12$dummy_hash")
-return "Invalid credentials"
+# 5. Success: rotate the session key (fixation defense), store
+#    the user id in the session, log the activity
 ```
 
 **Response**:
-- Success: `200 OK` with session cookie
-- Failure: `200 OK` with error message (no status code change for security)
+- Success: `200 {"message": "OK"}` with the session cookie
+- Missing input: `400` with `MISSING_CREDENTIALS` / `MISSING_EMAIL` / `MISSING_PASSWORD`
+- Unknown email, wrong password OR disabled account: `401 {"message": "INVALID_CREDENTIALS"}` — indistinguishable on purpose
+
+The login page maps the machine codes to its own wording.
 
 ### 2.2 Session Management
 
 **Cookie Configuration**:
 - Name: `session`
-- HttpOnly: Yes (prevents XSS)
-- Secure: Yes (HTTPS only)
+- HttpOnly: Yes — JavaScript never touches it; logout is a real endpoint
+- Secure: Outside development only (`SESSION_COOKIE_SECURE = not DEBUG` — dev over plain HTTP would otherwise refuse the cookie)
 - SameSite: Lax
 
-**Session Storage**: Server-side (Flask default)
+**Session Storage**: Server-side rows in `django_session`
+(`SESSION_ENGINE = django.contrib.sessions.backends.db`) — the cookie holds
+only the session key.
 
-**Session Lifetime**: Until browser closes (default Flask-Login behavior)
+**Session Lifetime**: Until the browser closes
+(`SESSION_EXPIRE_AT_BROWSER_CLOSE = True`).
+
+**Secret Key**: `DJANGO_SECRET_KEY` from `.env`, generated once by
+`runUpdateThisStack.sh` and stable across restarts — deploys do not log
+anyone out.
+
+**Logout**: `POST /api/logout` flushes the session (server row + cookie),
+needs no login and always answers `200 {"message": "OK"}` — the login page
+calls it on mount, so opening `/login` IS the logout. Disabling an account
+also ends its live sessions immediately: session resolution only accepts
+enabled accounts.
 
 ### 2.3 Authentication Verification
 
@@ -107,10 +120,11 @@ return "Invalid credentials"
 Used by frontend to verify if user is logged in.
 
 **Process**:
-1. Check session cookie validity
-2. Verify user account is enabled
-3. Update `LastLogin` timestamp
-4. Return user info
+1. Resolve the session to an enabled account (disabled → 401)
+2. Bump the `last_login` ("last seen") timestamp — at most once per
+   minute, because every SPA page load AND every :8443 forward_auth
+   subrequest lands here
+3. Return user info
 
 **Response**:
 ```json
@@ -130,14 +144,19 @@ Verifies user can access a specific virtual server.
 **Authorization Logic**:
 ```python
 def check_user_is_allowed_to_access_vm(user, vm_id):
-    # Admins can access any VM
+    # Admins may access every EXISTING, non-deleted VM — the
+    # existence check keeps forward_auth from proxying tool
+    # tabs into dead upstreams
     if user.admin == 1:
-        return True
-    
-    # Users can only access their own VMs
-    owner_id = get_vm_owner(vm_id)
-    return owner_id == user.id
+        return VirtualServer.objects.filter(id=vm_id, deleted=False).exists()
+
+    # Everyone else: only their own live VMs
+    owner_id = VirtualServer.objects.filter(id=vm_id, deleted=False) \
+                                    .values_list('owner_id', flat=True).first()
+    return owner_id is not None and owner_id == user.id
 ```
+
+Unknown and soft-deleted VMs answer 401 for everyone, admins included.
 
 ### 2.5 Admin Check
 
@@ -145,20 +164,21 @@ def check_user_is_allowed_to_access_vm(user, vm_id):
 
 Verifies user has administrator privileges.
 
-**Decorator Implementation**:
+**Decorator Implementation** (`control/common/auth.py`):
 ```python
 def admin_required(func):
     @wraps(func)
-    def wrapper(*args, **kwargs):
-        if 'admin' not in current_user.__dict__:
-            return jsonify({'message': 'Unauthorized: Admin required'}), 401
-        if not current_user.admin:
-            return jsonify({'message': 'Unauthorized: Admin required'}), 401
-        return func(*args, **kwargs)
+    def wrapper(request, *args, **kwargs):
+        thisUser = get_current_user(request)   # session → enabled account
+        if thisUser is None or not thisUser.admin:
+            return JsonResponse({'message': 'Unauthorized: Admin required'}, status=401)
+        request.current_user = thisUser
+        return func(request, *args, **kwargs)
     return wrapper
 ```
 
-**Note**: The `admin_required` decorator should be used in combination with `@login_required` to ensure the user is authenticated first.
+`admin_required` resolves the session itself — it implies `login_required`,
+so views carry it alone.
 
 ---
 
@@ -184,11 +204,13 @@ password_hash = bcrypt.hashpw(
 
 | Context | Minimum Length | Notes |
 |---------|---------------|-------|
-| User Registration | 6 characters | Basic requirement |
-| Password Change | 8 characters | Stricter for existing users |
-| Admin User Create | 8 characters | Intended (see note below) |
+| User Registration | 8 characters | |
+| Password Change | 8 characters | |
+| Admin User Create/Edit | 8 characters | Enforced (edit may leave the password empty to keep it) |
 
-> **⚠️ Implementation Note**: The admin user creation endpoint currently only checks for non-empty passwords, though the error message states "8 characters". This inconsistency should be addressed in the codebase.
+Passwords are **stripped of surrounding whitespace before hashing and
+before checking, everywhere** — an unstripped hash could never be matched
+at login again.
 
 ### 3.3 Password Change
 
@@ -222,6 +244,9 @@ New users can only register with a valid registration code generated by an admin
 - Format: Uppercase alphanumeric
 - Validity: 30 minutes
 - One-time use: No (can register multiple users)
+- One live code per admin (a OneToOne constraint — creating again replaces it)
+- `validUntil` is unix epoch seconds; expired codes are purged as a side
+  effect of the widget's GET poll
 
 ### 4.2 Registration Flow
 
@@ -327,8 +352,10 @@ Response:
 │  ┌─────────────────────────────────────────┐                        │
 │  │           BACKEND API                   │                        │
 │  │                                         │                        │
-│  │  3. Validate API key                    │                        │
-│  │  4. Lookup server owner                 │                        │
+│  │  3. Validate API key (constant-time;    │                        │
+│  │     unconfigured key → 503 fail-closed) │                        │
+│  │  4. Lookup server owner (deleted VM →   │                        │
+│  │     404; disabled/no owner → null hash) │                        │
 │  │  5. Return password hash                │                        │
 │  │                                         │                        │
 │  └────────────────┬────────────────────────┘                        │
@@ -370,6 +397,10 @@ ssh server1@hosting.knf.vu.lt
 # Enter your platform password when prompted
 ```
 
+A **disabled account loses SSH exactly like it loses the panel**: the
+lookup answers a null hash, which can never verify. Deleted VMs answer 404
+— any non-200 denies the login.
+
 ### 5.3 Internal SSH Connection
 
 Once authenticated, the router connects to the virtual server:
@@ -384,21 +415,20 @@ Once authenticated, the router connects to the virtual server:
 
 ### 6.1 Role-Based Access Control
 
-| Role | ID | Capabilities |
+| Role | `admin` flag | Capabilities |
 |------|-----|--------------|
-| User | 0 | Own resources only |
-| Admin | 1 | All resources |
+| User | false (JSON: 0) | Own resources only |
+| Admin | true (JSON: 1) | All resources |
 
 ### 6.2 Resource Ownership
 
-Each virtual server has an owner:
-```sql
-CREATE TABLE Hosting_VirtualServers (
-    ID INTEGER PRIMARY KEY,
-    OwnerID INTEGER NOT NULL,  -- References System_Users.ID
-    ...
-);
+Each virtual server has an owner — a real foreign key:
+```python
+class VirtualServer(models.Model):
+    owner = models.ForeignKey(SystemUser, null=True, on_delete=models.SET_NULL, ...)
 ```
+(`hosting_virtualserver.owner_id → users_systemuser.id`; NULL for
+monitor-adopted VMs and after the owner account is deleted.)
 
 ### 6.3 Permission Checks
 
@@ -432,32 +462,39 @@ def can_manage_users(user):
 | Attack | Protection | Implementation |
 |--------|------------|----------------|
 | Password Guessing | bcrypt (slow hash) | 12 rounds |
-| Timing Attack | Constant-time comparison | Always run bcrypt |
-| Session Hijacking | HttpOnly cookies | Flask default |
-| CSRF | SameSite cookies | Lax mode |
-| User Enumeration | Generic error messages | Same response |
+| Timing Attack | One bcrypt per login outcome | Real check or dummy — never zero, never two |
+| Session Hijacking | HttpOnly + Secure cookies | Django settings (Secure outside DEBUG) |
+| Session Fixation | Key rotation on login | `session.cycle_key()` |
+| CSRF | SameSite cookies + Caddy Origin check | Lax mode; foreign Origin → 403 at the proxy |
+| User Enumeration | One generic 401 | Unknown / wrong password / disabled — identical |
+| SSH key probing | Constant-time compare, fail-closed | `hmac.compare_digest`; unconfigured key → 503 |
 
 ### 7.2 Timing Attack Prevention
 
+Every login outcome costs exactly **one** bcrypt: the real check when the
+account exists, a dummy check when it does not. A correct password on a
+disabled account takes the same time as a wrong password — the response is
+always `401 INVALID_CREDENTIALS`.
+
 ```python
-# Always perform bcrypt check, even if user not found
-if user is None:
-    # Dummy check to prevent timing difference
-    bcrypt.checkpw(
-        b"dummy",
-        b"$2b$12$dummy_hash_to_prevent_timing_attack"
-    )
-    return "Invalid credentials"
+if thisUser is None:
+    # The dummy substitutes for the real check
+    bcrypt.checkpw(b'...', DUMMY_BCRYPT_HASH.encode())
+    return JsonResponse({'message': 'INVALID_CREDENTIALS'}, status=401)
+
+passwordOk = bcrypt.checkpw(password.encode(), thisUser.password.encode())
+if passwordOk and thisUser.enabled == 1:
+    ...  # success
+return JsonResponse({'message': 'INVALID_CREDENTIALS'}, status=401)
 ```
 
 ### 7.3 Activity Logging
 
-All authentication events are logged:
+All authentication events are logged through the shared helper:
 ```python
-conn.execute(
-    'INSERT INTO System_RecentActivity (UserID, Message, Time) VALUES (?, ?, ?)',
-    [user.id, f'User {user.email} logged in (IP: {ip})', timestamp]
-)
+log_activity(user.id, f'User {user.email} logged in (IP: {ip})')
+# → one users_recentactivity row; created_at stamps itself;
+#   the author detaches (SET_NULL) if the account is ever deleted
 ```
 
 ---
@@ -504,6 +541,8 @@ Port 8443 provides direct access to VM management interfaces:
 | Enabled | Yes |
 
 **⚠️ IMPORTANT**: Change this password immediately after installation!
+The account is seeded by `bootstrap_db` (which runs at container start)
+**only while the users table is completely empty** — it never resurrects.
 
 ### 9.2 Virtual Server Internal Credentials
 
@@ -527,7 +566,7 @@ Port 8443 provides direct access to VM management interfaces:
 
 **Debug Query**:
 ```sql
-SELECT ID, Email, Password, Enabled FROM System_Users WHERE Email = 'user@example.com';
+SELECT id, email, enabled FROM users_systemuser WHERE email = 'user@example.com';
 ```
 
 ### 10.2 Session Issues
@@ -535,9 +574,12 @@ SELECT ID, Email, Password, Enabled FROM System_Users WHERE Email = 'user@exampl
 **Problem**: Logged out unexpectedly
 
 **Possible Causes**:
-1. Server restart cleared sessions
-2. Cookie expired or deleted
-3. Session secret key changed
+1. Browser closed (sessions end with the browser session)
+2. The account was disabled — live sessions stop resolving immediately
+3. The session row was flushed (a logout, or `clearsessions` housekeeping)
+
+Sessions are server-side rows signed with a stable key from `.env` —
+restarts and deploys do NOT log anyone out.
 
 ### 10.3 SSH Access Issues
 

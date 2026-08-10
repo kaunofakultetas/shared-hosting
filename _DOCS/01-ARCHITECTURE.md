@@ -123,10 +123,10 @@ The control plane manages the platform, providing user interfaces, APIs, and orc
 
 **Purpose**: Web-based user interface for platform management.
 
-**Technology**: Next.js 15 with React
+**Technology**: Vite + React SPA (react-router-dom)
 
 **Key Features**:
-- Server-side rendering for SEO and performance
+- Static production build served by Caddy (dev: Vite dev server)
 - Role-based UI (Admin vs User views)
 - Real-time container status updates
 - Responsive design for mobile access
@@ -135,11 +135,11 @@ The control plane manages the platform, providing user interfaces, APIs, and orc
 ```
 /                    → Home / Dashboard redirect
 /login               → Authentication page
-/admin/              → Admin dashboard
-/admin/users         → User management
-/admin/servers       → All virtual servers
-/vm/{id}             → Virtual server management
+/vm                  → Virtual server list
+/vm/:virtualServerID → One virtual server
 /account             → User account settings
+/admin               → Admin dashboard
+/admin/users         → User management
 ```
 
 **Network Connections**:
@@ -152,32 +152,31 @@ The control plane manages the platform, providing user interfaces, APIs, and orc
 
 **Purpose**: REST API server providing business logic and data access.
 
-**Technology**: Flask 3.x with Python
+**Technology**: Django 5.2 with Python 3.13 — gunicorn (5 workers, prod) or runserver (dev)
 
 **Module Structure**:
 ```
-app/
-├── auth/
-│   ├── routes.py      # Authentication endpoints
-│   └── user.py        # User model and helpers
-├── dashboard/
-│   ├── routes.py      # Admin dashboard data
-│   └── registry_monitor.py  # DockerHub rate limits
-├── database/
-│   ├── db.py          # Database connection
-│   └── db_init.py     # Schema initialization
-├── dns_controller/
-│   └── routes.py      # Domain management
-├── docker/
-│   └── monitor.py     # Container status updater
-├── ssh_router/
-│   └── routes.py      # SSH routing lookup
-└── virtual_server/
-    └── routes.py      # VM CRUD operations
+manage.py
+control/
+├── settings.py / urls.py / wsgi.py
+├── common/auth.py              # session auth, decorators
+├── users/                      # accounts, codes, activity
+│   ├── models.py
+│   ├── api/{auth,account,users}_views.py
+│   └── management/commands/{bootstrap_db,transfer_legacy}.py
+├── hosting/                    # VMs, container cache, domains
+│   ├── models.py
+│   ├── docker_controller.py    # HTTP client for the sidecar
+│   ├── api/{vm,dns,sshrouter}_views.py
+│   └── management/commands/monitor_containers.py
+├── dashboard/                  # admin metrics
+│   ├── registry_monitor.py
+│   └── api/dashboard_views.py
+└── tests/                      # the contract test suite
 ```
 
 **Background Processes**:
-1. **Docker Monitor**: Polls container status every 3 seconds, updates database
+1. **Docker Monitor**: Polls container status every 3 seconds and updates the database; runs as a supervised background process (`manage.py monitor_containers`) started by the container CMD beside the web server and respawned if it exits — not a thread in the web process
 2. **Registry Monitor**: Checks DockerHub rate limits periodically
 
 **Network Connections**:
@@ -444,6 +443,8 @@ REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
      │◀─────────────│          │                      │
      │  Success     │          │                      │
 ```
+
+> **Note**: The VM row is committed before the sidecar call, which uses a 120 s timeout; a failed build soft-deletes the row.
 
 ### 4.3 Domain Registration Flow
 

@@ -490,8 +490,8 @@ The platform uses two public IP addresses with router-level port forwarding to r
 
 | Service | Port | Protocol | Purpose |
 |---------|------|----------|---------|
-| control-frontend | 3000 | HTTP | Next.js server |
-| control-backend | 8000 | HTTP | Flask API |
+| control-frontend | 80 | HTTP | Vite/React SPA |
+| control-backend | 8000 | HTTP | Django API |
 | control-docker | 8000 | HTTP | Docker Controller |
 | control-cadvisor | 8080 | HTTP | Metrics API |
 | control-dbgate | 3000 | HTTP | Database UI |
@@ -550,7 +550,8 @@ docker logs hosting-control-caddy
 curl -v https://hosting.knf.vu.lt
 
 # Check backend health
-docker exec hosting-control-backend curl localhost:8000/api/checkauth
+docker exec hosting-control-backend python3 -c "import requests; print(requests.get('http://localhost:8000/api/checkauth').status_code)"
+# 401 = the API is up (an unauthenticated probe is expected to be denied)
 ```
 
 **User app not accessible via custom domain**:

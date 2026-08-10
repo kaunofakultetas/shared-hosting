@@ -55,7 +55,7 @@ The platform employs a **nested containerization** approach using Sysbox runtime
 │  │                    CONTROL PLANE                                   │ │
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌──────────┐               │ │
 │  │  │ Caddy   │  │Frontend │  │ Backend │  │ Docker   │               │ │
-│  │  │ (Proxy) │  │ (Next)  │  │ (Flask) │  │Controller│               │ │
+│  │  │ (Proxy) │  │ (Vite)  │  │ (Django)│  │Controller│               │ │
 │  │  └─────────┘  └─────────┘  └─────────┘  └──────────┘               │ │
 │  └────────────────────────────────────────────────────────────────────┘ │
 │  ┌────────────────────────────────────────────────────────────────────┐ │
@@ -77,10 +77,10 @@ The platform employs a **nested containerization** approach using Sysbox runtime
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **Reverse Proxy** | Caddy 2.x | TLS termination, routing, geo-blocking |
-| **Frontend** | Next.js 15 | Admin and user web interface |
-| **Backend API** | Flask/Python | REST API, business logic |
+| **Frontend** | Vite + React SPA | Admin and user web interface |
+| **Backend API** | Django/Python | REST API, business logic |
 | **Docker Controller** | Flask/Python | Container lifecycle management |
-| **Database** | SQLite | User, server, and domain storage |
+| **Database** | SQLite | User, server, and domain storage (`_DATA/control-backend/database2.db`) |
 | **Virtual Servers** | Ubuntu + Sysbox | Isolated Docker-in-Docker environments |
 | **SSH Router** | Custom Go | Dynamic SSH routing to virtual servers |
 
@@ -186,8 +186,8 @@ Traffic is port-forwarded from the public IPs through a router to the Docker hos
 
 | Component | Technology | Version | Purpose |
 |-----------|------------|---------|---------|
-| Frontend | Next.js | 15.x | React-based web UI |
-| Backend API | Flask | 3.x | REST API server |
+| Frontend | Vite + React | 19.x | Static SPA build |
+| Backend API | Django | 5.2 | REST API server (gunicorn) |
 | Database | SQLite | 3.x | Persistent storage |
 | Documentation | BookStack | 25.x | User documentation wiki |
 | API Docs | Swagger UI | 5.x | OpenAPI documentation |
@@ -230,7 +230,7 @@ The entire platform runs on a single Docker host, leveraging:
 
 | Service | Username | Password | Notes |
 |---------|----------|----------|-------|
-| Admin Panel | admin@admin.com | admin | **Change immediately** |
+| Admin Panel | admin@admin.com | admin | **Change immediately** (seeded only while the users table is empty — `bootstrap_db`) |
 | Virtual Server SSH | server{id} | (user's password) | Uses user account password |
 
 ### 7.2 Important Paths
@@ -239,6 +239,7 @@ The entire platform runs on a single Docker host, leveraging:
 |------|---------|
 | `/home/aula/apps/students/` | Installation root |
 | `_DATA/` | Persistent data (databases, certs, caches) |
+| `_LOGS/control-backend/` | Gunicorn access log (prod) |
 | `SERVERS/{id}/` | User virtual server data |
 | `control-modules/` | Control plane source code |
 | `users-modules/` | User plane components |

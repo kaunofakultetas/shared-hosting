@@ -93,11 +93,11 @@ Each virtual server is a Docker container running:
 
 ### 2.2 State Definitions
 
-| State | Container Status | Database `Enabled` | User Access |
+| State | Container Status | Database `enabled` (`hosting_virtualserver`) | User Access |
 |-------|-----------------|-------------------|-------------|
-| Running | `running` | 1 | Full access |
-| Stopped | `exited` | 0 | No access |
-| Deleted | Removed | N/A (`Deleted=1`) | No access |
+| Running | `running` | `true` | Full access |
+| Stopped | `exited` | `false` | No access |
+| Deleted | Removed | N/A (`deleted=true`) | No access |
 
 ---
 
@@ -134,7 +134,8 @@ Each virtual server is a Docker container running:
 │     ▼                                                               │
 │  3. Database Insert                                                 │
 │     │                                                               │
-│     │ INSERT INTO Hosting_VirtualServers (OwnerID, Name, ...)       │
+│     │ The backend creates the row via the ORM                       │
+│     │ (VirtualServer.objects.create) in hosting_virtualserver       │
 │     │ → Returns new ID (e.g., 42)                                   │
 │     │                                                               │
 │     ▼                                                               │
@@ -168,6 +169,8 @@ Each virtual server is a Docker container running:
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+> **Note**: The row is committed before the sidecar call (120 s timeout); a failed build soft-deletes the row. The old insert-then-rollback race is gone.
 
 ### 3.3 Name Validation
 
@@ -206,6 +209,8 @@ SERVERS/
 
 ## 4. Start/Stop Operations
 
+> **Note** (applies to all VM actions in §4–§6): Actions on unknown or soft-deleted VMs answer 404.
+
 ### 4.1 Start Virtual Server
 
 **Endpoint**: `POST /api/vm/control`
@@ -214,14 +219,14 @@ SERVERS/
 ```json
 {
     "action": "start",
-    "virtualServerID": "42"
+    "virtualServerID": 42
 }
 ```
 
 **Process**:
 1. Verify user owns the virtual server
 2. Execute: `docker start hosting-users-dind-42`
-3. Update database: `Enabled = 1`
+3. Update database: `enabled = true`
 4. Log activity
 
 ### 4.2 Stop Virtual Server
@@ -232,14 +237,14 @@ SERVERS/
 ```json
 {
     "action": "stop",
-    "virtualServerID": "42"
+    "virtualServerID": 42
 }
 ```
 
 **Process**:
 1. Verify user owns the virtual server
 2. Execute: `docker stop hosting-users-dind-42`
-3. Update database: `Enabled = 0`
+3. Update database: `enabled = false`
 4. Log activity
 
 ### 4.3 State Persistence
@@ -262,7 +267,7 @@ When a virtual server is stopped:
 ```json
 {
     "action": "delete",
-    "virtualServerID": "42"
+    "virtualServerID": 42
 }
 ```
 
@@ -299,12 +304,18 @@ When a virtual server is stopped:
 │     ▼                                                               │
 │  6. Database Updates                                                │
 │     │                                                               │
-│     │ UPDATE Hosting_VirtualServers SET Deleted = 1                 │
-│     │ DELETE FROM Hosting_DockerContainers WHERE ParentServerID=42  │
-│     │ DELETE FROM Hosting_DomainNames WHERE VirtualServerID=42      │
+│     │ hosting_virtualserver: deleted=true (via ORM)                 │
+│     │ hosting_dockercontainer rows of the VM are removed            │
+│     │ hosting_domainname rows of the VM are removed                 │
 │     │                                                               │
 │     ▼                                                               │
-│  7. Deletion Complete                                               │
+│  7. Regenerate Users Caddyfile                                      │
+│     │                                                               │
+│     │ The users Caddyfile is regenerated so the VM's vhosts die     │
+│     │ with it (a Caddy failure is logged, not fatal)                │
+│     │                                                               │
+│     ▼                                                               │
+│  8. Deletion Complete                                               │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -313,7 +324,7 @@ When a virtual server is stopped:
 
 - **User data**: Archived (renamed with timestamp)
 - **Docker data**: Deleted (too large to archive)
-- **Database records**: Soft deleted (`Deleted = 1`)
+- **Database records**: Soft deleted (`deleted=true`)
 - **Domain associations**: Hard deleted
 
 ---
@@ -328,7 +339,7 @@ When a virtual server is stopped:
 ```json
 {
     "action": "rename",
-    "virtualServerID": "42",
+    "virtualServerID": 42,
     "newName": "New Server Name"
 }
 ```
@@ -482,9 +493,9 @@ hosting-users-dind-{id}:10080 (sistema-endpoint)
 
 ### 8.1 Background Monitor
 
-The backend runs a background thread that:
+The backend container runs a supervised background process (`manage.py monitor_containers`) that:
 1. Polls container status every 3 seconds
-2. Updates `Hosting_DockerContainers` table
+2. Updates the `hosting_dockercontainer` cache table
 3. Tracks containers inside each virtual server
 
 ### 8.2 Monitored Data
@@ -502,26 +513,7 @@ The backend runs a background thread that:
 
 ### 8.3 Database Schema
 
-```sql
-CREATE TABLE Hosting_DockerContainers (
-    DockerID TEXT NOT NULL,
-    ParentServerID INTEGER NOT NULL,
-    Command TEXT,
-    CreatedAt TEXT,
-    Image TEXT,
-    Labels TEXT,
-    Mounts TEXT,
-    Names TEXT,
-    Networks TEXT,
-    Ports TEXT,
-    RunningFor TEXT,
-    Size TEXT,
-    State TEXT,
-    Status TEXT,
-    UpdatedAt TEXT,
-    UNIQUE(DockerID, ParentServerID)
-);
-```
+The cache table is `hosting_dockercontainer` — Django-managed, with snake_case docker text columns, a real `synced_at` datetime that the 5-minute stale sweep uses, and a unique constraint per `(docker_id, parent_server)`. It is rewritten continuously by the monitor.
 
 ---
 

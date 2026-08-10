@@ -1,6 +1,7 @@
 # Database Schema
 
-This document describes the SQLite database schema, table relationships, and data access patterns used in the App Hosting Platform.
+This document describes the SQLite database schema, table relationships, and
+data access patterns of the App Hosting Platform's Django backend.
 
 ---
 
@@ -10,489 +11,206 @@ This document describes the SQLite database schema, table relationships, and dat
 
 | Property | Value |
 |----------|-------|
-| Engine | SQLite 3 |
-| Location | `_DATA/control-backend/database.db` |
-| Access | Single-writer, multiple-reader |
-| Backup | File copy when container stopped |
+| Engine | SQLite 3 (Django ORM, `django.db.backends.sqlite3`) |
+| Location | `_DATA/control-backend/database2.db` (env `DB_PATH`) |
+| Concurrency | 20 s busy timeout + `IMMEDIATE` transactions (web workers + the monitor share the file; WAL is deliberately off so DBGate can mount the bare file) |
+| Transactions | `ATOMIC_REQUESTS = True` — every request is one transaction, rollback on exception |
+| Schema management | Django migrations (`control/*/migrations/`), applied by `bootstrap_db` at container start |
+| Backup | SQLite backup API snapshot (consistent against live writers) |
+
+The legacy `database.db` (the previous backend's `System_Users` /
+`Hosting_VirtualServers` tables) is retired; its data was imported once by
+`manage.py transfer_legacy` with IDs and bcrypt hashes preserved.
 
 ### 1.2 Design Principles
 
-- **Simplicity**: Single SQLite file for all data
-- **Soft Deletes**: Virtual servers marked as deleted, not removed
-- **JSON Aggregation**: Complex queries use SQLite JSON functions
-- **Timestamps**: All tables include creation/update timestamps
+- **Real constraints**: every relation is a ForeignKey with explicit
+  `on_delete` behavior; uniqueness rules live in the database, not in code.
+- **Real types**: flags are booleans, timestamps are timezone-aware
+  datetimes (stored UTC). The API converts at its boundary — JSON still
+  exposes 0/1 integers and local `"YYYY-MM-DD HH:MM:SS"` strings, so the
+  frontend contract never changed.
+- **Soft deletes**: virtual server rows are never removed — the VM ID is a
+  platform-wide contract (container name, SSH login, `SERVERS/<id>`
+  directory) and `AUTOINCREMENT` guarantees IDs are never reused.
+- **Django-default naming**: `<app>_<model>` lowercase table names.
 
 ---
 
-## 2. Entity Relationship Diagram
+## 2. Entity Relationship Model
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    ENTITY RELATIONSHIP DIAGRAM                      │
-│                                                                     │
-│  ┌─────────────────────┐         ┌─────────────────────┐            │
-│  │   System_Users      │         │ System_Registration │            │
-│  │                     │         │      Codes          │            │
-│  │ ID (PK)             │◄────────│ UserID (FK)         │            │
-│  │ Email (UNIQUE)      │    1:1  │ Code (UNIQUE)       │            │
-│  │ Password            │         │ ValidUntil          │            │
-│  │ Admin               │         └─────────────────────┘            │
-│  │ Enabled             │                                            │
-│  │ LastLogin           │         ┌─────────────────────┐            │
-│  └─────────┬───────────┘         │System_RecentActivity│            │
-│            │                     │                     │            │
-│            │ 1:N                 │ ID (PK)             │            │
-│            │                     │ UserID (FK)         │◄───────────┤
-│            ▼                     │ Message             │            │
-│  ┌─────────────────────┐         │ Time                │            │
-│  │Hosting_VirtualServers         └─────────────────────┘            │
-│  │                     │                                            │
-│  │ ID (PK)             │                                            │
-│  │ OwnerID (FK)        │                                            │
-│  │ Name                │                                            │
-│  │ Enabled             │                                            │
-│  │ Deleted             │                                            │
-│  │ CreatedAt           │                                            │
-│  │ UpdatedAt           │                                            │
-│  └─────────┬───────────┘                                            │
-│            │                                                        │
-│            │ 1:N                                                    │
-│            │                                                        │
-│  ┌─────────▼───────────┐         ┌─────────────────────┐            │
-│  │Hosting_DomainNames  │         │Hosting_Docker       │            │
-│  │                     │         │    Containers       │            │
-│  │ ID (PK)             │         │                     │            │
-│  │ VirtualServerID (FK)│         │ DockerID            │            │
-│  │ DomainName (UNIQUE) │         │ ParentServerID (FK) │◄───────────┤
-│  │ IsCloudflare        │         │ Image               │            │
-│  │ SSL                 │         │ Names               │            │
-│  └─────────────────────┘         │ State               │            │
-│                                  │ Status              │            │
-│                                  │ ...                 │            │
-│                                  └─────────────────────┘            │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+Paste into [dbdiagram.io](https://dbdiagram.io) for the picture:
 
----
+```dbml
+Table users_systemuser {
+  id integer [pk, increment]
+  email varchar(255) [unique, not null]
+  password varchar(255) [not null, note: 'bcrypt hash (rounds=12)']
+  admin boolean [not null, default: false]
+  enabled boolean [not null, default: false]
+  last_login datetime [null, note: '"last seen" — bumped by checkauth at most once a minute']
+}
 
-## 3. Table Definitions
+Table users_registrationcode {
+  id integer [pk, increment]
+  code varchar(32) [unique, not null]
+  valid_until datetime [not null, note: 'API exposes epoch seconds']
+  user_id integer [unique, not null, note: 'OneToOne — one live code per admin']
+}
 
-### 3.1 System_Users
+Table users_recentactivity {
+  id integer [pk, increment]
+  message text [not null]
+  created_at datetime [not null]
+  user_id integer [null, note: 'NULL after author deletion → "Deleted User"']
+}
 
-Stores user accounts and authentication data.
+Table hosting_virtualserver {
+  id integer [pk, increment, note: 'THE contract: hosting-users-dind-<id>, server<id>, SERVERS/<id>. Row 0 = reserved HOST row']
+  name varchar(255) [not null, default: '']
+  enabled boolean [not null, default: true]
+  deleted boolean [not null, default: false, note: 'soft delete']
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  owner_id integer [null, note: 'NULL = adopted/ownerless VM or deleted owner']
+}
 
-```sql
-CREATE TABLE System_Users (
-    ID          INTEGER NOT NULL UNIQUE PRIMARY KEY AUTOINCREMENT,
-    Email       TEXT NOT NULL UNIQUE,
-    Password    TEXT NOT NULL,          -- bcrypt hash
-    Admin       INTEGER DEFAULT 0,       -- 0=user, 1=admin
-    Enabled     INTEGER NOT NULL DEFAULT 0,
-    LastLogin   TEXT NOT NULL DEFAULT ''
-);
-```
+Table hosting_dockercontainer {
+  id integer [pk, increment]
+  docker_id varchar(255) [not null]
+  command text [not null]
+  created_at text [not null, note: 'docker CLI display string, NOT a datetime']
+  image text [not null]
+  labels text [not null]
+  mounts text [not null]
+  names text [not null]
+  networks text [not null]
+  ports text [not null]
+  running_for text [not null]
+  size text [not null]
+  state text [not null]
+  status text [not null]
+  synced_at datetime [not null, note: 'monitor bookkeeping — rows unseen 5 min are swept']
+  parent_server_id integer [not null, note: '0 (HOST row) = host containers; N = inside VM N']
 
-**Sample Data**:
-| ID | Email | Password | Admin | Enabled | LastLogin |
-|----|-------|----------|-------|---------|-----------|
-| 1 | admin@admin.com | $2b$12$... | 1 | 1 | 2025-12-08 10:30:00 |
-| 2 | user@example.com | $2b$12$... | 0 | 1 | 2025-12-07 15:45:00 |
+  indexes {
+    (docker_id, parent_server_id) [unique]
+  }
+}
 
----
+Table hosting_domainname {
+  id integer [pk, increment]
+  domain_name varchar(255) [unique, not null, note: 'globally unique — one domain, one VM']
+  is_cloudflare boolean [not null, default: false]
+  ssl boolean [not null, default: false]
+  virtual_server_id integer [not null]
+}
 
-### 3.2 System_RegistrationCodes
+Table django_session {
+  session_key varchar(40) [pk]
+  session_data text [not null]
+  expire_date datetime [not null]
+}
 
-Stores temporary registration codes generated by admins.
-
-```sql
-CREATE TABLE System_RegistrationCodes (
-    ID          INTEGER NOT NULL UNIQUE PRIMARY KEY AUTOINCREMENT,
-    UserID      INTEGER NOT NULL UNIQUE,  -- Admin who created it
-    Code        TEXT NOT NULL UNIQUE,      -- 8-char alphanumeric
-    ValidUntil  INTEGER NOT NULL           -- Unix timestamp
-);
-```
-
-**Sample Data**:
-| ID | UserID | Code | ValidUntil |
-|----|--------|------|------------|
-| 1 | 1 | ABC12345 | 1733666400 |
-
-**Notes**:
-- One code per admin at a time
-- Codes expire after 30 minutes
-- Expired codes auto-deleted on GET
-
----
-
-### 3.3 Hosting_VirtualServers
-
-Stores virtual server metadata.
-
-```sql
-CREATE TABLE Hosting_VirtualServers (
-    ID          INTEGER NOT NULL UNIQUE PRIMARY KEY,  -- Not AUTOINCREMENT, matches container ID
-    OwnerID     INTEGER NOT NULL,
-    Name        TEXT NOT NULL DEFAULT '',
-    Enabled     INTEGER NOT NULL DEFAULT 1,
-    Deleted     INTEGER NOT NULL DEFAULT 0,           -- Soft delete flag
-    CreatedAt   TEXT NOT NULL,
-    UpdatedAt   TEXT NOT NULL
-);
-
--- Special entry for host-level containers
-INSERT INTO Hosting_VirtualServers VALUES (0, 0, 'HOST', 1, 0, '', '');
-```
-
-**Sample Data**:
-| ID | OwnerID | Name | Enabled | Deleted | CreatedAt | UpdatedAt |
-|----|---------|------|---------|---------|-----------|-----------|
-| 0 | 0 | HOST | 1 | 0 | | |
-| 1 | 2 | My Web App | 1 | 0 | 2025-12-01 10:00:00 | 2025-12-08 09:00:00 |
-| 2 | 2 | API Server | 0 | 0 | 2025-12-02 14:30:00 | 2025-12-07 16:00:00 |
-
-**Notes**:
-- ID 0 represents the host (for tracking host-level containers)
-- Deleted servers have `Deleted=1`, not physically removed
-- `Enabled` reflects running state
-
----
-
-### 3.4 Hosting_DockerContainers
-
-Stores container status information, updated by background monitor.
-
-```sql
-CREATE TABLE Hosting_DockerContainers (
-    DockerID        TEXT NOT NULL,
-    ParentServerID  INTEGER NOT NULL,       -- 0 = host, N = virtual server
-    Command         TEXT NOT NULL,
-    CreatedAt       TEXT NOT NULL,
-    Image           TEXT NOT NULL,
-    Labels          TEXT NOT NULL,          -- Comma-separated
-    Mounts          TEXT NOT NULL,
-    Names           TEXT NOT NULL,
-    Networks        TEXT NOT NULL,
-    Ports           TEXT NOT NULL,
-    RunningFor      TEXT NOT NULL,
-    Size            TEXT NOT NULL,
-    State           TEXT NOT NULL,          -- running, exited, etc.
-    Status          TEXT NOT NULL,
-    UpdatedAt       TEXT NOT NULL,
-    UNIQUE(DockerID, ParentServerID)
-);
-```
-
-**Sample Data**:
-| DockerID | ParentServerID | Image | Names | State | Status |
-|----------|----------------|-------|-------|-------|--------|
-| abc123... | 0 | hosting-dind-ubuntu | hosting-users-dind-1 | running | Up 2 hours |
-| def456... | 1 | nginx:latest | web-server | running | Up 1 hour |
-| ghi789... | 1 | postgres:15 | database | running | Up 1 hour |
-
-**Notes**:
-- `ParentServerID=0` means container runs on host
-- `ParentServerID=N` means container runs inside virtual server N
-- Stale entries (not updated in 5 min) are auto-deleted
-
----
-
-### 3.5 Hosting_DomainNames
-
-Stores domain name configurations.
-
-```sql
-CREATE TABLE Hosting_DomainNames (
-    ID              INTEGER NOT NULL UNIQUE PRIMARY KEY AUTOINCREMENT,
-    VirtualServerID INTEGER NOT NULL,
-    DomainName      TEXT NOT NULL UNIQUE,
-    IsCloudflare    INTEGER NOT NULL DEFAULT 0,
-    SSL             INTEGER NOT NULL DEFAULT 0
-);
-```
-
-**Sample Data**:
-| ID | VirtualServerID | DomainName | IsCloudflare | SSL |
-|----|-----------------|------------|--------------|-----|
-| 1 | 1 | myapp.example.com | 0 | 1 |
-| 2 | 1 | api.example.com | 1 | 1 |
-| 3 | 2 | demo.project.org | 0 | 0 |
-
----
-
-### 3.6 System_RecentActivity
-
-Stores activity log for audit purposes.
-
-```sql
-CREATE TABLE System_RecentActivity (
-    ID      INTEGER NOT NULL UNIQUE PRIMARY KEY AUTOINCREMENT,
-    UserID  INTEGER NOT NULL,
-    Message TEXT NOT NULL,
-    Time    TEXT NOT NULL
-);
-```
-
-**Sample Data**:
-| ID | UserID | Message | Time |
-|----|--------|---------|------|
-| 1 | 1 | User admin@admin.com logged in (IP: 10.0.0.1) | 2025-12-08 10:30:00 |
-| 2 | 2 | Virtual server #1 created | 2025-12-08 10:35:00 |
-| 3 | 2 | Domain name "myapp.example.com" added | 2025-12-08 10:40:00 |
-
----
-
-## 4. Complex Queries
-
-### 4.1 Users List with Server Count
-
-```sql
-WITH GetUserServersCount AS (
-    SELECT
-        OwnerID,
-        COUNT(*) AS ServerCount
-    FROM
-        Hosting_VirtualServers
-    WHERE
-        Deleted = 0
-    GROUP BY OwnerID
-)
-SELECT
-    json_group_array(
-        json_object(
-            'id',           System_Users.ID,
-            'email',        System_Users.Email,
-            'servercount',  IFNULL(GetUserServersCount.ServerCount, 0),
-            'admin',        System_Users.Admin,
-            'enabled',      System_Users.Enabled,
-            'lastseen',     System_Users.LastLogin
-        )
-    ) AS UsersJSON
-FROM
-    System_Users
-LEFT JOIN GetUserServersCount
-    ON GetUserServersCount.OwnerID = System_Users.ID;
-```
-
-### 4.2 Virtual Servers with Stacks and Domains
-
-```sql
-WITH GetVirtualServers AS (
-    SELECT
-        REPLACE(Names, 'hosting-users-dind-', '') AS VirtualServerID,
-        OwnerID,
-        Email AS OwnerEmail,
-        Name,
-        Status,
-        State,
-        Enabled
-    FROM
-        Hosting_DockerContainers
-    LEFT JOIN Hosting_VirtualServers
-        ON Hosting_VirtualServers.ID = VirtualServerID
-    LEFT JOIN System_Users
-        ON System_Users.ID = Hosting_VirtualServers.OwnerID
-    WHERE
-        ParentServerID = 0
-        AND Deleted = 0
-),
-GetVirtualServersDomains AS (
-    SELECT
-        VirtualServerID,
-        json_group_array(
-            json_object(
-                'id', ID,
-                'domainname', DomainName,
-                'iscloudflare', IsCloudflare,
-                'ssl', SSL
-            )
-        ) AS DomainsJSON
-    FROM
-        Hosting_DomainNames
-    GROUP BY VirtualServerID
-)
-SELECT
-    json_group_array(
-        json_object(
-            'id',       VirtualServerID,
-            'name',     Name,
-            'status',   Status,
-            'state',    State,
-            'enabled',  Enabled,
-            'domains',  JSON(DomainsJSON)
-        )
-    )
-FROM GetVirtualServers
-LEFT JOIN GetVirtualServersDomains
-    ON GetVirtualServersDomains.VirtualServerID = GetVirtualServers.VirtualServerID;
-```
-
-### 4.3 Dashboard Statistics
-
-```sql
-SELECT json_object(
-    'users',                 (SELECT COUNT(*) FROM System_Users),
-    'virtualservers_running',(SELECT COUNT(*) FROM Hosting_VirtualServers 
-                              WHERE Deleted = 0 AND ID <> 0 AND Enabled = 1),
-    'virtualservers_total',  (SELECT COUNT(*) FROM Hosting_VirtualServers 
-                              WHERE Deleted = 0 AND ID <> 0),
-    'domains',               (SELECT COUNT(*) FROM Hosting_DomainNames)
-) AS HostingSystemJSON;
+Ref: users_registrationcode.user_id - users_systemuser.id [delete: cascade]
+Ref: users_recentactivity.user_id > users_systemuser.id [delete: set null]
+Ref: hosting_virtualserver.owner_id > users_systemuser.id [delete: set null]
+Ref: hosting_dockercontainer.parent_server_id > hosting_virtualserver.id [delete: cascade]
+Ref: hosting_domainname.virtual_server_id > hosting_virtualserver.id [delete: cascade]
 ```
 
 ---
 
-## 5. Database Access Patterns
+## 3. Tables
 
-### 5.1 Connection Management
+### 3.1 users_systemuser — accounts
 
-```python
-import sqlite3
-from contextlib import contextmanager
+One account per person. `password` is a bcrypt hash (rounds=12) verified
+directly — inputs are stripped before hashing and checking, everywhere.
+`last_login` is really "last seen": every `/api/checkauth` bumps it, at most
+once per minute; `NULL` means never seen. Disabled accounts are refused at
+login, lose live sessions immediately (session resolution only accepts
+enabled accounts) and their VMs' SSH lookups return a null hash.
 
-DATABASE_PATH = '/data/database.db'
+Deleting a user is allowed only while they own no non-deleted VMs, and it
+**detaches history rather than destroying it**: their registration code dies
+(CASCADE), their activity rows and soft-deleted VMs lose the author/owner
+(SET_NULL) and render as "Deleted User" / ownerless.
 
-@contextmanager
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
-```
+### 3.2 users_registrationcode — self-registration codes
 
-### 5.2 Usage Pattern
+One live code per admin — a OneToOne constraint, upserted on every create.
+8 uppercase alphanumeric characters, valid 30 minutes. The API exposes
+`valid_until` as unix epoch seconds. Expired codes (any admin's) are purged
+as a side effect of the widget's GET poll.
 
-```python
-with get_db_connection() as conn:
-    # Read operation
-    result = conn.execute('SELECT * FROM System_Users WHERE ID = ?', [user_id])
-    user = result.fetchone()
-    
-    # Write operation
-    conn.execute('UPDATE System_Users SET LastLogin = ? WHERE ID = ?', [timestamp, user_id])
-    conn.commit()
-```
+### 3.3 users_recentactivity — the activity log
 
----
+Append-only. `message` is a free-form English sentence rendered verbatim by
+the frontend widgets — treat the wording as part of the UI. Written by
+login, registration, password changes and every VM/domain mutation.
 
-## 6. Data Integrity
+### 3.4 hosting_virtualserver — the VM registry
 
-### 6.1 Constraints
+**The ID is the platform contract**: VM N runs in the host container
+`hosting-users-dind-N`, is reached by SSH as `serverN`, and keeps its data
+in `SERVERS/N`. IDs are never reused (`AUTOINCREMENT`) and rows are never
+hard-deleted by the app — `deleted` is the soft-delete flag. Row **ID 0 is
+the reserved HOST row** (host containers hang off it in the cache); the
+`bootstrap_db` command seeds it and `AUTOINCREMENT` never assigns 0.
 
-| Table | Constraint | Type |
-|-------|------------|------|
-| System_Users | Email | UNIQUE |
-| System_RegistrationCodes | UserID | UNIQUE |
-| System_RegistrationCodes | Code | UNIQUE |
-| Hosting_DomainNames | DomainName | UNIQUE |
-| Hosting_DockerContainers | (DockerID, ParentServerID) | UNIQUE |
+`enabled` mirrors the intended run state (start/stop). `owner` is NULL for
+VMs the monitor adopted without a known owner, and for VMs whose owner
+account was deleted.
 
-### 6.2 Foreign Key Relationships
+### 3.5 hosting_dockercontainer — the 3-second cache
 
-SQLite foreign keys are **not enforced** by default. The application maintains referential integrity:
+A cache of `docker ps` output, rewritten continuously by the
+`monitor_containers` background process: host containers under the HOST row,
+each VM's containers under its row. All docker columns are CLI display
+strings rendered verbatim by the UI — including `created_at`, which is
+docker's own text, not a datetime. `synced_at` is the monitor's bookkeeping
+timestamp; rows not seen for 5 minutes are swept. Only the monitor writes
+this table. **VM visibility in `/api/vm` is driven by this cache** — a VM
+row without a cache row is invisible until the monitor's next pass.
 
-| Child Table | Parent Table | Relationship |
-|-------------|--------------|--------------|
-| System_RegistrationCodes.UserID | System_Users.ID | 1:1 |
-| Hosting_VirtualServers.OwnerID | System_Users.ID | N:1 |
-| Hosting_DomainNames.VirtualServerID | Hosting_VirtualServers.ID | N:1 |
-| Hosting_DockerContainers.ParentServerID | Hosting_VirtualServers.ID | N:1 |
-| System_RecentActivity.UserID | System_Users.ID | N:1 |
+### 3.6 hosting_domainname — vhosts
 
----
+One row per user domain. `domain_name` is globally unique — one domain can
+only ever point at one VM, enforced by the database. Every mutation pushes
+the whole table to the docker sidecar (users-Caddyfile regeneration) inside
+the request transaction, so the Caddyfile and the table can never diverge.
 
-## 7. Maintenance Operations
+### 3.7 Django infrastructure
 
-### 7.1 Cleanup Stale Containers
-
-Run automatically by background monitor:
-```sql
-DELETE FROM Hosting_DockerContainers 
-WHERE UpdatedAt < datetime('now', '-5 minutes');
-```
-
-### 7.2 Cleanup Expired Registration Codes
-
-Run when fetching codes:
-```sql
-DELETE FROM System_RegistrationCodes 
-WHERE ValidUntil < strftime('%s', 'now');
-```
-
-### 7.3 Database Backup
-
-```bash
-# Stop backend container
-docker stop hosting-control-backend
-
-# Copy database file
-cp _DATA/control-backend/database.db _DATA/control-backend/database.db.backup
-
-# Restart backend container
-docker start hosting-control-backend
-```
+`django_session` (server-side sessions; the cookie holds only the key) and
+`django_migrations` (applied-migration bookkeeping). There are no `auth_*`
+tables — `django.contrib.auth` is not installed; the session auth is
+hand-rolled in `control/common/auth.py`.
 
 ---
 
-## 8. Performance Considerations
+## 4. Deletion Semantics
 
-### 8.1 SQLite Limitations
-
-- Single writer at a time
-- No concurrent write transactions
-- Best for < 100 concurrent users
-
-### 8.2 Optimization Opportunities
-
-```sql
--- Add indexes for common queries
-CREATE INDEX idx_vs_owner ON Hosting_VirtualServers(OwnerID);
-CREATE INDEX idx_vs_deleted ON Hosting_VirtualServers(Deleted);
-CREATE INDEX idx_dc_parent ON Hosting_DockerContainers(ParentServerID);
-CREATE INDEX idx_dn_vs ON Hosting_DomainNames(VirtualServerID);
-CREATE INDEX idx_ra_time ON System_RecentActivity(Time);
-```
-
-### 8.3 JSON Aggregation
-
-SQLite JSON functions (`json_object`, `json_group_array`) are used to:
-- Reduce number of queries
-- Return structured data in single query
-- Simplify Python code
+| You delete... | What happens |
+|---|---|
+| A user | Code dies (CASCADE); activity + soft-deleted VMs detach (SET_NULL); refused while non-deleted VMs exist |
+| A VM (soft) | `deleted=true`; domains removed explicitly + users Caddyfile regenerated; cache rows removed; ID stays claimed forever |
+| A domain | Row removed; users Caddyfile regenerated in the same transaction |
+| A container (real world) | The monitor prunes its cache row on the next pass (or the 5-minute sweep) |
 
 ---
 
-## 9. Migration Considerations
+## 5. Access Patterns
 
-### 9.1 Future PostgreSQL Migration
-
-If scaling requires it:
-
-| SQLite | PostgreSQL |
-|--------|------------|
-| `INTEGER PRIMARY KEY` | `SERIAL PRIMARY KEY` |
-| `TEXT` | `VARCHAR(n)` or `TEXT` |
-| `json_object()` | `jsonb_build_object()` |
-| `json_group_array()` | `jsonb_agg()` |
-
-### 9.2 Schema Versioning
-
-Currently no formal migration system. Changes are applied manually:
-
-```python
-def init_db_tables():
-    # Check if column exists, add if not
-    conn.execute('''
-        ALTER TABLE System_Users ADD COLUMN NewField TEXT DEFAULT ''
-    ''')
-```
-
----
-
-## Next Document
-
-Continue to [07-SECURITY.md](07-SECURITY.md) for security considerations and hardening.
-
+- **The API** reads/writes through the Django ORM only — no raw SQL.
+- **The monitor** (`manage.py monitor_containers`) is the only writer of
+  `hosting_dockercontainer` and may adopt unknown dind containers as
+  ownerless `hosting_virtualserver` rows.
+- **DBGate** can browse the file read-only (mount
+  `_DATA/control-backend/database2.db`).
+- **Migrations discipline**: the initial migrations are hand-written to
+  match the models exactly — `manage.py makemigrations --check` proves they
+  stayed in sync.
+- **The contract test suite** (`manage.py test control`) pins every JSON
+  shape derived from this schema.

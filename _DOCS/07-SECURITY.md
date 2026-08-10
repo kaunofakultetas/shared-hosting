@@ -57,37 +57,33 @@ The platform implements multiple layers of security:
 | Hashing Algorithm | bcrypt | ✓ Strong |
 | Cost Factor | 12 rounds | ✓ Adequate |
 | Salt | Unique per password | ✓ Strong |
-| Timing Attack Prevention | Constant-time comparison | ✓ Strong |
+| Timing Attack Prevention | One bcrypt per login outcome (real or dummy) | ✓ Strong |
 
 ### 2.2 Session Security
 
 | Measure | Implementation | Status |
 |---------|----------------|--------|
-| HttpOnly Cookie | Yes | ✓ Enabled |
-| Secure Cookie | Yes (HTTPS only) | ✓ Enabled |
+| HttpOnly Cookie | Yes (logout is a real endpoint, not JS) | ✓ Enabled |
+| Secure Cookie | Outside DEBUG (`SESSION_COOKIE_SECURE = not DEBUG`) | ✓ Enabled in prod |
 | SameSite | Lax | ✓ Enabled |
-| Session Fixation | New session on login | ✓ Protected |
+| Session Fixation | Key rotation on login (`cycle_key`) | ✓ Protected |
+| Session Storage | Server-side rows (`django_session`) | ✓ Enabled |
+| Secret Key | Stable, from `.env` (generated once by the deploy script) | ✓ Enabled |
 
 ### 2.3 Recommendations
 
+Still open, in Django terms:
+
 ```python
-# Add these configurations for enhanced security
+# 1. Absolute session age (today: browser-session only)
+SESSION_COOKIE_AGE = 60 * 60 * 24        # + keep EXPIRE_AT_BROWSER_CLOSE
 
-# 1. Session timeout (add to Flask config)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+# 2. Login rate limiting — the endpoint Caddy is stock (no
+#    rate_limit directive), so this belongs in the view: a
+#    small cache-based per-IP cooldown in login_view.
 
-# 2. Strong session secret (generate with)
-import secrets
-app.secret_key = secrets.token_hex(32)
-
-# 3. Rate limiting (add flask-limiter)
-from flask_limiter import Limiter
-limiter = Limiter(app, default_limits=["200 per day", "50 per hour"])
-
-@app.route('/api/login', methods=['POST'])
-@limiter.limit("5 per minute")  # Prevent brute force
-def login():
-    ...
+# 3. Session housekeeping — expired django_session rows are
+#    only removed by `manage.py clearsessions` (cron job).
 ```
 
 ---
@@ -165,9 +161,13 @@ Sysbox provides secure Docker-in-Docker:
 **Current Implementation**:
 ```yaml
 hosting-control-backend:
+    user: 1000:1000              # Non-root
     read_only: true              # Immutable filesystem
+    tmpfs:
+      - /tmp/backend             # Writable scratch (gunicorn heartbeat)
     volumes:
-      - /data                    # Only /data is writable
+      - ./_DATA/control-backend:/data    # The SQLite file
+      - ./_LOGS/control-backend:/logs    # Gunicorn access log (prod)
 ```
 
 **Recommended Additions**:
@@ -221,26 +221,28 @@ for char in name:
 
 ### 5.2 SQL Injection Prevention
 
-All database queries use parameterized statements:
+All database access goes through the Django ORM — there is no raw SQL in
+the backend:
 ```python
-# Good - parameterized
-conn.execute('SELECT * FROM Users WHERE ID = ?', [user_id])
-
-# Bad - string concatenation (NOT USED)
-conn.execute(f'SELECT * FROM Users WHERE ID = {user_id}')
+SystemUser.objects.filter(id=user_id).first()   # always parameterized
 ```
 
 ### 5.3 Authorization Checks
 
 Every protected endpoint includes:
 ```python
-@app.route('/api/vm/{id}')
-@login_required  # Authentication check
-def get_vm(id):
-    if not can_access_vm(current_user, id):  # Authorization check
-        return unauthorized()
+@login_required                      # control/common/auth.py
+def vm_list(request, virtualServerID=None):
+    if not check_user_is_allowed_to_access_vm(request.current_user, virtualServerID):
+        return JsonResponse({'message': 'Unauthorized'}, status=401)
     ...
 ```
+
+Notable properties: unknown and soft-deleted VMs answer 401 uniformly
+(admins included); DNS PUT/DELETE resolve domains by **(domain id AND
+virtual server id)**, so one VM's endpoint can never edit another VM's
+vhosts; `/api/sshrouter` compares its shared key in constant time and fails
+closed (503) when the key is unconfigured.
 
 ---
 
@@ -251,7 +253,7 @@ def get_vm(id):
 | Data | Storage | Protection |
 |------|---------|------------|
 | Passwords | Database | bcrypt hash |
-| Session tokens | Server memory | Flask-Login |
+| Session tokens | `django_session` rows in the SQLite file | Signed with the stable secret |
 | API keys | Environment variables | Not in code |
 | TLS certificates | Volume mounts | File permissions |
 
@@ -278,7 +280,7 @@ services:
 
 | Data | Encryption | Location |
 |------|------------|----------|
-| Database | None (recommended: encrypted volume) | _DATA/control-backend/ |
+| Database | None (recommended: encrypted volume) | _DATA/control-backend/database2.db |
 | User files | None | SERVERS/{id}/apps/ |
 | Docker data | None | SERVERS/{id}/docker/ |
 | TLS certs | None (sensitive) | _DATA/*/certs/ |
@@ -320,10 +322,8 @@ services:
 
 ### 8.1 Immediate Actions
 
-- [ ] **Change default admin password**
-  ```sql
-  UPDATE System_Users SET Password = '$2b$12$...' WHERE ID = 1;
-  ```
+- [ ] **Change default admin password** (through the panel's Account page,
+  or by grid edit — the hash lives in `users_systemuser.password`)
 
 - [ ] **Rotate BACKEND_SSH_API_KEY**
   ```bash
@@ -337,11 +337,9 @@ services:
 
 ### 8.2 Short-Term Improvements
 
-- [ ] **Add rate limiting**
-  ```python
-  from flask_limiter import Limiter
-  limiter = Limiter(app)
-  ```
+- [ ] **Add login rate limiting** (a cache-based per-IP cooldown in
+  `login_view` — the endpoint Caddy is stock and has no rate_limit
+  directive)
 
 - [ ] **Enable container resource limits**
   ```yaml
@@ -352,9 +350,9 @@ services:
         memory: 512M
   ```
 
-- [ ] **Implement session timeout**
+- [ ] **Implement an absolute session age**
   ```python
-  app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+  SESSION_COOKIE_AGE = 60 * 60 * 24   # settings.py
   ```
 
 ### 8.3 Long-Term Improvements
@@ -372,8 +370,10 @@ services:
 ### 9.1 Detecting Compromise
 
 **Signs of Compromise**:
-- Unusual container activity in `Hosting_DockerContainers`
-- Multiple failed login attempts in `System_RecentActivity`
+- Unusual container activity in `hosting_dockercontainer`
+- Bursts of 401s on `/api/login` in the gunicorn access log
+  (`_LOGS/control-backend/access.log` — the activity log records only
+  successful logins)
 - Unexpected outbound connections from firewall logs
 
 ### 9.2 Response Procedures
@@ -400,10 +400,10 @@ docker rm hosting-users-dind-{id}
 docker-compose down && docker-compose up -d
 
 # 3. Review activity logs
-sqlite3 _DATA/control-backend/database.db "SELECT * FROM System_RecentActivity ORDER BY ID DESC LIMIT 100"
+sqlite3 _DATA/control-backend/database2.db "SELECT * FROM users_recentactivity ORDER BY id DESC LIMIT 100"
 
 # 4. Check for unauthorized users
-sqlite3 _DATA/control-backend/database.db "SELECT * FROM System_Users"
+sqlite3 _DATA/control-backend/database2.db "SELECT id, email, admin, enabled FROM users_systemuser"
 ```
 
 ---
@@ -416,7 +416,7 @@ sqlite3 _DATA/control-backend/database.db "SELECT * FROM System_Users"
 |-------------|--------|-------|
 | Encryption in transit | ✓ | TLS everywhere |
 | Encryption at rest | ✗ | Recommended |
-| Access logging | Partial | Activity log exists |
+| Access logging | ✓ | Activity log + gunicorn access log (`_LOGS/control-backend/`, prod) |
 | Data retention | Manual | No automatic cleanup |
 
 ### 10.2 Access Control
@@ -426,7 +426,7 @@ sqlite3 _DATA/control-backend/database.db "SELECT * FROM System_Users"
 | Authentication | ✓ | Session-based |
 | Authorization | ✓ | Role-based |
 | Audit trail | Partial | Login/action logs |
-| Password policy | Partial | Minimum 6-8 chars |
+| Password policy | ✓ | Minimum 8 chars, uniform everywhere |
 
 ---
 
@@ -435,8 +435,9 @@ sqlite3 _DATA/control-backend/database.db "SELECT * FROM System_Users"
 ### 11.1 Recommended Monitoring
 
 ```bash
-# Monitor failed logins
-sqlite3 database.db "SELECT * FROM System_RecentActivity WHERE Message LIKE '%Invalid%'"
+# Monitor failed logins (the activity log records only successes —
+# failures appear as 401s in the gunicorn access log)
+grep ' 401 ' _LOGS/control-backend/access.log | grep '/api/login'
 
 # Monitor container states
 docker events --filter 'type=container'

@@ -133,14 +133,20 @@ Replace `hosting.knf.vu.lt` with your control panel domain name.
 
 <br>
 
-### 9. Start Shared Hosting System
+### 9. Environment Secrets
+`runUpdateThisStack.sh` generates the required `.env` secrets on first run (`DJANGO_SECRET_KEY` — the backend refuses to start in production without it; `BACKEND_SSH_API_KEY` — unset would make `/api/sshrouter` fail closed). No manual `.env` editing is needed.
+
+<br>
+
+### 10. Start Shared Hosting System
 ```bash
 ./runUpdateThisStack.sh
 ```
 
 <br>
 
-### 10. Access
+### 11. Access
 - **Control Panel**: https://hosting.knf.vu.lt
 - **SSH Access**: `ssh server{id}@hosting.knf.vu.lt`
 - **User Apps**: https://myapp.knf-hosting.lt (after configuration)
+- **First login**: admin@admin.com / admin — seeded automatically only while the users table is empty (`bootstrap_db` runs at container start); change the password immediately.

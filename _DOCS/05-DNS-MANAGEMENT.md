@@ -100,13 +100,7 @@ def is_domain_valid(virtual_server_id, domainname):
         return False, 'Domain name must start and end with characters (a-z)'
     
     # Uniqueness check
-    count = db.execute(
-        'SELECT COUNT(*) FROM Hosting_DomainNames '
-        'WHERE VirtualServerID <> ? AND DomainName = ?',
-        [virtual_server_id, domainname]
-    ).fetchone()[0]
-    
-    if count > 0:
+    if DomainName.objects.filter(domain_name=name).exclude(virtual_server_id=vm_id).exists():
         return False, 'Domain name is already taken'
     
     return True, 'Domain name is valid'
@@ -131,6 +125,8 @@ def is_domain_valid(virtual_server_id, domainname):
 ---
 
 ## 3. Domain CRUD Operations
+
+Unknown or deleted VMs answer 401 from the access check; a duplicate domain answers 400 with reason "Domain name is already taken"; success is 200 `{"message":"ok"}`.
 
 ### 3.1 List Domains
 
@@ -192,6 +188,8 @@ def is_domain_valid(virtual_server_id, domainname):
 ### 3.4 Delete Domain
 
 **Endpoint**: `DELETE /api/vm/dns/{virtualServerID}/{domainID}`
+
+PUT and DELETE resolve the domain by (domain id AND virtual server id) — a foreign domain id answers 404 with a reason and changes nothing, so one VM's endpoint can never edit another VM's vhosts.
 
 ---
 
@@ -276,7 +274,7 @@ myapp.example.com {
 
 ### 5.1 Caddyfile Updater Module
 
-The `CaddyfileUpdater` class generates Caddyfile configurations dynamically:
+The `CaddyfileUpdater` class generates Caddyfile configurations dynamically. This code lives in the docker sidecar (`control-modules/control-docker`), which is a separate Flask service — not in the backend:
 
 ```python
 class CaddyfileUpdater:
@@ -518,23 +516,11 @@ The virtual server's internal routing handles path-based routing if needed.
 
 ### 8.1 Domain Names Table
 
-```sql
-CREATE TABLE Hosting_DomainNames (
-    ID INTEGER PRIMARY KEY AUTOINCREMENT,
-    VirtualServerID INTEGER NOT NULL,
-    DomainName TEXT NOT NULL UNIQUE,
-    IsCloudflare INTEGER NOT NULL DEFAULT 0,
-    SSL INTEGER NOT NULL DEFAULT 0
-);
-```
+The table is `hosting_domainname` — a real FK `virtual_server_id → hosting_virtualserver(id)` (CASCADE), a globally-unique `domain_name`, and boolean `is_cloudflare`/`ssl` columns (exposed as 0/1 in JSON).
 
 ### 8.2 Indexes
 
-```sql
--- Implicit unique index on DomainName
--- Consider adding:
-CREATE INDEX idx_domains_server ON Hosting_DomainNames(VirtualServerID);
-```
+The unique index on `domain_name` is implicit; Django indexes the `virtual_server_id` FK automatically.
 
 ---
 
