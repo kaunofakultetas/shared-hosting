@@ -54,6 +54,7 @@ import { useTranslations } from "@/i18n";
 import IOSSwitch from "@/components/IOSSwitch/IOSSwitch";
 import { LongPressIconButton } from "@/components/LongPressButton";
 import PageTitle from "@/components/PageTitle/PageTitle";
+import UsageStats from "@/components/UsageStats/UsageStats";
 import AddNewVM from "./AddNewVM/AddNewVM";
 
 import AddCircleOutlinedIcon from "@mui/icons-material/AddCircleOutlined";
@@ -530,6 +531,11 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
             <AccessTimeIcon sx={{ fontSize: 18, color: "gray" }} />
             <span>{vm.status || "N/A"}</span>
           </div>
+        </div>
+
+        {/* Resource usage — the monitor's telemetry */}
+        <div className="mb-4">
+          <UsageStats usage={vm.usage} />
         </div>
 
 

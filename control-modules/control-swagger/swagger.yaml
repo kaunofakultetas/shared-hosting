@@ -1006,6 +1006,21 @@ components:
               domainname: { type: string }
               iscloudflare: { type: integer, enum: [0, 1] }
               ssl: { type: integer, enum: [0, 1] }
+        usage:
+          type: object
+          nullable: true
+          description: |
+            The monitor's resource telemetry — null while nothing has been
+            measured. CPU% is a share of the whole host (no per-VM quotas
+            exist); memory is the working set; disk is the SERVERS/<id>
+            tree measured by du every ~5 minutes. CPU/RAM are null while
+            the VM is not running.
+          properties:
+            cpu_percent: { type: number, nullable: true, example: 12.3 }
+            memory_mb: { type: integer, nullable: true, example: 2759 }
+            disk_mb: { type: integer, nullable: true, example: 18432 }
+            cpu_measured_at: { type: string, nullable: true, example: '2026-08-10 14:30:00' }
+            disk_measured_at: { type: string, nullable: true, example: '2026-08-10 14:28:00' }
 
     Domain:
       type: object

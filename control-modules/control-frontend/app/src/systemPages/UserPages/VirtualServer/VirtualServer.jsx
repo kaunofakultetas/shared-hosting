@@ -51,6 +51,7 @@ import {
 import toast from "react-hot-toast";
 
 import { useTranslations } from "@/i18n";
+import UsageStats from "@/components/UsageStats/UsageStats";
 import DomainsListTable from "./DomainsListTable/DomainsListTable";
 
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -489,6 +490,11 @@ function VmHeaderCard({ vmData, virtualServerID, startStop, rename }) {
                   <AccessTimeIcon sx={{ fontSize: 18, color: "gray" }} />
                   <span>{vmData.status || "N/A"}</span>
                 </div>
+              </div>
+
+              {/* Resource usage — refreshed by the 5 s poll */}
+              <div className="mt-3">
+                <UsageStats usage={vmData.usage} large />
               </div>
             </div>
           </div>

@@ -106,6 +106,16 @@ Table hosting_domainname {
   virtual_server_id integer [not null]
 }
 
+Table hosting_vmusage {
+  id integer [pk, increment]
+  cpu_percent float [null, note: 'share of the whole host; NULL while not running']
+  memory_mb integer [null, note: 'working set; NULL while not running']
+  disk_mb integer [null, note: 'du of SERVERS/<id>, refreshed ~5 min']
+  cpu_measured_at datetime [null]
+  disk_measured_at datetime [null]
+  virtual_server_id integer [unique, not null, note: 'OneToOne beside the registry row']
+}
+
 Table django_session {
   session_key varchar(40) [pk]
   session_data text [not null]
@@ -117,6 +127,7 @@ Ref: users_recentactivity.user_id > users_systemuser.id [delete: set null]
 Ref: hosting_virtualserver.owner_id > users_systemuser.id [delete: set null]
 Ref: hosting_dockercontainer.parent_server_id > hosting_virtualserver.id [delete: cascade]
 Ref: hosting_domainname.virtual_server_id > hosting_virtualserver.id [delete: cascade]
+Ref: hosting_vmusage.virtual_server_id - hosting_virtualserver.id [delete: cascade]
 ```
 
 ---
@@ -181,7 +192,16 @@ only ever point at one VM, enforced by the database. Every mutation pushes
 the whole table to the docker sidecar (users-Caddyfile regeneration) inside
 the request transaction, so the Caddyfile and the table can never diverge.
 
-### 3.7 Django infrastructure
+### 3.7 hosting_vmusage — per-VM resource telemetry
+
+One nullable-everything OneToOne beside the VM registry row, written only by
+the monitor: CPU% (share of the whole host) and RAM (working set) from
+cAdvisor every 3-second pass — cleared to NULL while the VM is not running —
+and disk from the sidecar's `du` sweep over `SERVERS/<id>` every ~5 minutes.
+NULL means "not measured (yet)". Serialized as the `usage` object on
+`/api/vm`; dies with its VM row (CASCADE).
+
+### 3.8 Django infrastructure
 
 `django_session` (server-side sessions; the cookie holds only the key) and
 `django_migrations` (applied-migration bookkeeping). There are no `auth_*`

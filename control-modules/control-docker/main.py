@@ -348,6 +348,37 @@ def cleanup_HTTPGET(container_name):
 
 
 
+@app.route('/api/usage/disk', methods=['GET'])
+def usagedisk_HTTPGET():
+    json_obj = {'usage': {}}
+
+    # Mounted read-only by compose (./SERVERS:/SERVERS:ro).
+    # Only live VM dirs (pure numeric names) are measured — the
+    # renamed "<id>-deleted-<timestamp>" archives are skipped.
+    servers_dir = '/SERVERS'
+    if not os.path.isdir(servers_dir):
+        return Response(json.dumps({'message': 'SERVERS is not mounted'}, indent=4), mimetype='application/json', status=500)
+
+    for entry in sorted(os.listdir(servers_dir)):
+        if not entry.isdigit():
+            continue
+
+        # du prints the total even when parts of the tree are
+        # unreadable, so the output matters, not the exit code
+        process = Popen(['du', '-sb', os.path.join(servers_dir, entry)], stdout=PIPE, stderr=PIPE)
+        stdout, stderr = process.communicate()
+        if stdout:
+            try:
+                json_obj['usage'][entry] = int(stdout.split()[0])
+            except (ValueError, IndexError):
+                pass
+
+    return Response(json.dumps(json_obj, indent=4), mimetype='application/json')
+
+
+
+
+
 @app.route('/api/updatecaddyconfig', methods=['POST'])
 def updatecaddyconfig_HTTPPOST():
     # Get the data from the request

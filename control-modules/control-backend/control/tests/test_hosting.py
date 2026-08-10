@@ -27,7 +27,8 @@ from control.tests.helpers import (
     post_json,
     put_json,
 )
-from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer
+from control.hosting.management.commands.monitor_containers import parse_cadvisor_docker, update_vm_usage
+from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer, VmUsage
 from control.users.models import RecentActivity
 
 
@@ -71,6 +72,22 @@ class VmListTests(TestCase):
         self.assertIsInstance(vms[0]['id'], int)
         self.assertEqual(vms[0]['enabled'], 1)
         self.assertEqual(vms[0]['owneremail'], 'user@test.local')
+        self.assertIsNone(vms[0]['usage'])   # nothing measured yet
+
+    def test_usage_attached_when_measured(self):
+        VmUsage.objects.create(
+            virtual_server=self.ownVm,
+            cpu_percent=12.34, memory_mb=512, disk_mb=2048,
+            cpu_measured_at=timezone.now(), disk_measured_at=timezone.now(),
+        )
+        login(self.client, 'user@test.local', 'test-pass-8')
+
+        usage = self.client.get(f'/api/vm/{self.ownVm.id}').json()['usage']
+        self.assertEqual(usage['cpu_percent'], 12.3)   # rounded to one decimal
+        self.assertEqual(usage['memory_mb'], 512)
+        self.assertEqual(usage['disk_mb'], 2048)
+        self.assertIsNotNone(usage['cpu_measured_at'])
+        self.assertIsNotNone(usage['disk_measured_at'])
 
     def test_show_other_users_is_admin_only(self):
         login(self.client, 'user@test.local', 'test-pass-8')
@@ -351,6 +368,74 @@ class DnsTests(TestCase):
                              {'domainname': 'ghost.test.lt', 'iscloudflare': 0, 'ssl': 0})
         self.assertEqual(response.status_code, 500)
         self.assertFalse(DomainName.objects.filter(domain_name='ghost.test.lt').exists())
+
+
+
+
+
+
+
+
+############################################################
+# CadvisorParsingTests
+############################################################
+#
+# The pure cAdvisor-payload parser the monitor feeds — CPU%
+# math, memory extraction, and the skip rules.
+############################################################
+
+class CadvisorParsingTests(TestCase):
+
+    @staticmethod
+    def node(alias, samples):
+        return {'aliases': [alias], 'stats': samples}
+
+    @staticmethod
+    def sample(ts, cpuTotalNs, workingSetBytes):
+        return {'timestamp': ts, 'cpu': {'usage': {'total': cpuTotalNs}},
+                'memory': {'working_set': workingSetBytes}}
+
+    def test_cpu_and_memory_math(self):
+        # 1 s wall time, 1e9 cpu-ns burned, 2 cores → 50 %
+        payload = {'/docker/abc': self.node('hosting-users-dind-7', [
+            self.sample('2026-08-10T12:00:00.000000000Z', 0, 0),
+            self.sample('2026-08-10T12:00:01.000000000Z', 1_000_000_000, 512 * 1048576),
+        ])}
+        usage = parse_cadvisor_docker(payload, numCores=2)
+        self.assertEqual(usage, {7: {'cpu_percent': 50.0, 'memory_mb': 512}})
+
+    def test_single_sample_has_memory_but_no_cpu(self):
+        payload = {'/docker/abc': self.node('hosting-users-dind-7', [
+            self.sample('2026-08-10T12:00:00.000000000Z', 0, 256 * 1048576),
+        ])}
+        usage = parse_cadvisor_docker(payload, numCores=2)
+        self.assertEqual(usage, {7: {'cpu_percent': None, 'memory_mb': 256}})
+
+    def test_non_dind_and_malformed_names_are_skipped(self):
+        payload = {
+            'a': self.node('some-other-container', [self.sample('2026-08-10T12:00:00.000000000Z', 0, 1)]),
+            'b': self.node('hosting-users-dind-abc', [self.sample('2026-08-10T12:00:00.000000000Z', 0, 1)]),
+        }
+        self.assertEqual(parse_cadvisor_docker(payload, numCores=1), {})
+
+    def test_update_clears_stopped_vms_and_skips_unknown_ids(self):
+        owner = create_system_user(email='mon@test.local')
+        runningVm = create_vm(owner)
+        stoppedVm = create_vm(owner)
+        VmUsage.objects.create(virtual_server=stoppedVm, cpu_percent=5.0, memory_mb=128, disk_mb=999)
+
+        update_vm_usage({
+            runningVm.id: {'cpu_percent': 12.0, 'memory_mb': 256},
+            999999: {'cpu_percent': 1.0, 'memory_mb': 1},     # no such VM — skipped
+        })
+
+        self.assertEqual(VmUsage.objects.get(virtual_server=runningVm).memory_mb, 256)
+
+        stoppedUsage = VmUsage.objects.get(virtual_server=stoppedVm)
+        self.assertIsNone(stoppedUsage.cpu_percent)
+        self.assertIsNone(stoppedUsage.memory_mb)
+        self.assertEqual(stoppedUsage.disk_mb, 999)           # disk survives the clear
+        self.assertFalse(VmUsage.objects.filter(virtual_server_id=999999).exists())
 
 
 

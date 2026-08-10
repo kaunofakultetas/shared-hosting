@@ -151,3 +151,41 @@ class DomainName(models.Model):
     # String representation
     def __str__(self):
         return self.domain_name
+
+
+
+
+
+
+
+
+############################################################
+# VmUsage
+############################################################
+#
+# One VM's live resource telemetry — a OneToOne beside the
+# registry row, written only by monitor_containers: CPU/RAM
+# from cAdvisor every 3-second pass (cleared to NULL while
+# the VM is not running), disk from the sidecar's du sweep
+# every ~5 minutes. All fields nullable — NULL means "not
+# measured (yet)". memory_mb is the working set; disk_mb is
+# the SERVERS/<id> tree (apps + the inner docker data).
+#
+# Used by:
+#   - monitor_containers — the only writer
+#   - vm_views — the usage object on the VM cards/detail
+############################################################
+
+class VmUsage(models.Model):
+
+    # Columns
+    virtual_server = models.OneToOneField(VirtualServer, on_delete=models.CASCADE, related_name='usage')
+    cpu_percent = models.FloatField(null=True, blank=True)
+    memory_mb = models.IntegerField(null=True, blank=True)
+    disk_mb = models.IntegerField(null=True, blank=True)
+    cpu_measured_at = models.DateTimeField(null=True, blank=True)
+    disk_measured_at = models.DateTimeField(null=True, blank=True)
+
+    # String representation
+    def __str__(self):
+        return f'usage of #{self.virtual_server_id}'

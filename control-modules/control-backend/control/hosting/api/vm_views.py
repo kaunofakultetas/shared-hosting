@@ -26,12 +26,13 @@ import requests
 
 from control.common.auth import (
     check_user_is_allowed_to_access_vm,
+    format_datetime,
     get_json,
     log_activity,
     login_required,
 )
 from control.hosting import docker_controller
-from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer
+from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer, VmUsage
 from control.users.models import SystemUser
 
 
@@ -149,6 +150,20 @@ def vm_list(request, virtualServerID=None):
         })
 
 
+    # Every VM's live usage (the monitor's telemetry), in one
+    # query — null while nothing has been measured
+    usageByVm = {
+        thisUsage.virtual_server_id: {
+            'cpu_percent': round(thisUsage.cpu_percent, 1) if thisUsage.cpu_percent is not None else None,
+            'memory_mb': thisUsage.memory_mb,
+            'disk_mb': thisUsage.disk_mb,
+            'cpu_measured_at': format_datetime(thisUsage.cpu_measured_at),
+            'disk_measured_at': format_datetime(thisUsage.disk_measured_at),
+        }
+        for thisUsage in VmUsage.objects.all()
+    }
+
+
     # Assemble, in numeric id order
     responseData = []
     for vmIdText in sorted(dindRows, key=int):
@@ -178,6 +193,7 @@ def vm_list(request, virtualServerID=None):
             'owneremail': ownerEmails.get(thisVm.owner_id),
             'stacks': stacks or None,
             'domains': domainsByVm.get(thisVm.id) or None,
+            'usage': usageByVm.get(thisVm.id),
         })
 
 

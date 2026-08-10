@@ -77,6 +77,30 @@ def get_status(containerName):
 
 
 ############################################################
+# get_disk_usage
+############################################################
+#
+# The sidecar's du sweep over /SERVERS: {"usage": {"<id>":
+# <bytes>}} for every live VM directory. A du over the inner
+# docker trees can take a while — the generous timeout is
+# fine because the monitor calls this from a background
+# thread, never from a request.
+#
+# Used by:
+#   - monitor_containers — the ~5-minute disk refresh
+############################################################
+
+def get_disk_usage():
+    return requests.get(f'{BASE_URL}/api/usage/disk', timeout=240)
+
+
+
+
+
+
+
+
+############################################################
 # update_caddy_config
 ############################################################
 #
