@@ -105,21 +105,32 @@ services:
 
 
 
+
   # ------------------------------------------------------------
   #                System Control Panel Services
   # ------------------------------------------------------------
   hosting-control-frontend:
     container_name: hosting-control-frontend
+
+    # Docker Hub
     image: vuknf/hosting-control-frontend:latest
+
+    # # Self-built
+    # image: hosting-control-frontend
+    # build:
+    #   context: ./control-modules/control-frontend
+    #   # dockerfile: Dockerfile                                                         # Prod
+    #   dockerfile: Dockerfile.dev                                                     # Dev
+
     user: 1000:1000
-    runtime: sysbox-runc
     read_only: true
-    environment:
-      - BACKEND_API_URL=http://hosting-control-backend:8000
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
+    # tmpfs:                                                                           # Dev
+    #   - /home/node/.npm:uid=1000,gid=1000                                            # Dev
+    # volumes:                                                                         # Dev
+    #   - ./control-modules/control-frontend/app:/app                                  # Dev
     networks:
       - isolated-control-panel
+      # - external                                                                     # Dev
     restart: unless-stopped
 
 
@@ -127,55 +138,107 @@ services:
   # Control Panel Backend
   hosting-control-backend:
     container_name: hosting-control-backend
+
+    # Docker Hub
     image: vuknf/hosting-control-backend:latest
+
+    # # Self-built
+    # image: hosting-control-backend
+    # build: ./control-modules/control-backend
+
     user: 1000:1000
-    runtime: sysbox-runc
     read_only: true
     environment:
       - TMPDIR=/tmp/backend
-      - DB_PATH=/data/database.db
+      # - APP_DEBUG=true                                                               # Dev
+      - DB_PATH=/data/database2.db
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
 
       - DOCKER_CONTROLLER_HOST=hosting-control-docker
       - DOCKER_CONTROLLER_PORT=8000
 
       - BACKEND_SSH_API_KEY=${BACKEND_SSH_API_KEY}
+    tmpfs:
+      - /tmp/backend:uid=1000,gid=1000
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./_DATA/control-backend:/data
+      - ./_LOGS/control-backend:/logs
+      # - ./control-modules/control-backend:/app                                       # Dev
     extra_hosts:
       - "auth.docker.io:172.19.0.30"
       - "registry-1.docker.io:172.19.0.30"
     networks:
       - isolated-control-panel
       - isolated-control-docker
+      # - external                                                                     # Dev
     restart: unless-stopped
-  
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
 
 
+
+
+
+
+
+
+  # ------------------------------------------------------------
+  #                Docker Control and Monitoring Services
+  # ------------------------------------------------------------
   # System Docker Controller
   hosting-control-docker:
     container_name: hosting-control-docker
+
+    # Docker Hub
     image: vuknf/hosting-control-docker:latest
-    user: root
-    runtime: sysbox-runc
+
+    # # Self-built
+    # image: hosting-control-docker
+    # build: ./control-modules/control-docker
+
     read_only: true
     environment:
+      # - APP_DEBUG=true                                                               # Dev
       - ROOT_DIR=${ROOT_DIR}
       - USERS_VM_DIR=SERVERS
-      - APP_DEBUG=false
     volumes:
       - /etc/localtime:/etc/localtime:ro
 
-      # Users Caddy
+      # Users apps caddy config
       - ./_DATA/users-caddy:/users-caddy
 
-      # Control Docker
+      # Docker socket for controlling docker containers
       - /var/run/docker.sock:/var/run/docker.sock
+
+      # VM data directories, read-only — /api/usage/disk
+      - ./SERVERS:/SERVERS:ro
 
       # Users virtual servers persistent directories
       - ${ROOT_DIR}/SERVERS:${ROOT_DIR}/SERVERS
+
+      # Source code
+      # - ./control-modules/control-docker:/app                                        # Dev
     networks:
       - isolated-control-docker
+    restart: unless-stopped
+
+
+
+  # Proxy for accessing Users' VMs docker sockets
+  hosting-control-dockersocket:
+    container_name: hosting-control-dockersocket
+    image: caddy:2.11-alpine
+    runtime: sysbox-runc
+    user: 1000:1000
+    read_only: true
+    volumes:
+      - ./control-modules/control-dockersocket/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      isolated-control-docker: {}
+      filtered-users:
+        ipv4_address: 172.19.2.11
     restart: unless-stopped
 
 
@@ -197,26 +260,9 @@ services:
       - isolated-control-docker
     restart: unless-stopped
 
-
-
-  hosting-control-dockersocket:
-    container_name: hosting-control-dockersocket
-    image: caddy:2.11-alpine
-    user: 1000:1000
-    runtime: sysbox-runc
-    read_only: true
-    volumes:
-      - ./control-modules/control-dockersocket/Caddyfile:/etc/caddy/Caddyfile:ro
-    networks:
-      isolated-control-docker: {}
-      filtered-users:
-        ipv4_address: 172.19.2.11
-    restart: unless-stopped 
   # ------------------------------------------------------------
   # ------------------------------------------------------------
   # ------------------------------------------------------------
-
-
 
 
 
@@ -257,8 +303,6 @@ services:
   # ------------------------------------------------------------
   # ------------------------------------------------------------
   # ------------------------------------------------------------
-
-
 
 
 
@@ -337,8 +381,6 @@ services:
   hosting-control-swagger:
     container_name: hosting-control-swagger
     image: swaggerapi/swagger-ui:v5.29.5
-    user: 1000:1000
-    runtime: sysbox-runc
     read_only: false
     volumes:
       - ./control-modules/control-swagger/swagger.yaml:/swagger.yaml:ro
@@ -351,9 +393,6 @@ services:
   # ------------------------------------------------------------
   # ------------------------------------------------------------
   # ------------------------------------------------------------
-
-
-
 
 
 
