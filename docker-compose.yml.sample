@@ -63,7 +63,6 @@ services:
     container_name: hosting-users-ssh-router
     image: vuknf/hosting-users-ssh-router:latest
     user: 1000:1000
-    runtime: sysbox-runc
     read_only: true
     environment:
       - BACKEND_SSH_API_URL=http://hosting-control-backend:8000/api/sshrouter
@@ -370,7 +369,6 @@ services:
     container_name: hosting-control-docs-drawio
     image: jgraph/drawio:29.0.3
     user: 1000:1000
-    runtime: sysbox-runc
     read_only: false
     networks:
       - isolated-control-panel
