@@ -1,8 +1,8 @@
 services:
 
-  #########################################################
-  ##############  Incoming Traffic Endpoints ##############
-  #########################################################
+  # ------------------------------------------------------------
+  #                Incoming and outgoing endpoints
+  # ------------------------------------------------------------
   # Endpoint of the system control panel
   hosting-control-caddy:
     container_name: hosting-control-caddy
@@ -33,6 +33,7 @@ services:
     restart: unless-stopped
 
 
+
   # Users servers hosted apps WEB traffic endpoint
   hosting-users-caddy:
     container_name: hosting-users-caddy
@@ -56,6 +57,7 @@ services:
     restart: unless-stopped
 
 
+
   # SSH Router for Users
   hosting-users-ssh-router:
     container_name: hosting-users-ssh-router
@@ -74,17 +76,38 @@ services:
       filtered-users:
         ipv4_address: 172.19.2.5
     restart: unless-stopped
-  #########################################################
-  #########################################################
-  #########################################################
+
+
+
+  # Exit container for Docker Hub API access (L4 SNI proxy)
+  hosting-control-backend-exit:
+    container_name: hosting-control-backend-exit
+    image: vuknf/caddy-l4:2.11
+    user: 1000:1000
+    runtime: sysbox-runc
+    read_only: true
+    volumes:
+      - ./control-modules/control-backend-exit/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      isolated-control-panel:
+        ipv4_address: 172.19.0.30
+      external: {}
+    restart: unless-stopped
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
 
 
 
 
-  #########################################################
-  ############  System Control Panel Services #############
-  #########################################################
-  # Control Panel Frontend
+
+
+
+
+
+  # ------------------------------------------------------------
+  #                System Control Panel Services
+  # ------------------------------------------------------------
   hosting-control-frontend:
     container_name: hosting-control-frontend
     image: vuknf/hosting-control-frontend:latest
@@ -98,6 +121,7 @@ services:
     networks:
       - isolated-control-panel
     restart: unless-stopped
+
 
 
   # Control Panel Backend
@@ -127,21 +151,6 @@ services:
     restart: unless-stopped
   
 
-  # Exit container for Docker Hub API access (L4 SNI proxy)
-  hosting-control-backend-exit:
-    container_name: hosting-control-backend-exit
-    image: vuknf/caddy-l4:2.11
-    user: 1000:1000
-    runtime: sysbox-runc
-    read_only: true
-    volumes:
-      - ./control-modules/control-backend-exit/Caddyfile:/etc/caddy/Caddyfile:ro
-    networks:
-      isolated-control-panel:
-        ipv4_address: 172.19.0.30
-      external: {}
-    restart: unless-stopped
-
 
   # System Docker Controller
   hosting-control-docker:
@@ -170,6 +179,7 @@ services:
     restart: unless-stopped
 
 
+
   # Container Monitoring (Cadvisor)
   hosting-control-cadvisor:
     container_name: hosting-control-cadvisor
@@ -188,6 +198,7 @@ services:
     restart: unless-stopped
 
 
+
   hosting-control-dockersocket:
     container_name: hosting-control-dockersocket
     image: caddy:2.11-alpine
@@ -201,12 +212,31 @@ services:
       filtered-users:
         ipv4_address: 172.19.2.11
     restart: unless-stopped 
-  
-  
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+  # ------------------------------------------------------------
+  #                    Administrator Services
+  # ------------------------------------------------------------
   # Database Browser
   hosting-control-dbgate:
     container_name: hosting-control-dbgate
-    image: dbgate/dbgate:7.1.4
+    image: dbgate/dbgate:7.2.3
+    user: root
+    read_only: true
     environment:
       WEB_ROOT: /dbgate
 
@@ -216,25 +246,33 @@ services:
 
       CONNECTIONS: con1
       LABEL_con1: App Hosting Platform - SQLite
-      FILE_con1: /root/db.sqlite3
+      FILE_con1: /data/database2.db
       ENGINE_con1: sqlite@dbgate-plugin-sqlite
-    read_only: false
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./_DATA/control-backend/database.db:/root/db.sqlite3
+      - ./_DATA/control-backend:/data
     networks:
       - isolated-control-panel
     restart: unless-stopped
-  #########################################################
-  #########################################################
-  #########################################################
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
 
 
 
 
-  #########################################################
-  ####################  Documentation #####################
-  #########################################################
+
+
+
+
+
+
+
+
+
+  # ------------------------------------------------------------
+  #                Documentation Services
+  # ------------------------------------------------------------
   hosting-control-docs-web:
     container_name: hosting-control-docs-web
     image: linuxserver/bookstack:25.11.1
@@ -310,17 +348,22 @@ services:
     networks:
       - isolated-control-panel
     restart: unless-stopped
-  #########################################################
-  #########################################################
-  #########################################################
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
 
 
 
 
 
-  #########################################################
-  ############## Outgoing Traffic Management ##############
-  #########################################################
+
+
+
+
+
+  # ------------------------------------------------------------
+  #                Outgoing traffic management
+  # ------------------------------------------------------------
   # Outgoing users traffic firewall
   hosting-users-firewall:
     container_name: hosting-users-firewall
@@ -364,6 +407,7 @@ services:
     restart: unless-stopped
 
 
+
   # Docker Hub cache proxy for users
   hosting-users-dockerhub-cache:
     container_name: hosting-users-dockerhub-cache
@@ -380,9 +424,13 @@ services:
       filtered-users:
         ipv4_address: 172.19.2.4
     restart: unless-stopped
-  #########################################################
-  #########################################################
-  #########################################################
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+  # ------------------------------------------------------------
+
+
+
+
 
 
 
