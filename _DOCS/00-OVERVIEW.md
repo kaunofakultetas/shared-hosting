@@ -83,6 +83,7 @@ The platform employs a **nested containerization** approach using Sysbox runtime
 | **Database** | SQLite | User, server, and domain storage (`_DATA/control-backend/database2.db`) |
 | **Virtual Servers** | Ubuntu + Sysbox | Isolated Docker-in-Docker environments |
 | **SSH Router** | Custom Go | Dynamic SSH routing to virtual servers |
+| **Port Forwarder** | Caddy layer4 | Public TCP ports (30000-30029) → virtual servers |
 
 ---
 
@@ -115,6 +116,7 @@ Traffic is port-forwarded from the public IPs through a router to the Docker hos
 |---------------|---------------|----------|---------|
 | 80 | 10080 | HTTP | User applications |
 | 443 | 10443 | HTTPS | User applications (SSL) |
+| 30000-30029 | 30000-30029 | TCP | User port forwards (raw TCP) |
 
 ### 3.3 Request Flow Diagram
 
@@ -264,6 +266,7 @@ The entire platform runs on a single Docker host, leveraging:
 | `https://myapp.knf-hosting.lt/` | User-hosted web application |
 | `https://*.knf-hosting.lt/` | Any subdomain → user apps |
 | `https://custom-domain.com/` | Custom domain (configured in DNS settings) |
+| `knf-hosting.lt:30000-30029` | User port forwards (raw TCP, assigned in the panel) |
 
 ---
 

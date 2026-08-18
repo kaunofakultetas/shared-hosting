@@ -27,6 +27,11 @@ mkdir -p _DATA/users-caddy/caddy_logs
 mkdir -p _DATA/users-caddy/certs
 touch _DATA/users-caddy/Caddyfile
 
+# Create users-portforwarder directories
+mkdir -p _DATA/users-portforwarder/caddy_config
+mkdir -p _DATA/users-portforwarder/caddy_data
+touch _DATA/users-portforwarder/Caddyfile
+
 # Create users-dockerhub-cache directory
 mkdir -p _DATA/users-dockerhub-cache
 #########################################################################################

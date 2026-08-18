@@ -87,6 +87,7 @@ Configure port forwarding on your router to route traffic from two public IP add
 |-------------|-------------|----------|---------|
 | 80 | 10080 | TCP | HTTP (user apps) |
 | 443 | 10443 | TCP | HTTPS (user apps) |
+| 30000-30029 | 30000-30029 | TCP | User port forwards (raw TCP) |
 
 Example router configuration:
 ```
@@ -97,11 +98,21 @@ Example router configuration:
 158.129.172.221:8443 → {server}:8443
 
 # User Apps IP (158.129.172.222)
-158.129.172.222:80   → {server}:10080
-158.129.172.222:443  → {server}:10443
+158.129.172.222:80          → {server}:10080
+158.129.172.222:443         → {server}:10443
+158.129.172.222:30000-30029 → {server}:30000-30029
 ```
 
 Replace `{server}` with your Docker host's internal IP address.
+
+The `30000-30029` range is the user port forward pool — students assign
+these ports to their apps in the control panel ("Port Forwarding" tab).
+The pool is IPv4/TCP only and can be moved by setting
+`PORTFORWARD_RANGE_START` / `PORTFORWARD_RANGE_END` in `.env` (the same
+values size the published range on `hosting-users-portforwarder` and the
+backend's validation). Keep it outside the Linux ephemeral port range
+(32768-60999 by default) — the default pool sits safely below it, so
+host outgoing connections can never occupy a pool port.
 
 <br>
 

@@ -6,8 +6,8 @@
 #  and the containers cache decorates it with live state — a
 #  row whose container the monitor has not seen yet renders
 #  as "creating" (fresh row) or "unknown" (old row). Ids are
-#  integers; stacks/domains are null when empty. The frontend
-#  polls this every 3 seconds.
+#  integers; stacks/domains/portforwards are null when empty.
+#  The frontend polls this every 3 seconds.
 #
 #  POST /api/vm/control proxies to the docker sidecar;
 #  create and delete answer 202 and finish in one-shot
@@ -35,7 +35,8 @@ from control.common.auth import (
     login_required,
 )
 from control.hosting import docker_controller
-from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer, VmUsage
+from control.hosting.api.portforward_views import PORTFORWARD_PUBLIC_HOST
+from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, PortForward, VirtualServer, VmUsage
 from control.users.models import SystemUser
 
 
@@ -157,6 +158,19 @@ def vm_list(request, virtualServerID=None):
         })
 
 
+    # Every VM's port forwards, in one query — publichost rides
+    # along so the card can render the exact connect string
+    portForwardsByVm = {}
+    for thisForward in PortForward.objects.order_by('id'):
+        portForwardsByVm.setdefault(thisForward.virtual_server_id, []).append({
+            'id': thisForward.id,
+            'publichost': PORTFORWARD_PUBLIC_HOST,
+            'publicport': thisForward.public_port,
+            'internalport': thisForward.internal_port,
+            'description': thisForward.description,
+        })
+
+
     # Every VM's live usage (the monitor's telemetry), in one
     # query — null while nothing has been measured
     usageByVm = {
@@ -209,6 +223,7 @@ def vm_list(request, virtualServerID=None):
             'owneremail': ownerEmails.get(thisVm.owner_id),
             'stacks': stacks or None,
             'domains': domainsByVm.get(thisVm.id) or None,
+            'portforwards': portForwardsByVm.get(thisVm.id) or None,
             'usage': usageByVm.get(thisVm.id),
         })
 
@@ -458,22 +473,29 @@ def vm_control(request):
     elif action == 'delete':
 
         # The intent commits NOW: the card disappears on the
-        # next poll and the domains are freed immediately (the
-        # global uniqueness must not be held by a dying VM).
-        # The cache rows are the monitor's to prune.
+        # next poll and the domains and public ports are freed
+        # immediately (the global uniqueness must not be held
+        # by a dying VM). The cache rows are the monitor's to
+        # prune.
         with transaction.atomic():
             VirtualServer.objects.filter(id=virtualServerID).update(deleted=True, updated_at=timezone.now())
             DomainName.objects.filter(virtual_server_id=virtualServerID).delete()
+            PortForward.objects.filter(virtual_server_id=virtualServerID).delete()
             log_activity(request.current_user.id, f'Virtual server #{virtualServerID} deleted')
 
-        # Regenerate the users Caddyfile so the deleted VM's
-        # vhosts die with the flag, before the slow teardown.
-        # A Caddy hiccup must not fail the delete — the next
-        # domain change re-syncs anyway.
+        # Regenerate the users Caddyfile and the portforwarder
+        # Caddyfile so the deleted VM's vhosts and listeners
+        # die with the flag, before the slow teardown. A Caddy
+        # hiccup must not fail the delete — the next domain or
+        # forward change re-syncs anyway.
         try:
             docker_controller.update_caddy_config()
         except Exception as e:
             print(f'Caddy config update after VM delete failed: {e}')
+        try:
+            docker_controller.update_portforwarder_config()
+        except Exception as e:
+            print(f'Portforwarder config update after VM delete failed: {e}')
 
         # The physical teardown (stop + rm + data archive) runs
         # in the background; a failure reverts the flag and the

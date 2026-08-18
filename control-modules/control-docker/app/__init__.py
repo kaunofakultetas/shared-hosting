@@ -14,6 +14,8 @@
 #    usage/routes.py            — /api/usage/disk
 #    caddy/routes.py            — /api/updatecaddyconfig
 #    caddy/caddyfile_updater.py — the users-Caddyfile renderer
+#    portforwarder/routes.py    — /api/updateportforwarderconfig
+#    portforwarder/portforwarder_updater.py — the layer4 renderer
 #
 #  Trust model: NO authentication and state-changing GETs —
 #  the isolated-control-docker network is the only caller
@@ -38,7 +40,7 @@ from flask import Flask
 # create_app
 ############################################################
 #
-# Build the Flask app and register the four blueprints. No
+# Build the Flask app and register the five blueprints. No
 # secret key and no CORS layer on purpose: the service has
 # no sessions, no cookies and no browser callers — the only
 # clients are backend containers on the internal network.
@@ -64,6 +66,9 @@ def create_app():
 
     from .caddy.routes import caddy_bp
     app.register_blueprint(caddy_bp, url_prefix='')
+
+    from .portforwarder.routes import portforwarder_bp
+    app.register_blueprint(portforwarder_bp, url_prefix='')
 
 
     return app

@@ -8,13 +8,13 @@
 //  (3-second poll, invalidation after every action); the
 //  first load renders skeleton cards.
 //
-//  Search matches VM name, owner email, VM id, domain names
-//  and container/stack names; the search text and the
-//  other-users switch live in the URL (?q=...&all=1) and the
-//  scroll spot in sessionStorage, so opening a VM and coming
-//  back lands exactly where the user left. Delete additionally
-//  requires the VM to be stopped and a 3-second hold on the
-//  shared LongPressIconButton.
+//  Search matches VM name, owner email, VM id, domain names,
+//  public forward ports and container/stack names; the search
+//  text and the other-users switch live in the URL
+//  (?q=...&all=1) and the scroll spot in sessionStorage, so
+//  opening a VM and coming back lands exactly where the user
+//  left. Delete additionally requires the VM to be stopped
+//  and a 3-second hold on the shared LongPressIconButton.
 //
 //  Split into (root component last):
 //
@@ -23,6 +23,8 @@
 //    QuickActions        — start/stop + hold-to-delete corner
 //    DomainRow           — one domain with its chips
 //    DomainsSection      — the card's domain list
+//    PortForwardRow      — one forward with its copy button
+//    PortForwardsSection — the card's port forward list
 //    StacksSection       — the card's containers by stack
 //    VMCard              — one server card
 //    SearchBox           — the header search field
@@ -68,6 +70,8 @@ import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import ClearIcon from "@mui/icons-material/Clear";
 import DomainIcon from "@mui/icons-material/Domain";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import SettingsEthernetIcon from "@mui/icons-material/SettingsEthernet";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 
 
@@ -162,9 +166,9 @@ function useVirtualServers(showOtherUsers) {
 // -----------------------------------------------------------
 //
 // The search predicate: true when the VM's name, owner email,
-// id, any domain name, or any stack/container name contains
-// the query (case-insensitive). An empty query matches
-// everything.
+// id, any domain name, any forward's public port or
+// description, or any stack/container name contains the query
+// (case-insensitive). An empty query matches everything.
 //
 // Used by:
 //   - VirtualServersTable (below) — filters the card grid
@@ -184,6 +188,13 @@ function vmMatchesQuery(vm, searchQuery) {
   if (vm.domains) {
     for (const domain of vm.domains) {
       if (domain.domainname?.toLowerCase().includes(query)) return true;
+    }
+  }
+
+  if (vm.portforwards) {
+    for (const forward of vm.portforwards) {
+      if (forward.publicport?.toString().includes(query)) return true;
+      if (forward.description?.toLowerCase().includes(query)) return true;
     }
   }
 
@@ -383,6 +394,107 @@ function DomainsSection({ domains }) {
 
 
 // -----------------------------------------------------------
+// PortForwardRow
+// -----------------------------------------------------------
+//
+// One port forward of the card: the public endpoint, the
+// muted arrow to the VM-side port, the copy button
+// (propagation stopped so the card doesn't navigate) and the
+// description as a neutral chip.
+//
+// Used by:
+//   - PortForwardsSection (below)
+// -----------------------------------------------------------
+
+function PortForwardRow({ forward }) {
+  const t = useTranslations("PAGES.vmList");
+
+  // The exact string students paste into their client tools
+  const endpoint = `${forward.publichost}:${forward.publicport}`;
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm text-gray-700 font-medium">{endpoint}</span>
+      <span className="text-sm text-gray-400">→ :{forward.internalport}</span>
+      <Tooltip title={t("CARD.copy_endpoint")}>
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(endpoint);
+            toast.success(<b>{t("CARD.copied")}</b>, { duration: 2000 });
+          }}
+          sx={{
+            p: 0.5,
+            color: "gray",
+            "&:hover": { color: "#1976d2", bgcolor: "#e3f2fd" },
+          }}
+        >
+          <ContentCopyIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+      </Tooltip>
+      {forward.description && (
+        <Chip
+          label={forward.description}
+          size="small"
+          sx={{
+            fontSize: "0.6rem",
+            height: 18,
+            bgcolor: "#e5e7eb",
+            color: "#374151",
+            fontWeight: 600,
+            "& .MuiChip-label": { px: 0.75 },
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+
+
+
+
+
+
+// -----------------------------------------------------------
+// PortForwardsSection
+// -----------------------------------------------------------
+//
+// The card's port forward list under its section heading —
+// one PortForwardRow per forward.
+//
+// Used by:
+//   - VMCard (below) — rendered only when forwards exist
+// -----------------------------------------------------------
+
+function PortForwardsSection({ portforwards }) {
+  const t = useTranslations("PAGES.vmList");
+
+  return (
+    <div className="border-t border-gray-100 pt-3 mb-4">
+      <div className="flex items-center gap-2 mb-2">
+        <SettingsEthernetIcon sx={{ fontSize: 16, color: "gray" }} />
+        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          {t("CARD.port_forwards")}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {portforwards.map((forward, fidx) => (
+          <PortForwardRow key={fidx} forward={forward} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+// -----------------------------------------------------------
 // StacksSection
 // -----------------------------------------------------------
 //
@@ -455,8 +567,9 @@ function StacksSection({ stacks, vmRunning }) {
 //
 // One server card: id + running/stopped chip, name, the
 // QuickActions corner, owner and uptime line, then the
-// DomainsSection and StacksSection. Clicking anywhere else on
-// the card opens the VM detail page.
+// DomainsSection, PortForwardsSection and StacksSection.
+// Clicking anywhere else on the card opens the VM detail
+// page.
 //
 // Used by:
 //   - VirtualServersTable (below) — one per filtered VM
@@ -554,6 +667,10 @@ function VMCard({ vm, onNavigate, onStartStop, onDelete }) {
 
         {vm.domains && vm.domains.length > 0 && (
           <DomainsSection domains={vm.domains} />
+        )}
+
+        {vm.portforwards && vm.portforwards.length > 0 && (
+          <PortForwardsSection portforwards={vm.portforwards} />
         )}
 
         <StacksSection stacks={vm.stacks} vmRunning={isRunning} />

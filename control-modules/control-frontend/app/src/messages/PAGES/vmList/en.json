@@ -27,6 +27,9 @@
     "unnamed": "Unnamed Server",
     "domain_names": "Domain Names",
     "open_new_tab": "Open in new tab",
+    "port_forwards": "Port Forwarding",
+    "copy_endpoint": "Copy address",
+    "copied": "Copied to clipboard",
     "docker_containers": "Docker Containers",
     "hold_toast": "Hold for 3 seconds to delete"
   },

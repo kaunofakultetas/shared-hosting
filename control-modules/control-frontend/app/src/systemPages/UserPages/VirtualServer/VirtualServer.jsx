@@ -5,9 +5,10 @@
 //  Header card with the VM icon, id/status, inline rename
 //  (pencil → text field with Enter/Escape), owner + uptime
 //  and the start/stop button, then the container chips and
-//  two tabs: management tool cards (Controls) and the domain
-//  table (Domain Names) — the open tab lives in the URL
-//  (?tab=domains). The data lives in useVirtualServer
+//  three tabs: management tool cards (Controls), the domain
+//  table (Domain Names) and the port forward table (Port
+//  Forwarding) — the open tab lives in the URL (?tab=domains
+//  / ?tab=ports). The data lives in useVirtualServer
 //  (5-second poll; 401 bounces to "/"); until it arrives the
 //  page renders as a skeleton.
 //
@@ -53,6 +54,7 @@ import toast from "react-hot-toast";
 import { useTranslations } from "@/i18n";
 import UsageStats from "@/components/UsageStats/UsageStats";
 import DomainsListTable from "./DomainsListTable/DomainsListTable";
+import PortForwardsListTable from "./PortForwardsListTable/PortForwardsListTable";
 
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
@@ -63,6 +65,7 @@ import CodeIcon from "@mui/icons-material/Code";
 import FolderIcon from "@mui/icons-material/Folder";
 import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import DnsIcon from "@mui/icons-material/Dns";
+import SettingsEthernetIcon from "@mui/icons-material/SettingsEthernet";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/Edit";
@@ -677,12 +680,13 @@ export default function VirtualServerPage({ virtualServerID }) {
 
   const { vmData, startStop, rename } = useVirtualServer(virtualServerID);
 
-  // The open tab lives in the URL (?tab=domains) — it
-  // survives leaving the page and the link is shareable
+  // The open tab lives in the URL (?tab=domains / ?tab=ports)
+  // — it survives leaving the page and the link is shareable
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentTab = searchParams.get('tab') === 'domains' ? 1 : 0;
+  const tabParam = searchParams.get('tab');
+  const currentTab = tabParam === 'ports' ? 2 : tabParam === 'domains' ? 1 : 0;
   const setCurrentTab = (val) =>
-    setSearchParams(val === 1 ? { tab: 'domains' } : {}, { replace: true });
+    setSearchParams(val === 2 ? { tab: 'ports' } : val === 1 ? { tab: 'domains' } : {}, { replace: true });
 
 
   // Nothing to show yet (or the id answered empty)
@@ -743,6 +747,7 @@ export default function VirtualServerPage({ virtualServerID }) {
           >
             <Tab icon={<SettingsIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={t("TABS.controls")} />
             <Tab icon={<DnsIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={t("TABS.domains")} />
+            <Tab icon={<SettingsEthernetIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={t("TABS.portforwards")} />
           </Tabs>
         </div>
 
@@ -754,6 +759,10 @@ export default function VirtualServerPage({ virtualServerID }) {
 
           {currentTab === 1 && (
             <DomainsListTable virtualServerID={virtualServerID} />
+          )}
+
+          {currentTab === 2 && (
+            <PortForwardsListTable virtualServerID={virtualServerID} />
           )}
         </div>
       </div>

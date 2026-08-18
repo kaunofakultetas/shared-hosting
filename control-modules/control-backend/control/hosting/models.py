@@ -160,6 +160,43 @@ class DomainName(models.Model):
 
 
 ############################################################
+# PortForward
+############################################################
+#
+# One public TCP port of a VM. public_port is globally unique
+# (a database constraint — one port can only ever point at
+# one VM) and must live inside the published pool, which the
+# views enforce (the database cannot know the pool). Dies
+# with its VM row (CASCADE); the soft-delete flow still
+# removes forwards explicitly and regenerates the
+# portforwarder Caddyfile.
+#
+# Used by:
+#   - portforward_views — CRUD
+#   - docker_controller.update_portforwarder_config — the
+#     payload
+############################################################
+
+class PortForward(models.Model):
+
+    # Columns
+    virtual_server = models.ForeignKey(VirtualServer, on_delete=models.CASCADE, related_name='port_forwards')
+    public_port = models.IntegerField(unique=True)
+    internal_port = models.IntegerField()
+    description = models.CharField(max_length=100, default='')
+
+    # String representation
+    def __str__(self):
+        return f':{self.public_port} → #{self.virtual_server_id}:{self.internal_port}'
+
+
+
+
+
+
+
+
+############################################################
 # VmUsage
 ############################################################
 #

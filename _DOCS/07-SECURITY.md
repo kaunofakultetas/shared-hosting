@@ -141,6 +141,26 @@ iptables -A FORWARD -s 172.19.2.0/24 -m limit --limit 5/min -j LOG --log-prefix 
 }
 ```
 
+### 3.4 Port Forward Exposure
+
+The 30000-30029 pool exposes user TCP services to the whole internet —
+deliberately, like the HTTP side (user apps carry no geo-block either).
+The containment is structural:
+
+| Control | Implementation |
+|---------|----------------|
+| Bounded pool | Only 100 high ports published; bounds validated by the backend against the SAME env values compose publishes |
+| One port, one VM | `public_port` is database-unique; forwards resolve by (forward id AND VM id) |
+| Per-VM quota | 5 forwards per VM — one server cannot hoard the shared pool |
+| Upstreams by construction | The renderer only ever emits `hosting-users-dind-<id>:<port>` upstreams from integer-coerced values; user text (description) never reaches the config |
+| Off the ephemeral range | The pool sits below the kernel's ephemeral ports (32768-60999), so host outbound connections can never hold a pool port hostage at bind time |
+| Audit trail | Every add/edit/delete writes a RecentActivity row |
+
+Ports without a forward configured refuse connections (nothing listens
+behind the published range). A port whose VM is stopped accepts at the
+proxy and drops on the failed dial — indistinguishable from a dead app,
+which is the honest answer.
+
 ---
 
 ## 4. Container Security

@@ -73,6 +73,8 @@ tags:
     description: VM list and lifecycle control
   - name: DNS
     description: Domain names (vhosts) of a virtual server
+  - name: Port Forwards
+    description: Public TCP ports of a virtual server (the 30000-30029 pool)
   - name: Dashboard
     description: Admin dashboard metrics
   - name: SSH Router
@@ -745,6 +747,176 @@ paths:
 
 
   # ============================================
+  # PORT FORWARDS
+  # ============================================
+  /api/vm/portforward/isvalid:
+    get:
+      tags: [Port Forwards]
+      summary: Live port validation
+      description: |
+        The dialog calls this on every keystroke. Rules: both ports must be
+        integers, the public port inside the published pool
+        (PORTFORWARD_RANGE_START..END, default 30000-30029), the internal
+        port 1-65535, and the public port not taken by any other forward.
+        `portforwardid` is the edit case — the row being edited may keep
+        its own public port.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: publicport, in: query, required: true, schema: { type: integer } }
+        - { name: internalport, in: query, required: true, schema: { type: integer } }
+        - { name: portforwardid, in: query, required: false, schema: { type: integer } }
+      responses:
+        '200':
+          description: The verdict (also 200 for invalid ports)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isvalid: { type: boolean }
+                  error_message: { type: string, example: Port forward is valid }
+        '400':
+          description: Missing publicport or internalport parameter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/vm/portforward/{virtualServerID}:
+    get:
+      tags: [Port Forwards]
+      summary: The VM's port forwards
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: All port forwards of this VM
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PortForward' }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+    post:
+      tags: [Port Forwards]
+      summary: Add a port forward
+      description: |
+        Validates (pool bounds, taken check, the per-VM quota of 5), then
+        pushes the whole forward table to the docker sidecar which rewrites
+        and reloads the portforwarder Caddyfile — INSIDE the request
+        transaction, so a failed push rolls the change back and the two can
+        never diverge.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PortForwardInput' }
+      responses:
+        '200':
+          description: Added and the portforwarder reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [ok] }
+        '400':
+          description: Validation failure, port already taken, or the per-VM quota is reached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+    put:
+      tags: [Port Forwards]
+      summary: Update a port forward
+      description: |
+        Resolved by (forward id AND virtual server id) — a forward id
+        belonging to another VM answers 404 and changes nothing, so one
+        VM's endpoint can never edit another VM's ports.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/PortForwardInput' }
+                - type: object
+                  required: [portforwardid]
+                  properties:
+                    portforwardid: { type: integer }
+      responses:
+        '200':
+          description: Updated and the portforwarder reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [ok] }
+        '400':
+          description: Validation failure or the port is already taken
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: The forward id does not belong to this VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+
+  /api/vm/portforward/{virtualServerID}/{portForwardID}:
+    delete:
+      tags: [Port Forwards]
+      summary: Delete a port forward
+      description: Scoped by (forward id AND virtual server id), like PUT.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: virtualServerID, in: path, required: true, schema: { type: integer } }
+        - { name: portForwardID, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Deleted and the portforwarder reloaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, enum: [ok] }
+        '401':
+          description: No session, foreign VM, unknown VM or deleted VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '404':
+          description: The forward id does not belong to this VM
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReasonError' }
+
+
+
+
+  # ============================================
   # DASHBOARD (admin)
   # ============================================
   /api/dashboard/system:
@@ -1023,6 +1195,18 @@ components:
               domainname: { type: string }
               iscloudflare: { type: integer, enum: [0, 1] }
               ssl: { type: integer, enum: [0, 1] }
+        portforwards:
+          type: array
+          nullable: true
+          description: Like PortForward but without virtualserverid (it is the card's own VM)
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              publichost: { type: string }
+              publicport: { type: integer }
+              internalport: { type: integer }
+              description: { type: string }
         usage:
           type: object
           nullable: true
@@ -1055,3 +1239,21 @@ components:
         domainname: { type: string, description: Stored lowercased }
         iscloudflare: { type: integer, enum: [0, 1] }
         ssl: { type: integer, enum: [0, 1] }
+
+    PortForward:
+      type: object
+      properties:
+        id: { type: integer }
+        virtualserverid: { type: integer }
+        publichost: { type: string, example: knf-hosting.lt, description: The hostname clients connect to — shown next to every port }
+        publicport: { type: integer, example: 30005 }
+        internalport: { type: integer, example: 3000, description: Where the app listens inside the VM }
+        description: { type: string, example: Minecraft }
+
+    PortForwardInput:
+      type: object
+      required: [publicport, internalport]
+      properties:
+        publicport: { type: integer, description: Must live inside the published pool }
+        internalport: { type: integer, description: 1-65535 }
+        description: { type: string, description: Optional label, at most 100 characters }

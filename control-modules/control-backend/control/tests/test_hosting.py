@@ -33,8 +33,9 @@ from control.tests.helpers import (
     post_json,
     put_json,
 )
+from control.hosting.api.portforward_views import PORTFORWARD_PUBLIC_HOST
 from control.hosting.management.commands.monitor_containers import parse_cadvisor_docker, update_vm_usage
-from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, VirtualServer, VmUsage
+from control.hosting.models import DIND_PREFIX, DockerContainer, DomainName, PortForward, VirtualServer, VmUsage
 from control.users.models import RecentActivity
 
 
@@ -148,6 +149,17 @@ class VmListTests(TestCase):
         self.assertEqual(domains, [{'id': domains[0]['id'], 'domainname': 'mano.test.lt',
                                     'iscloudflare': 0, 'ssl': 1}])
 
+    def test_portforwards_attached(self):
+        login(self.client, 'user@test.local', 'test-pass-8')
+
+        # No forwards → null, like stacks and domains
+        self.assertIsNone(self.client.get(f'/api/vm/{self.ownVm.id}').json()['portforwards'])
+
+        PortForward.objects.create(virtual_server=self.ownVm, public_port=30005, internal_port=3000, description='Minecraft')
+        forwards = self.client.get('/api/vm').json()[0]['portforwards']
+        self.assertEqual(forwards, [{'id': forwards[0]['id'], 'publichost': PORTFORWARD_PUBLIC_HOST,
+                                     'publicport': 30005, 'internalport': 3000, 'description': 'Minecraft'}])
+
     def test_single_vm_is_an_object(self):
         login(self.client, 'user@test.local', 'test-pass-8')
         payload = self.client.get(f'/api/vm/{self.ownVm.id}').json()
@@ -260,26 +272,31 @@ class VmControlTests(TestCase):
         self.assertEqual(self.control({'virtualServerID': foreignVm.id, 'action': 'stop'}).status_code, 401)
 
     @patch('control.hosting.api.vm_views.run_in_background', new=RUN_INLINE)
+    @patch('control.hosting.docker_controller.update_portforwarder_config')
     @patch('control.hosting.docker_controller.update_caddy_config')
     @patch('control.hosting.docker_controller.delete_vm', return_value=OK_RESPONSE)
-    def test_delete_accepts_and_tears_down_in_background(self, deleteMock, caddyMock):
+    def test_delete_accepts_and_tears_down_in_background(self, deleteMock, caddyMock, portforwarderMock):
         create_dind_row(self.vm)
         DomainName.objects.create(virtual_server=self.vm, domain_name='dies.test.lt')
+        PortForward.objects.create(virtual_server=self.vm, public_port=30005, internal_port=3000)
 
         response = self.control({'virtualServerID': self.vm.id, 'action': 'delete'})
         self.assertEqual(response.status_code, 202)
 
         self.assertTrue(VirtualServer.objects.get(id=self.vm.id).deleted)
         self.assertFalse(DomainName.objects.filter(virtual_server=self.vm).exists())
+        self.assertFalse(PortForward.objects.filter(virtual_server=self.vm).exists())
         deleteMock.assert_called_once_with(f'{DIND_PREFIX}{self.vm.id}')
-        caddyMock.assert_called_once()   # stale vhosts die with the VM
+        caddyMock.assert_called_once()          # stale vhosts die with the VM
+        portforwarderMock.assert_called_once()  # stale listeners die with the VM
         # The cache rows are deliberately NOT touched here — the
         # monitor prunes them once the container is gone
 
     @patch('control.hosting.api.vm_views.run_in_background', new=RUN_INLINE)
+    @patch('control.hosting.docker_controller.update_portforwarder_config')
     @patch('control.hosting.docker_controller.update_caddy_config')
     @patch('control.hosting.docker_controller.delete_vm', side_effect=requests.ConnectionError)
-    def test_delete_failure_reverts_the_flag(self, deleteMock, caddyMock):
+    def test_delete_failure_reverts_the_flag(self, deleteMock, caddyMock, portforwarderMock):
         response = self.control({'virtualServerID': self.vm.id, 'action': 'delete'})
         self.assertEqual(response.status_code, 202)
 

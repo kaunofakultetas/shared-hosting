@@ -16,6 +16,7 @@
 #  Used by:
 #    - vm_views — create/start/stop/delete
 #    - dns_views + vm_views — update_caddy_config
+#    - portforward_views + vm_views — update_portforwarder_config
 #    - monitor_containers — get_status
 ############################################################
 
@@ -139,5 +140,54 @@ def update_caddy_config():
     }
 
     response = requests.post(f'{BASE_URL}/api/updatecaddyconfig', json=domains, timeout=30)
+    response.raise_for_status()
+    return json.loads(response.text)
+
+
+
+
+
+
+
+
+############################################################
+# update_portforwarder_config
+############################################################
+#
+# Pushes the WHOLE port forward table to the sidecar, which
+# renders the portforwarder Caddyfile and reloads the
+# portforwarder Caddy. Raises on any non-2xx, so callers
+# inside a request transaction get rollback-on-failure — DB
+# and listeners never diverge.
+#
+# The payload is the plain JSON object {"portforwards":
+# [...]} — the sidecar answers 500 when the caddy reload
+# fails, and the raise_for_status below is what turns that
+# into the backend-side transaction rollback. description is
+# deliberately NOT sent: it is user text, and the renderer
+# splices its inputs into config — only integers travel.
+#
+# Used by:
+#   - portforward_views — after every forward change
+#   - vm_views — after a VM delete, so the deleted VM's
+#     forwards die with it
+############################################################
+
+def update_portforwarder_config():
+    from control.hosting.models import PortForward
+
+    portForwards = {
+        'portforwards': [
+            {
+                'id': thisForward.id,
+                'virtualserverid': thisForward.virtual_server_id,
+                'publicport': thisForward.public_port,
+                'internalport': thisForward.internal_port,
+            }
+            for thisForward in PortForward.objects.order_by('id')
+        ]
+    }
+
+    response = requests.post(f'{BASE_URL}/api/updateportforwarderconfig', json=portForwards, timeout=30)
     response.raise_for_status()
     return json.loads(response.text)

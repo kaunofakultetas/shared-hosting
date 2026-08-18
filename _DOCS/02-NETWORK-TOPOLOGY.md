@@ -80,6 +80,7 @@ networks:
 - `hosting-control-caddy` (ports 80, 443, 8443)
 - `hosting-users-caddy` (ports 10080, 10443)
 - `hosting-users-ssh-router` (port 10022)
+- `hosting-users-portforwarder` (ports 30000-30029, IPv4/TCP only)
 - `hosting-users-firewall` (NAT gateway)
 
 ---
@@ -181,6 +182,7 @@ networks:
 | 172.19.2.3 | users-caddy | User app proxy |
 | 172.19.2.4 | dockerhub-cache | Image cache |
 | 172.19.2.5 | ssh-router | SSH access |
+| 172.19.2.6 | users-portforwarder | Public TCP port forwards |
 | 172.19.2.11 | dockersocket | Docker API proxy |
 | 172.19.2.128+ | Virtual servers | Dynamic assignment |
 
@@ -363,7 +365,40 @@ User SSH Client
 └─────────────────┘
 ```
 
-### 5.4 Virtual Server Outbound
+### 5.4 Port Forward Access
+
+```
+External Client (any TCP tool)
+     │
+     │ TCP (:30000-30029)
+     │ via knf-hosting.lt
+     ▼
+┌─────────────────────┐
+│  Router             │
+│ (30000-30029 → same)│
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│ users-portforwarder │
+│ (layer4 TCP proxy)  │
+└──────────┬──────────┘
+           │
+           │ Match port to virtual server + internal port
+           ▼
+┌─────────────────────┐
+│ virtual-server      │
+│ (user's TCP app)    │
+└─────────────────────┘
+```
+
+Each forward is one `layer4` listener in the portforwarder's Caddyfile,
+regenerated from the `hosting_portforward` table on every change (the
+same regenerate-and-reload pattern as the users Caddyfile). The proxy
+terminates the client's TCP connection, so the user's app sees
+172.19.2.6 as the source address — not the real client IP.
+
+### 5.5 Virtual Server Outbound
 
 ```
 Virtual Server Container
@@ -474,6 +509,7 @@ The platform uses two public IP addresses with router-level port forwarding to r
 |---------------|---------------|----------|---------|
 | 80 | 10080 | TCP | HTTP (user apps) |
 | 443 | 10443 | TCP | HTTPS (user apps) |
+| 30000-30029 | 30000-30029 | TCP | User port forwards |
 
 ### 6.4 Docker Host Port Mapping
 
@@ -485,6 +521,17 @@ The platform uses two public IP addresses with router-level port forwarding to r
 | 10080 | users-caddy | 80 | HTTP | User apps (HTTP) |
 | 10443 | users-caddy | 443 | HTTPS | User apps (HTTPS) |
 | 10022 | ssh-router | 2222 | SSH | Terminal access |
+| 30000-30029 | users-portforwarder | 30000-30029 | TCP | User port forwards (IPv4 only) |
+
+The port forward pool is published IPv4-only on purpose — the router
+forwards IPv4, and every published port costs one `docker-proxy` process
+per address family, so skipping IPv6 halves the process count. The pool
+bounds come from `PORTFORWARD_RANGE_START` / `PORTFORWARD_RANGE_END` in
+`.env` (default 30000-30029) — the same values the backend validates
+against, so the API can never assign a port the host does not listen on.
+The pool sits below the Linux ephemeral port range (32768-60999 by
+default), so host outgoing connections can never occupy a pool port —
+keep any custom range outside the ephemeral window too.
 
 ### 6.6 Internal Service Ports
 

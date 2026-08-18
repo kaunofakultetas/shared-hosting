@@ -106,6 +106,14 @@ Table hosting_domainname {
   virtual_server_id integer [not null]
 }
 
+Table hosting_portforward {
+  id integer [pk, increment]
+  public_port integer [unique, not null, note: 'globally unique — one port, one VM; pool bounds live in the views']
+  internal_port integer [not null, note: 'where the app listens inside the VM']
+  description varchar(100) [not null, default: '', note: 'free-text label']
+  virtual_server_id integer [not null]
+}
+
 Table hosting_vmusage {
   id integer [pk, increment]
   cpu_percent float [null, note: 'share of the whole host; NULL while not running']
@@ -127,6 +135,7 @@ Ref: users_recentactivity.user_id > users_systemuser.id [delete: set null]
 Ref: hosting_virtualserver.owner_id > users_systemuser.id [delete: set null]
 Ref: hosting_dockercontainer.parent_server_id > hosting_virtualserver.id [delete: cascade]
 Ref: hosting_domainname.virtual_server_id > hosting_virtualserver.id [delete: cascade]
+Ref: hosting_portforward.virtual_server_id > hosting_virtualserver.id [delete: cascade]
 Ref: hosting_vmusage.virtual_server_id - hosting_virtualserver.id [delete: cascade]
 ```
 
@@ -192,7 +201,19 @@ only ever point at one VM, enforced by the database. Every mutation pushes
 the whole table to the docker sidecar (users-Caddyfile regeneration) inside
 the request transaction, so the Caddyfile and the table can never diverge.
 
-### 3.7 hosting_vmusage — per-VM resource telemetry
+### 3.7 hosting_portforward — public TCP ports
+
+One row per forwarded port. `public_port` is globally unique — one port
+can only ever point at one VM, enforced by the database; the pool bounds
+(`PORTFORWARD_RANGE_START..END`, default 30000-30029) and the per-VM
+quota (5) live in the views, because the database cannot know the
+published range. Every mutation pushes the whole table to the docker
+sidecar (portforwarder Caddyfile regeneration) inside the request
+transaction, so the listeners and the table can never diverge —
+`description` deliberately stays out of that payload (user text never
+reaches the config renderer).
+
+### 3.8 hosting_vmusage — per-VM resource telemetry
 
 One nullable-everything OneToOne beside the VM registry row, written only by
 the monitor: CPU% (share of the whole host) and RAM (working set) from
@@ -201,7 +222,7 @@ and disk from the sidecar's `du` sweep over `SERVERS/<id>` every ~5 minutes.
 NULL means "not measured (yet)". Serialized as the `usage` object on
 `/api/vm`; dies with its VM row (CASCADE).
 
-### 3.8 Django infrastructure
+### 3.9 Django infrastructure
 
 `django_session` (server-side sessions; the cookie holds only the key) and
 `django_migrations` (applied-migration bookkeeping). There are no `auth_*`
@@ -215,8 +236,9 @@ hand-rolled in `control/common/auth.py`.
 | You delete... | What happens |
 |---|---|
 | A user | Code dies (CASCADE); activity + soft-deleted VMs detach (SET_NULL); refused while non-deleted VMs exist |
-| A VM (soft) | `deleted=true`; domains removed explicitly + users Caddyfile regenerated; cache rows removed; ID stays claimed forever |
+| A VM (soft) | `deleted=true`; domains and port forwards removed explicitly + both Caddyfiles regenerated; cache rows removed; ID stays claimed forever |
 | A domain | Row removed; users Caddyfile regenerated in the same transaction |
+| A port forward | Row removed; portforwarder Caddyfile regenerated in the same transaction |
 | A container (real world) | The monitor prunes its cache row on the next pass (or the 5-minute sweep) |
 
 ---

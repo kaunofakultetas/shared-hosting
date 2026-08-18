@@ -78,6 +78,29 @@ services:
 
 
 
+  # Users servers public TCP port forwarding endpoint (L4 proxy)
+  hosting-users-portforwarder:
+    container_name: hosting-users-portforwarder
+    image: vuknf/caddy-l4:2.11
+    user: 1000:1000
+    runtime: sysbox-runc
+    read_only: true
+    volumes:
+      - ./_DATA/users-portforwarder/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./_DATA/users-portforwarder/caddy_data:/data
+      - ./_DATA/users-portforwarder/caddy_config:/config
+    ports:
+      # IPv4-only on purpose (the router forwards IPv4) — the
+      # 0.0.0.0 prefix halves the docker-proxy process count
+      - "0.0.0.0:${PORTFORWARD_RANGE_START:-30000}-${PORTFORWARD_RANGE_END:-30029}:${PORTFORWARD_RANGE_START:-30000}-${PORTFORWARD_RANGE_END:-30029}/tcp"
+    networks:
+      external: {}
+      filtered-users:
+        ipv4_address: 172.19.2.6
+    restart: unless-stopped
+
+
+
   # Exit container for Docker Hub API access (L4 SNI proxy)
   hosting-control-backend-exit:
     container_name: hosting-control-backend-exit
@@ -156,6 +179,10 @@ services:
       - DOCKER_CONTROLLER_HOST=hosting-control-docker
       - DOCKER_CONTROLLER_PORT=8000
 
+      - PORTFORWARD_RANGE_START=${PORTFORWARD_RANGE_START:-30000}
+      - PORTFORWARD_RANGE_END=${PORTFORWARD_RANGE_END:-30029}
+      - PORTFORWARD_PUBLIC_HOST=knf-hosting.lt
+
       - BACKEND_SSH_API_KEY=${BACKEND_SSH_API_KEY}
     tmpfs:
       - /tmp/backend:uid=1000,gid=1000
@@ -207,6 +234,9 @@ services:
 
       # Users apps caddy config
       - ./_DATA/users-caddy:/users-caddy
+
+      # Users port forwarder caddy config
+      - ./_DATA/users-portforwarder:/users-portforwarder
 
       # Docker socket for controlling docker containers
       - /var/run/docker.sock:/var/run/docker.sock

@@ -21,7 +21,8 @@
   },
   "TABS": {
     "controls": "Valdymas",
-    "domains": "Domenų vardai"
+    "domains": "Domenų vardai",
+    "portforwards": "Prievadų peradresavimas"
   },
   "CONTROLS": {
     "intro": "Valdykite savo virtualų serverį šiais įrankiais:",
@@ -40,6 +41,29 @@
     "yes": "Taip",
     "no": "Ne",
     "insert_new": "Pridėti naują"
+  },
+  "PORTFORWARDS_TABLE": {
+    "id": "ID",
+    "publicendpoint": "Viešas adresas",
+    "internalport": "Serverio prievadas",
+    "description": "Aprašymas",
+    "insert_new": "Pridėti naują",
+    "copy": "Kopijuoti adresą",
+    "copied": "Nukopijuota"
+  },
+  "PORTFORWARD_MODAL": {
+    "title": "Prievado peradresavimas",
+    "publicport": "Viešas prievadas",
+    "internalport": "Serverio prievadas",
+    "description": "Aprašymas (nebūtinas)",
+    "save": "Išsaugoti",
+    "create": "Sukurti",
+    "delete": "Ištrinti",
+    "hold_to_delete": "Laikykite 3 sekundes, kad ištrintumėte",
+    "created": "Peradresavimas sukurtas",
+    "updated": "Peradresavimas atnaujintas",
+    "deleted": "Peradresavimas ištrintas",
+    "error": "Klaida: {message}"
   },
   "DOMAIN_MODAL": {
     "title": "Domeno vardas",

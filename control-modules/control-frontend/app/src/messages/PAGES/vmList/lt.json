@@ -27,6 +27,9 @@
     "unnamed": "Serveris be pavadinimo",
     "domain_names": "Domenų vardai",
     "open_new_tab": "Atidaryti naujame skirtuke",
+    "port_forwards": "Prievadų peradresavimas",
+    "copy_endpoint": "Kopijuoti adresą",
+    "copied": "Nukopijuota",
     "docker_containers": "Docker konteineriai",
     "hold_toast": "Laikykite 3 sekundes, kad ištrintumėte"
   },

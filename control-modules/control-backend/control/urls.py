@@ -62,19 +62,21 @@ urlpatterns += [
 
 
 ############################################################
-# Hosting — virtual servers, domains, SSH router
+# Hosting — virtual servers, domains, ports, SSH router
 ############################################################
 #
 # The VM list/detail, the control actions proxied to the
 # docker sidecar, the domain CRUD that regenerates the users
-# Caddyfile, and the shared-secret endpoint the external SSH
-# router calls to route server<N> logins.
+# Caddyfile, the port forward CRUD that regenerates the
+# portforwarder Caddyfile, and the shared-secret endpoint the
+# external SSH router calls to route server<N> logins.
 #
 # Views live in control/hosting/api/.
 ############################################################
 
 from control.hosting.api.vm_views import vm_list, vm_control
 from control.hosting.api.dns_views import dns_isvalid, vm_dns
+from control.hosting.api.portforward_views import portforward_isvalid, vm_portforward
 from control.hosting.api.sshrouter_views import sshrouter
 
 urlpatterns += [
@@ -85,6 +87,10 @@ urlpatterns += [
     path('api/vm/dns/isvalid', dns_isvalid),                                # GET  — live domain-name validation
     path('api/vm/dns/<int:virtualServerID>', vm_dns),                       # GET list / POST add / PUT edit
     path('api/vm/dns/<int:virtualServerID>/<int:domainID>', vm_dns),        # DELETE — one domain
+
+    path('api/vm/portforward/isvalid', portforward_isvalid),                # GET  — live public/internal port validation
+    path('api/vm/portforward/<int:virtualServerID>', vm_portforward),       # GET list / POST add / PUT edit
+    path('api/vm/portforward/<int:virtualServerID>/<int:portForwardID>', vm_portforward),   # DELETE — one forward
 
     path('api/sshrouter', sshrouter),                                       # POST — shared-secret; upstream data for server<N> logins
 ]

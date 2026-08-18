@@ -21,7 +21,8 @@
   },
   "TABS": {
     "controls": "Controls",
-    "domains": "Domain Names"
+    "domains": "Domain Names",
+    "portforwards": "Port Forwarding"
   },
   "CONTROLS": {
     "intro": "Manage your virtual server with these tools:",
@@ -40,6 +41,29 @@
     "yes": "Yes",
     "no": "No",
     "insert_new": "Insert New"
+  },
+  "PORTFORWARDS_TABLE": {
+    "id": "ID",
+    "publicendpoint": "Public endpoint",
+    "internalport": "Server port",
+    "description": "Description",
+    "insert_new": "Insert New",
+    "copy": "Copy address",
+    "copied": "Copied to clipboard"
+  },
+  "PORTFORWARD_MODAL": {
+    "title": "Port Forward",
+    "publicport": "Public port",
+    "internalport": "Server port",
+    "description": "Description (optional)",
+    "save": "Save",
+    "create": "Create",
+    "delete": "Delete",
+    "hold_to_delete": "Hold for 3 seconds to delete",
+    "created": "Port forward created",
+    "updated": "Port forward updated",
+    "deleted": "Port forward deleted",
+    "error": "Error: {message}"
   },
   "DOMAIN_MODAL": {
     "title": "Domain Name",
