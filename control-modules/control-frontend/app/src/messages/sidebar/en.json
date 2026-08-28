@@ -11,6 +11,7 @@
   },
   "ADMIN": {
     "TITLE": "ADMIN",
+    "filebrowser-teachers": "File Dropbox",
     "users": "Users",
     "database": "Database",
     "api_documentation": "API Documentation"

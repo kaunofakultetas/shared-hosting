@@ -11,6 +11,7 @@
   },
   "ADMIN": {
     "TITLE": "ADMINISTRAVIMAS",
+    "filebrowser-teachers": "Failų Dropbox'as",
     "users": "Naudotojai",
     "database": "Duomenų bazė",
     "api_documentation": "API dokumentacija"

@@ -65,6 +65,7 @@ import ImportContactsIcon from '@mui/icons-material/ImportContacts';
 import ExtensionIcon from '@mui/icons-material/Extension';
 
 // ADMIN
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import StorageIcon from '@mui/icons-material/Storage';
 import ApiIcon from '@mui/icons-material/Api';
@@ -135,13 +136,14 @@ const SECTIONS = [
     title: "INFORMATION.TITLE",
     items: [
       { href: "/docs", icon: ImportContactsIcon, label: "INFORMATION.documentation", external: true },
-      { href: "https://awesome-docker-compose.com/apps", icon: ExtensionIcon, label: "INFORMATION.examples", external: true },
+      { href: "https://awesome-docker-compose.com", icon: ExtensionIcon, label: "INFORMATION.examples", external: true },
     ],
   },
   {
     title: "ADMIN.TITLE",
     adminOnly: true,
     items: [
+      { href: "/filebrowser-teachers", icon: UploadFileIcon, label: "ADMIN.filebrowser-teachers", external: true },
       { href: "/admin/users", icon: PersonOutlineIcon, label: "ADMIN.users" },
       { href: "/dbgate", icon: StorageIcon, label: "ADMIN.database", external: true },
       { href: "/swagger", icon: ApiIcon, label: "ADMIN.api_documentation", external: true },

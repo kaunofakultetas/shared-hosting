@@ -3,7 +3,6 @@
 ################## HOSTING MODULES DATA DIRECTORIES AND FILES ###########################
 # Control backend database
 mkdir -p _DATA/control-backend
-
 mkdir -p _LOGS/control-backend
 
 
@@ -11,6 +10,10 @@ mkdir -p _LOGS/control-backend
 mkdir -p _DATA/control-docs/app_data
 mkdir -p _DATA/control-docs/db_data
 sudo chown -R 1000:1000 _DATA/control-docs
+
+
+# Create Dropbox directory
+mkdir -p _DATA/control-filebrowser-teachers
 
 
 # Create control-caddy directories

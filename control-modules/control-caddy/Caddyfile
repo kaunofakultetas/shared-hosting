@@ -101,7 +101,11 @@
 
 
 
+
         import geo_block_non_vu
+
+
+
 
         ####### DBGate Endpoint #######
         redir /dbgate /dbgate/
@@ -114,6 +118,23 @@
                 header_up Authorization "Basic {env.DBGATE_AUTH_HEADER}"
             }
         }
+
+
+
+
+        ####### Teachers Filebrowser Endpoint #######
+        redir /filebrowser-teachers /filebrowser-teachers/
+        handle /filebrowser-teachers/* {
+            forward_auth hosting-control-backend:8000 {
+                uri /api/checkauth/admin
+            }
+            reverse_proxy hosting-control-filebrowser-teachers:80 {
+                header_up X-Forwarded-For {remote_host}
+            }
+        }
+
+
+
 
         ####### Docs Endpoint #######
         handle_path /docs* {
@@ -132,6 +153,9 @@
             }
         }
 
+
+
+
         ####### API Endpoint #######
         handle /api/* {
             reverse_proxy hosting-control-backend:8000 {
@@ -139,12 +163,19 @@
             }
         }
 
+
+
+
         ####### Frontend Endpoint #######
         handle {
             reverse_proxy hosting-control-frontend:80 {
                 header_up X-Forwarded-For {remote_host}
             }
         }
+
+
+
+
     }
 }
 
