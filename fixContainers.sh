@@ -92,7 +92,7 @@ LOG_DIR="$SCRIPT_DIR/_LOGS/fixContainers/$(date +'%Y%m%d-%H%M%S')"
 # to 65535, every other id stays as it is.
 #
 # Used by:
-#   - shift_upper_back (below)
+#   - shift_upper_back, upper_is_shifted (below)
 ############################################################
 
 unshift() {
@@ -287,12 +287,16 @@ shift_upper_back() {
 # upper_is_shifted
 ############################################################
 #
-# True when any path in a stopped container's upper layer
-# still carries an id from the sysbox range or the wrapped
-# one, i.e. nobody reverted it after the last run. Every
-# path counts, not just the layer's root, so a shift-back
-# that was cut off half-way is still seen as stuck and a
-# rerun finishes it; find stops at the first hit.
+# True when a stopped container's upper layer is still
+# shifted, judged the way sysbox-runc judges it at the next
+# start: by the owner of the layer's root directory. Paths
+# below the root don't count. After a clean stop sysbox
+# leaves the content of its own special dirs shifted in the
+# layer (/var/lib/docker when it is not a bind mount, and
+# the kubelet, k3s, rke2 and buildkit dirs), which is normal
+# and was seen with Sysbox 0.7.1. A shift-back that was cut
+# off half-way still counts as stuck, because
+# shift_upper_back moves the root last.
 #
 # Used by:
 #   - assess (below) — stopped containers
@@ -302,7 +306,9 @@ shift_upper_back() {
 ############################################################
 
 upper_is_shifted() {
-    [ -n "$(sudo find "$1" -xdev \( "${IN_RANGE[@]}" \) -print -quit 2> /dev/null)" ]
+    local u g
+    read -r u g < <(sudo stat -c '%u %g' "$1" 2> /dev/null) || return 1
+    [ "$(unshift "$u")" != "$u" ] || [ "$(unshift "$g")" != "$g" ]
 }
 
 
