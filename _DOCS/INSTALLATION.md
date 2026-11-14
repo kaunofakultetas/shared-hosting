@@ -25,6 +25,8 @@ sudo dpkg -i sysbox-ce_0.6.7.linux_amd64.deb
 rm sysbox-ce_0.6.7.linux_amd64.deb
 ```
 
+To upgrade Sysbox later on a host that already has VMs, run `./upgradeSysbox.sh` instead (first with `--check`, which causes no downtime). It upgrades with Docker stopped, so no VM is lost. With Docker running, the Sysbox installer restarts sysbox under the running VMs. If `daemon.json` has no `bip` entry, it even refuses to install and suggests `docker rm` for every container, which would delete all VMs.
+
 <br>
 
 ### 4. Docker Configuration
