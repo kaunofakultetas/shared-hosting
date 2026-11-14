@@ -306,6 +306,24 @@ services:
   # ------------------------------------------------------------
   #                    Administrator Services
   # ------------------------------------------------------------
+  # Filebrowser for teachers
+  hosting-control-filebrowser-teachers:
+    container_name: hosting-control-filebrowser-teachers
+    image: vuknf/filebrowser-noauth:v2.63.23
+    user: 1000:1000
+    read_only: false
+    volumes:
+      # Filebrowser Configuration
+      - ./control-modules/control-filebrowser-teachers/settings.json:/config/settings.json:ro
+
+      # Filebrowser Root Directory
+      - ./_DATA/control-filebrowser-teachers:/data
+    networks:
+      - isolated-control-panel
+    restart: unless-stopped
+
+
+
   # Database Browser
   hosting-control-dbgate:
     container_name: hosting-control-dbgate
