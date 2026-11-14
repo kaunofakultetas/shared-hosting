@@ -613,6 +613,26 @@ docker exec hosting-users-dind-{id} df -h
 docker exec hosting-users-dind-{id} docker system df
 ```
 
+### 11.4 Image Files Owned by `nobody` (SSH: "no hostkeys available")
+
+**Symptom**: SSH into the VM fails. Inside the VM, `ssh.service` fails with `sshd: no hostkeys available`, nothing can be installed into `/usr`, and `sudo` is setuid-nobody. `ls -ln /usr/bin` inside the VM shows the owner `65534`.
+
+**Cause**: sysbox-mgr chowns each VM's overlayfs upper layer from `0` to `165536` at start and back at stop, but it keeps that record only in memory. If sysbox restarts while VMs are running (on 2026-11-14 that was needrestart, after a libc upgrade) or the host crashes, the revert is skipped. On the next start sysbox-runc sees a rootfs that is already owned by the VM's root, so it skips ID-mapping the image layers. From then on every image file shows up as `nobody:nogroup` on every restart.
+
+**Check / fix** (run it as your normal user, without sudo; the script calls sudo itself):
+```bash
+# List stuck VMs (changes nothing)
+./fixContainers.sh --dry-run
+
+# Heal one VM: stop it, shift its upper layer back, start it
+./fixContainers.sh {id}
+
+# Heal every stuck VM
+./fixContainers.sh
+```
+
+Prevention is covered in [INSTALLATION.md §5.1](INSTALLATION.md).
+
 ---
 
 ## Next Document

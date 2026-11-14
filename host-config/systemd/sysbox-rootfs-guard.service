@@ -1,0 +1,39 @@
+############################################################
+#  [*] sysbox-rootfs-guard — shift stuck sysbox rootfs layers
+#      back before docker starts
+#
+#  Runs fixContainers.sh --boot ahead of every start of
+#  docker.service: at boot, and on every docker restart or
+#  upgrade. With docker down no container runs, so a sysbox
+#  container whose overlayfs upper layer still carries ids
+#  from the sysbox range missed sysbox-mgr's revert (host
+#  crash, power loss, sysbox restarted under the VMs) and
+#  would start with its image owned by nobody; the guard
+#  shifts those layers back first and logs every change to
+#  _LOGS/fixContainers/.
+#
+#  It never blocks docker: docker.service only wants it, so a
+#  failed or timed-out run still lets docker start, and a run
+#  cut off half-way leaves the layer's root untouched, which
+#  sysbox reads as "already shifted" — that VM stays stuck
+#  until the next run instead of being shifted twice.
+#
+#  The paths assume the stack lives in /home/aula/apps/students.
+#  Installed as /etc/systemd/system/sysbox-rootfs-guard.service
+#  and enabled, which hooks it into docker.service.wants.
+############################################################
+
+[Unit]
+Description=Shift stuck sysbox container rootfs layers back before docker starts
+Documentation=file:///home/aula/apps/students/fixContainers.sh
+After=local-fs.target
+Before=docker.service
+RequiresMountsFor=/var/lib/docker /home/aula/apps/students
+
+[Service]
+Type=oneshot
+ExecStart=/home/aula/apps/students/fixContainers.sh --boot
+TimeoutStartSec=10min
+
+[Install]
+WantedBy=docker.service

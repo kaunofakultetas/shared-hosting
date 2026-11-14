@@ -67,6 +67,26 @@ cd shared-hosting
 
 <br>
 
+### 5.1 Sysbox Host Hardening
+sysbox-mgr chowns each VM's rootfs upper layer when the VM starts and reverts it when the VM stops, but it remembers this only in memory. If sysbox restarts while VMs are running, or the host crashes, the revert is skipped. The VM then comes up on its next start with every image file owned by `nobody:nogroup`: SSH fails with `no hostkeys available`, and apt and sudo break. See the header of `fixContainers.sh` for the details. Two host-level pieces prevent this.
+
+Stop unattended upgrades from restarting sysbox. Otherwise every libc, dash or coreutils upgrade restarts it through needrestart:
+```bash
+sudo install -m 0644 host-config/needrestart/sysbox.conf /etc/needrestart/conf.d/sysbox.conf
+```
+
+Install the boot guard. Before every docker start it shifts back the rootfs layers that sysbox-mgr failed to revert:
+```bash
+sudo install -m 0644 host-config/systemd/sysbox-rootfs-guard.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable sysbox-rootfs-guard.service
+```
+The unit assumes the stack lives in `/home/aula/apps/students`. Adjust its paths if it doesn't.
+
+Never restart sysbox while sysbox containers are running. Stop them first, or reboot. VMs that are already affected are healed by `./fixContainers.sh`; with `--dry-run` it only lists the stuck VMs.
+
+<br>
+
 ### 6. Port Forwarding Configuration
 Configure port forwarding on your router to route traffic from two public IP addresses to the Docker host.
 
