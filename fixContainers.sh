@@ -403,6 +403,44 @@ wait_for_unregister() {
 
 
 ############################################################
+# wait_for_boot
+############################################################
+#
+# Waits up to 180 seconds for the systemd inside a freshly
+# started VM to finish booting: "running", or "degraded"
+# when one of the student's units failed. It polls rather
+# than using systemctl --wait, because right after docker
+# start systemd isn't reachable yet and systemctl gives up
+# at once instead of waiting — the VMs need about 4 seconds
+# to boot, and sshd's socket is not listening before that.
+# Containers whose PID 1 is not systemd have nothing to wait
+# for.
+#
+# Used by:
+#   - heal_running (below)
+############################################################
+
+wait_for_boot() {
+    local name=$1 state
+    [ "$(sudo docker exec "$name" cat /proc/1/comm 2> /dev/null)" = systemd ] || return 0
+    for _ in $(seq 90); do
+        state=$(sudo docker exec "$name" systemctl is-system-running 2> /dev/null)
+        case $state in
+            running|degraded) return 0 ;;
+        esac
+        sleep 2
+    done
+    return 1
+}
+
+
+
+
+
+
+
+
+############################################################
 # open_log_dir
 ############################################################
 #
@@ -489,8 +527,9 @@ heal_running() {
         return 1
     fi
 
-    # "degraded" ends the wait too: one failed unit of a student must not hang the heal
-    sudo timeout 180 docker exec "$name" systemctl is-system-running --wait > /dev/null 2>&1
+    if ! wait_for_boot "$name"; then
+        echo "  WARNING: systemd inside the VM had not finished booting after 180s, checking anyway"
+    fi
 
 
     # STEP 4: verify from inside the VM
@@ -503,11 +542,16 @@ heal_running() {
     echo "  ✓ Image layers are ID-mapped (files of the image are owned by root again)"
 
     # sshd is socket-activated: only a connection starts ssh.service (which also creates
-    # /run/sshd, so a bare sshd -t fails before that) and makes it load the host keys
+    # /run/sshd, so a bare sshd -t fails before that) and makes it load the host keys;
+    # the retries cover a boot that wait_for_boot gave up on
     if sudo docker exec "$name" systemctl cat ssh.socket > /dev/null 2>&1; then
-        banner=$(sudo docker exec "$name" timeout 10 bash -c 'exec 3<>/dev/tcp/127.0.0.1/22; head -c 7 <&3' 2> /dev/null)
+        for _ in $(seq 10); do
+            banner=$(sudo docker exec "$name" timeout 10 bash -c 'exec 3<>/dev/tcp/127.0.0.1/22; head -c 7 <&3' 2> /dev/null)
+            [ "$banner" = "SSH-2.0" ] && break
+            sleep 3
+        done
         if [ "$banner" != "SSH-2.0" ]; then
-            echo "  FAILED: sshd does not answer on port 22 inside the VM"
+            echo "  FAILED: sshd does not answer on port 22 inside the VM (tried for 30s)"
             return 1
         fi
         echo "  ✓ sshd answers on port 22 inside the VM"
